@@ -140,6 +140,12 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
 
 ### SEC-05 — Access-request approval grants department admin in other orgs · Tenant isolation · S · [BAD-132](https://linear.app/baddley/issue/BAD-132)
 
+> **Status: done (12 Nov 2026), on `staging`.** What shipped:
+> - On creation, `requestedDepartmentIds` must be valid ids of departments in that organization, and `volunteerNeedId` must be one of its needs; anything else gets 400.
+> - Approval filters again, so requests stored before this fix can't grant foreign departments.
+> - The role change and department grants now run in one transaction.
+> - Test in `tests/http/voluntime-feedback.test.mjs`: a cross-org request is refused, and a planted legacy request with a foreign department grants nothing when approved.
+
 - **Where:** `src/lib/api/features/access-requests.ts` 70–80 (parse), 112–122 (stored without checks), and 222–231 (approval upserts `DepartmentMembership` with role ADMIN for every ID).
 - **Problem:** A volunteer in org B creates org A, files an access request in A listing B's department IDs, and approves it themselves. They become a department ADMIN in org B.
 - **Fix:**

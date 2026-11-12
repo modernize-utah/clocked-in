@@ -9,6 +9,7 @@ import {
   identity,
   label,
   logIn,
+  queryDatabase,
   signUp,
   suite,
   joinOrg,
@@ -101,6 +102,34 @@ describe("voluntime feedback", suite, () => {
     });
     assert.equal(decided.status, 200, decided.text);
     assert.equal(decided.json.status, "approved");
+  });
+
+  test("an access request cannot grant another organization's departments", async () => {
+    const attacker = await signUp("vtfcross");
+    const victimGroup = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/departments`, {
+      name: label("Victim group"),
+    });
+    const ownOrg = await createJson(attacker.accessToken, "/organizations", { name: label("Attacker org") });
+    const refused = await callApi(`/organizations/${ownOrg.id}/access-requests`, {
+      method: "POST",
+      token: attacker.accessToken,
+      body: { requestedDepartmentIds: [victimGroup.id] },
+    });
+    assertError(refused, 400, "validation_error", "requestedDepartmentIds must be departments of this organization.");
+
+    const planted = await queryDatabase(
+      `INSERT INTO "AccessRequest" ("id", "organizationId", "userId", "requestedDepartmentIds", "status")
+       VALUES (gen_random_uuid(), $1::uuid, $2::uuid, $3::jsonb, 'pending') RETURNING "id"`,
+      [ownOrg.id, attacker.user.id, JSON.stringify([victimGroup.id])],
+    );
+    const approved = await callApi(`/organizations/${ownOrg.id}/access-requests/${planted.rows[0].id}`, {
+      method: "PATCH",
+      token: attacker.accessToken,
+      body: { status: "approved" },
+    });
+    assert.equal(approved.status, 200, approved.text);
+    const members = await callApi(`/departments/${victimGroup.id}/memberships`, { token: ctx.admin.accessToken });
+    assert.equal(members.json.items.some((item) => item.userId === attacker.user.id), false);
   });
 
   test("archives a project and keeps it out of placement lookups", async () => {

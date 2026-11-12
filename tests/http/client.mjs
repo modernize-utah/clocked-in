@@ -534,6 +534,11 @@ async function withDatabase(run) {
   }
 }
 
+/** Runs one SQL statement, for tests that must plant rows the API would refuse. */
+export async function queryDatabase(sql, params = []) {
+  return withDatabase((client) => client.query(sql, params));
+}
+
 export async function grantSuperAdmin(userId) {
   await withDatabase(async (client) => {
     const result = await client.query('UPDATE "User" SET "isSuperAdmin" = true WHERE id = $1::uuid', [userId]);
