@@ -94,7 +94,7 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
 >   - Reset confirm: 30 failures per IP in 15 minutes.
 >   - Reset request and sign-up: 20 per IP per hour.
 > - The IP is the Vercel-set `x-forwarded-for`. Loopback and private addresses are skipped, so local runs aren't limited.
-> - Migration `20261112210000_auth_rate_limits` was applied to staging, together with the two 5 Nov migrations staging was still missing. **Production is also missing `20261105180000_paid_rates` and `20261105181000_paid_in_kind_zero`**, which `main` already needs, so run `db:deploy` for production before the next release.
+> - Migration `20261112210000_auth_rate_limits` was applied to staging, together with the two 5 Nov migrations staging was still missing. All three were applied to production on 12 Nov 2026, before this change was released to `main`.
 > - Deferred: making the reset request `POST` (the mobile app uses `GET`), 32-byte link tokens, and identical sign-up responses for taken emails. The last needs the email verification from SEC-04.
 > - Tests in `tests/http/auth.test.mjs`: five wrong guesses retire a code, ten wrong passwords lock a username, and the per-IP limit on reset confirmations.
 
@@ -205,7 +205,7 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
 ### REPO-01 — Credentials and personal data tracked in git · Security, hygiene · S · [BAD-135](https://linear.app/baddley/issue/BAD-135)
 
 > **Status: partly done (12 Nov 2026), on `staging`. Owner decisions needed.**
-> - **The GitHub repository `jbaddley/clocked-in` is public.** Everything below, including the real-name workbook, client feedback PDFs and the project brief in `docs/base/`, has been readable by anyone and stays in git history.
+> - **The GitHub repository (moved to `modernize-utah/clocked-in` on 12 Nov 2026) is public.** Everything below, including the real-name workbook, client feedback PDFs and the project brief in `docs/base/`, has been readable by anyone and stays in git history.
 > - Done:
 >   - Deleted `Untitled`. Its Azure SQL string had only a placeholder password (`YOUR_PASSWORD`), so no live secret leaked, just the host and user.
 >   - Deleted `scripts/diag-add-person.mjs`.
