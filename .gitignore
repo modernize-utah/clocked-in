@@ -53,3 +53,6 @@ next-env.d.ts
 # feature workflow (local only)
 .workflows/
 .worktrees/
+
+# real volunteer names; keep a local copy only (see README)
+/docs/base/2026 Volunteer Hours.xlsx

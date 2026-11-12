@@ -204,6 +204,20 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
 
 ### REPO-01 — Credentials and personal data tracked in git · Security, hygiene · S · [BAD-135](https://linear.app/baddley/issue/BAD-135)
 
+> **Status: partly done (12 Nov 2026), on `staging`. Owner decisions needed.**
+> - **The GitHub repository `jbaddley/clocked-in` is public.** Everything below, including the real-name workbook, client feedback PDFs and the project brief in `docs/base/`, has been readable by anyone and stays in git history.
+> - Done:
+>   - Deleted `Untitled`. Its Azure SQL string had only a placeholder password (`YOUR_PASSWORD`), so no live secret leaked, just the host and user.
+>   - Deleted `scripts/diag-add-person.mjs`.
+>   - Stopped tracking `docs/base/2026 Volunteer Hours.xlsx` and added it to `.gitignore`. A copy is at `~/code/clocked-in-private/`, because pulling this change removes the file from a checkout. The seed reads `CASWJ_WORKBOOK_PATH` or the old path.
+>   - The `dworkman` seed account now gets a random temporary password, printed once, instead of the hard-coded `dworkman_temp`.
+> - Still open, for the owner:
+>   1. Make the repository private.
+>   2. Decide whether to rewrite history (for example with `git filter-repo`) to purge the workbook and PDFs.
+>   3. Decide whether the client PDFs and brief belong in the repo.
+>   4. Confirm the Azure SQL server `clocked-in.database.windows.net` is decommissioned.
+>   5. If any database was seeded with `dworkman_temp` and that account has never signed in, change its password.
+
 - **Where:**
   - `Untitled` at the repo root: an Azure SQL connection string with host `clocked-in.database.windows.net` and user `init_admin`.
   - `docs/base/2026 Volunteer Hours.xlsx`: real names (the README says so).

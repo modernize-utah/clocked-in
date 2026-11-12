@@ -1,1 +1,0 @@
-DATABASE_URL="sqlserver://clocked-in.database.windows.net:1433;database=clocked-in;user=init_admin;password=YOUR_PASSWORD;encrypt=true;trustServerCertificate=false;"

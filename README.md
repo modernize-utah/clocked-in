@@ -71,7 +71,7 @@ npm run db:seed:caswj
 npm run db:seed:caswj:anon
 ```
 
-`db:seed:caswj` imports `docs/base/2026 Volunteer Hours.xlsx` (real names) and is **local-only**. It no-ops on staging/production unless `SEED_ALLOW_REAL_NAMES=1`. Staging uses the anonymized Clockify sample. The Playwright golden suite (`tests/e2e/caswj-hours.spec.ts`) needs that named local seed and must never run against production. Production e2e is the read-only cache-bust crawl.
+`db:seed:caswj` imports `docs/base/2026 Volunteer Hours.xlsx` (real names) and is **local-only**. The workbook is not in git: get a copy from the project owner and put it at that path, or set `CASWJ_WORKBOOK_PATH`. When the seed creates the `dworkman` admin it prints a one-time `dworkmanTemporaryPassword`. It no-ops on staging/production unless `SEED_ALLOW_REAL_NAMES=1`. Staging uses the anonymized Clockify sample. The Playwright golden suite (`tests/e2e/caswj-hours.spec.ts`) needs that named local seed and must never run against production. Production e2e is the read-only cache-bust crawl.
 
 ## MCP and API reference
 

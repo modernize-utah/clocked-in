@@ -158,6 +158,7 @@ async function main() {
     });
 
     let dworkmanStatus = "skipped";
+    let dworkmanPassword: string | null = null;
     if (!anon) {
     const dworkmanByUsername = await db.user.findUnique({ where: { username: "dworkman" } });
     const dworkmanByEmail = await db.user.findUnique({ where: { email: "volunteer@wjarts.org" } });
@@ -166,6 +167,7 @@ async function main() {
     }
 
     const dworkmanExisting = dworkmanByUsername ?? dworkmanByEmail;
+    dworkmanPassword = dworkmanExisting ? null : randomBytes(12).toString("base64url");
     const dworkman = dworkmanExisting
       ? await db.user.update({
           where: { id: dworkmanExisting.id },
@@ -175,7 +177,7 @@ async function main() {
           data: {
             username: "dworkman",
             email: "volunteer@wjarts.org",
-            passwordHash: await bcrypt.hash("dworkman_temp", 12),
+            passwordHash: await bcrypt.hash(dworkmanPassword!, 12),
             mustChangePassword: true,
             profile: { create: { firstName: "Dillon", lastName: "Workman", displayName: "Dillon Workman" } },
           },
@@ -506,6 +508,7 @@ async function main() {
           themeId: theme.id,
           themeName: theme.name,
           dworkman: dworkmanStatus,
+          ...(dworkmanPassword ? { dworkmanTemporaryPassword: dworkmanPassword } : {}),
           created,
           skipped,
           entries: totals._count._all,
