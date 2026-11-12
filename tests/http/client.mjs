@@ -676,4 +676,26 @@ export async function acceptInvite(token, email) {
   return response.json;
 }
 
+/** Adds an existing account to an organization the way people join: invite, then accept. */
+export async function joinOrg(adminToken, organizationId, person, { role = "MEMBER", departmentIds, managedDepartmentIds } = {}) {
+  await createJson(adminToken, `/organizations/${organizationId}/invitations`, {
+    email: person.email,
+    role,
+    firstName: person.firstName,
+    lastName: person.lastName,
+  });
+  const accepted = await acceptInvite(person.accessToken, person.email);
+  let membership = accepted.organizationMembership;
+  if (departmentIds || managedDepartmentIds) {
+    const response = await callApi(`/organizations/${organizationId}/memberships/${membership.id}`, {
+      method: "PATCH",
+      token: adminToken,
+      body: { ...(departmentIds ? { departmentIds } : {}), ...(managedDepartmentIds ? { managedDepartmentIds } : {}) },
+    });
+    assertStatus(response, 200);
+    membership = response.json;
+  }
+  return membership;
+}
+
 export const suite = { concurrency: false, timeout: 180_000 };

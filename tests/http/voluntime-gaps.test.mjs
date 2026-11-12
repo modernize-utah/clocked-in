@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { before, describe, test } from "node:test";
-import { callApi, createJson, label, signUp, suite } from "./client.mjs";
+import { callApi, createJson, joinOrg, label, signUp, suite } from "./client.mjs";
 
 describe("voluntime gaps", suite, () => {
   const ctx = {};
@@ -23,20 +23,8 @@ describe("voluntime gaps", suite, () => {
       title: label("Gap project"),
       accessType: "Public",
     });
-    await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/memberships`, {
-      email: ctx.volunteer.email,
-      firstName: "Jane",
-      lastName: "Volunteer",
-      role: "VOLUNTEER",
-    });
-    await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/memberships`, {
-      email: ctx.coordinator.email,
-      firstName: "Cora",
-      lastName: "Coordinator",
-      role: "VOLUNTEER",
-      departmentIds: [ctx.groupA.id, ctx.groupB.id],
-      managedDepartmentIds: [ctx.groupA.id, ctx.groupB.id],
-    });
+    await joinOrg(ctx.admin.accessToken, ctx.org.id, ctx.volunteer, { role: "VOLUNTEER" });
+    await joinOrg(ctx.admin.accessToken, ctx.org.id, ctx.coordinator, { role: "VOLUNTEER", departmentIds: [ctx.groupA.id, ctx.groupB.id], managedDepartmentIds: [ctx.groupA.id, ctx.groupB.id] });
   });
 
   test("assigning two groups as Group manager combines report scope", async () => {
@@ -181,12 +169,7 @@ describe("voluntime gaps", suite, () => {
 
   test("import near-match Skip does not create a second user", async () => {
     const person = await signUp("gapskip");
-    await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/memberships`, {
-      email: person.email,
-      firstName: person.firstName,
-      lastName: person.lastName,
-      role: "VOLUNTEER",
-    });
+    await joinOrg(ctx.admin.accessToken, ctx.org.id, person, { role: "VOLUNTEER" });
     const imported = await callApi(`/organizations/${ctx.org.id}/imports/people`, {
       method: "POST",
       token: ctx.admin.accessToken,

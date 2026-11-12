@@ -11,6 +11,7 @@ import {
   logIn,
   signUp,
   suite,
+  joinOrg,
 } from "./client.mjs";
 
 describe("voluntime feedback", suite, () => {
@@ -20,12 +21,7 @@ describe("voluntime feedback", suite, () => {
     ctx.admin = await signUp("vtfadmin");
     ctx.volunteer = await signUp("vtfvol");
     ctx.org = await createJson(ctx.admin.accessToken, "/organizations", { name: label("VTF org") });
-    await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/memberships`, {
-      email: ctx.volunteer.email,
-      firstName: ctx.volunteer.firstName,
-      lastName: ctx.volunteer.lastName,
-      role: "VOLUNTEER",
-    });
+    await joinOrg(ctx.admin.accessToken, ctx.org.id, ctx.volunteer, { role: "VOLUNTEER" });
   });
 
   test("lists system roles and creates a custom role", async () => {
@@ -125,12 +121,7 @@ describe("voluntime feedback", suite, () => {
 
   test("group-scoped role submits a need that stays private until approved", async () => {
     const manager = await signUp("vtfmgr");
-    await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/memberships`, {
-      email: manager.email,
-      firstName: manager.firstName,
-      lastName: manager.lastName,
-      role: ctx.role.code,
-    });
+    await joinOrg(ctx.admin.accessToken, ctx.org.id, manager, { role: ctx.role.code });
     const need = await createJson(manager.accessToken, `/organizations/${ctx.org.id}/volunteer-needs`, {
       name: label("Pending need"),
       type: "Task",

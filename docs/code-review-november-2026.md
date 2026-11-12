@@ -48,6 +48,12 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
 
 ### SEC-01 — Account takeover through org-scoped email and profile edits · Security, tenant isolation · M · [BAD-128](https://linear.app/baddley/issue/BAD-128)
 
+> **Status: done (12 Nov 2026), on `staging`.** What shipped:
+> - `POST /organizations/{id}/memberships` always creates a new account. An email that already has an account gets 409 `account_exists` and is told to send an invitation; existing accounts join only by accepting an invite. This differs from fix step 2, which proposed creating the invitation automatically.
+> - `PATCH` on a membership changes the email or global profile only while no other organization shares the person and they aren't a SuperAdmin. The email additionally needs an account the person has never signed in to (`mustChangePassword` true). Re-sending a field's current value isn't a change, so the edit form still works. Verified email changes (fix step 3) come with SEC-04.
+> - Import "merge" only touches people already in the organization, and updates names only on accounts no other organization shares.
+> - Tests: a new takeover regression test in `tests/http/memberships.test.mjs`, a merge test in `imports.test.mjs`, and a `joinOrg` (invite then accept) helper that the other test files now use for setup.
+
 - **Where:**
   - `src/lib/api/features/memberships.ts` 403–424: adding an existing user by email overwrites their global `UserProfile`.
   - `src/lib/api/features/memberships.ts` 541–546: `updateOrgMembership` writes `User.email`.

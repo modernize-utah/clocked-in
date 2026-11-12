@@ -229,47 +229,31 @@ export async function importPeople(access: Access, organizationId: string, rows:
       await lockOrganization(tx, organizationId);
       const email = normalizeEmail(requiredText(row, "email"));
       const action = String(row._action ?? "").toLowerCase();
-      const existing = await tx.user.findUnique({
-        where: { email },
-        include: { profile: true, organizationMemberships: { where: { organizationId }, select: { id: true } } },
-      });
+      const existing = await tx.user.findUnique({ where: { email }, select: { id: true } });
       if (action === "skip" || (action !== "merge" && (seenEmails.has(email) || existing))) {
         return { kind: "skip", email } as const;
       }
       if (action === "merge") {
         const firstName = personName(requiredText(row, "firstName"), "firstName");
         const lastName = personName(requiredText(row, "lastName"), "lastName");
-        const match =
-          existing ??
-          (await tx.user.findFirst({
-            where: {
-              profile: { firstName, lastName },
-              organizationMemberships: { some: { organizationId } },
-            },
-            include: { profile: true, organizationMemberships: { where: { organizationId }, select: { id: true } } },
-          }));
-        if (!match) {
-          return { kind: "skip", email } as const;
-        }
-        if (match.profile) {
+        // Merge only updates people already in this organization, and only accounts no other organization shares.
+        const match = await tx.user.findFirst({
+          where: {
+            ...(existing ? { id: existing.id } : { profile: { firstName, lastName } }),
+            organizationMemberships: { some: { organizationId } },
+          },
+          select: {
+            id: true,
+            isSuperAdmin: true,
+            profile: { select: { id: true } },
+            _count: { select: { organizationMemberships: { where: { organizationId: { not: organizationId } } } } },
+          },
+        });
+        if (match?.profile && !match.isSuperAdmin && match._count.organizationMemberships === 0) {
           await tx.userProfile.update({
             where: { userId: match.id },
             data: { firstName, lastName },
           });
-        }
-        if (match.organizationMemberships.length === 0) {
-          const volunteerRole = roleIds.get("VOLUNTEER");
-          if (volunteerRole) {
-            await tx.organizationMembership.create({
-              data: {
-                userId: match.id,
-                organizationId,
-                roleId: volunteerRole,
-                rateType: organization.defaultRateType,
-                isActive: true,
-              },
-            });
-          }
         }
         return { kind: "skip", email } as const;
       }
