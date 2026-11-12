@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { acceptCodeFromNext, invitationAccount } from "@/lib/api/features/invitations";
+import { clientIp } from "@/lib/api/rate-limit";
 import { portalName } from "@/lib/portal";
 import { safeNext } from "@/lib/server/action";
 import { requirePinnedOrganizationOrApex } from "@/lib/server/tenant";
@@ -29,7 +31,7 @@ async function SignupContent({ searchParams }: { searchParams: PageProps<"/signu
   const [search, pinned] = await Promise.all([searchParams, requirePinnedOrganizationOrApex()]);
   const next = safeNext(typeof search.next === "string" ? search.next : "");
   const code = acceptCodeFromNext(next);
-  const invite = code ? await invitationAccount(code, pinned.organization?.id) : null;
+  const invite = code ? await invitationAccount(code, pinned.organization?.id, { ip: clientIp(await headers()) }) : null;
   if (invite?.userExists) {
     redirect(`/login?next=${encodeURIComponent(next)}`);
   }

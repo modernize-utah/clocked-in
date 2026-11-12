@@ -17,7 +17,7 @@ Handwritten duration and total hours require a project and a task category. The 
 
 Brand, brief, and seed workbooks live in [`docs/base/`](base/):
 
-- `2026 Volunteer Hours.xlsx` — named local seed and the 14,609-hour golden suite. Never point Playwright `caswj-hours` at production.
+- `2026 Volunteer Hours.xlsx` — named local seed and the 14,609-hour golden suite. It holds real names, so it is not in git; keep a local copy at this path (or set `CASWJ_WORKBOOK_PATH`). Never point Playwright `caswj-hours` at production.
 - `clockify-export-ANONYMIZED-sample.xlsx` — synthetic names for `npm run db:seed:caswj:anon` on staging.
 - `caswj-gradient-usage.png` — approved brand-hero treatments.
 - CASWJ brand guidelines and the original project brief.

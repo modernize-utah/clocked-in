@@ -9,6 +9,7 @@ import {
   callApi,
   createJson,
   identity,
+  joinOrg,
   label,
   missingId,
   remove,
@@ -256,15 +257,26 @@ describe("memberships", suite, () => {
     assert.equal(session.json.user.mustChangePassword, true);
 
     const existing = await signUp("alreadyin");
-    const added = await createJson(ctx.second.accessToken, `/organizations/${ctx.org.id}/memberships`, {
-      email: existing.email,
-      firstName: "Already",
-      lastName: "Here",
+    const refused = await callApi(`/organizations/${ctx.org.id}/memberships`, {
+      method: "POST",
+      token: ctx.second.accessToken,
+      body: {
+        email: existing.email,
+        firstName: "Already",
+        lastName: "Here",
+        role: "MEMBER",
+        departmentIds: [extraDepartment.id],
+      },
+    });
+    assertError(refused, 409, "account_exists", "This email already has an account. Send them an invitation instead.");
+    const untouched = await callApi("/users/me", { token: existing.accessToken });
+    assert.equal(untouched.json.profile.firstName, existing.firstName);
+
+    const added = await joinOrg(ctx.second.accessToken, ctx.org.id, existing, {
       role: "MEMBER",
       departmentIds: [extraDepartment.id],
     });
     assert.equal(added.userId, existing.user.id);
-    assert.equal(added.user.firstName, "Already");
     assert.deepEqual(added.departmentIds, [extraDepartment.id]);
     const samePassword = await callApi("/auth/login", {
       method: "POST",
@@ -305,8 +317,15 @@ describe("memberships", suite, () => {
     });
     assertError(denied, 403, "forbidden", "Forbidden.");
 
-    const nextEmail = `patched.${existing.email}`;
-    const profile = await callApi(`/organizations/${ctx.org.id}/memberships/${added.id}`, {
+    const claimed = await callApi(`/organizations/${ctx.org.id}/memberships/${added.id}`, {
+      method: "PATCH",
+      token: ctx.second.accessToken,
+      body: { email: `patched.${existing.email}` },
+    });
+    assertError(claimed, 403, "forbidden", "This person has signed in, so only they can change their email.");
+
+    const nextEmail = `patched.${person.email}`;
+    const profile = await callApi(`/organizations/${ctx.org.id}/memberships/${created.id}`, {
       method: "PATCH",
       token: ctx.second.accessToken,
       body: {
@@ -324,10 +343,10 @@ describe("memberships", suite, () => {
     assert.equal(profile.json.user.displayName, "Patched Name");
     assert.deepEqual(profile.json.departmentIds, [ctx.department.id, extraDepartment.id].sort());
 
-    const taken = await callApi(`/organizations/${ctx.org.id}/memberships/${added.id}`, {
+    const taken = await callApi(`/organizations/${ctx.org.id}/memberships/${created.id}`, {
       method: "PATCH",
       token: ctx.second.accessToken,
-      body: { email: person.email },
+      body: { email: existing.email },
     });
     assertError(taken, 409, "conflict", "That email is already in use.");
 
@@ -339,6 +358,46 @@ describe("memberships", suite, () => {
     assert.equal(stillExists.status, 200);
     const gone = await callApi(`/organizations/${ctx.org.id}/memberships`, { token: ctx.second.accessToken });
     assert.equal(gone.json.items.some((item) => item.userId === existing.user.id), false);
+  });
+
+  test("another organization's admin cannot take over or edit a shared account", async () => {
+    const victim = await signUp("takeover");
+    const attacker = await signUp("attacker");
+    const attackerOrg = await createJson(attacker.accessToken, "/organizations", { name: label("Attacker org") });
+    const forced = await callApi(`/organizations/${attackerOrg.id}/memberships`, {
+      method: "POST",
+      token: attacker.accessToken,
+      body: { email: victim.email, firstName: "Taken", lastName: "Over", role: "MEMBER" },
+    });
+    assertError(forced, 409, "account_exists", "This email already has an account. Send them an invitation instead.");
+
+    const membership = await joinOrg(ctx.second.accessToken, ctx.org.id, victim, { role: "MEMBER" });
+    await joinOrg(attacker.accessToken, attackerOrg.id, victim, { role: "MEMBER" });
+    const attackerView = await callApi(`/organizations/${attackerOrg.id}/memberships`, { token: attacker.accessToken });
+    const shared = attackerView.json.items.find((item) => item.userId === victim.user.id);
+    const reEmail = await callApi(`/organizations/${attackerOrg.id}/memberships/${shared.id}`, {
+      method: "PATCH",
+      token: attacker.accessToken,
+      body: { email: `owned.${attacker.email}` },
+    });
+    assertError(reEmail, 403, "forbidden", "This person belongs to another organization, so only they can change their profile.");
+    const rename = await callApi(`/organizations/${ctx.org.id}/memberships/${membership.id}`, {
+      method: "PATCH",
+      token: ctx.second.accessToken,
+      body: { firstName: "Renamed" },
+    });
+    assertError(rename, 403, "forbidden", "This person belongs to another organization, so only they can change their profile.");
+
+    const unchangedProfile = await callApi(`/organizations/${ctx.org.id}/memberships/${membership.id}`, {
+      method: "PATCH",
+      token: ctx.second.accessToken,
+      body: { firstName: victim.firstName, email: victim.email, orgUserTitle: "Usher" },
+    });
+    assert.equal(unchangedProfile.status, 200, unchangedProfile.text);
+    assert.equal(unchangedProfile.json.orgUserTitle, "Usher");
+    const me = await callApi("/users/me", { token: victim.accessToken });
+    assert.equal(me.json.email, victim.email);
+    assert.equal(me.json.profile.firstName, victim.firstName);
   });
 
   test("batch delete removes the selected memberships", async () => {
@@ -459,13 +518,12 @@ describe("memberships", suite, () => {
     assert.deepEqual(await quietMail.json(), []);
 
     const existing = await signUp("mailexisting");
-    await createJson(ctx.second.accessToken, `/organizations/${ctx.org.id}/memberships`, {
-      email: existing.email,
-      firstName: "Existing",
-      lastName: "Mail",
-      role: "MEMBER",
-      emailUser: true,
+    const refused = await callApi(`/organizations/${ctx.org.id}/memberships`, {
+      method: "POST",
+      token: ctx.second.accessToken,
+      body: { email: existing.email, firstName: "Existing", lastName: "Mail", role: "MEMBER", emailUser: true },
     });
+    assert.equal(refused.status, 409);
     const existingMail = await fetch(`${mailSinkUrl}/emails?to=${encodeURIComponent(existing.email)}`);
     assert.equal(existingMail.ok, true);
     const existingMessages = await existingMail.json();

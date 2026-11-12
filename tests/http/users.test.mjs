@@ -16,6 +16,7 @@ import {
   remove,
   signUp,
   suite,
+  joinOrg,
 } from "./client.mjs";
 
 describe("users", suite, () => {
@@ -207,12 +208,7 @@ describe("users / workspace", suite, () => {
     });
     assert.equal(launched.status, 200);
 
-    await createJson(owner.accessToken, `/organizations/${first.id}/memberships`, {
-      email: member.email,
-      firstName: "Mem",
-      lastName: "Ber",
-      role: "MEMBER",
-    });
+    await joinOrg(owner.accessToken, first.id, member, { role: "MEMBER" });
     await createJson(owner.accessToken, `/organizations/${first.id}/memberships`, {
       email: volunteer.email,
       username: volunteer.username,

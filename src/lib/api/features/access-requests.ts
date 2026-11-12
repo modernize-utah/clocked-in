@@ -1,15 +1,28 @@
 import { randomUUID } from "node:crypto";
 import { Access } from "@/lib/api/access";
-import { guard } from "@/lib/api/db";
-import { conflict, forbidden, notFound, validation } from "@/lib/api/errors";
-import { Body, has, list, normalizeEmail, page, requireString } from "@/lib/api/json";
+import { guard, transaction } from "@/lib/api/db";
+import { parseGuid } from "@/lib/api/guid";
+import { ApiError, conflict, forbidden, notFound, validation } from "@/lib/api/errors";
+import { Body, has, ids, list, normalizeEmail, optionalUuid, page, requireString } from "@/lib/api/json";
 import { sendEmail } from "@/lib/api/mail";
 import { resolveRole, roleId } from "@/lib/api/features/memberships";
+import { assertCanGrant, effectivePermissions } from "@/lib/api/features/roles";
+import { isRoleScope } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 
 function asStringArray(value: unknown) {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is string => typeof item === "string");
+}
+
+/** The ids that are departments of this organization. */
+async function departmentsIn(organizationId: string, departmentIds: string[]) {
+  if (departmentIds.length === 0) return [];
+  const rows = await prisma.department.findMany({
+    where: { organizationId, id: { in: departmentIds.map(parseGuid).filter((id): id is string => id !== null) } },
+    select: { id: true },
+  });
+  return rows.map((row) => row.id);
 }
 
 function requestJson(row: {
@@ -71,10 +84,10 @@ export function parseCreateAccessRequest(body: Body) {
   return {
     message: has(body, "message") ? requireString(body, "message").trim().slice(0, 2000) : null,
     requestedRole: has(body, "requestedRole") ? requireString(body, "requestedRole") : "GROUP_MANAGER",
-    requestedDepartmentIds: asStringArray(body.requestedDepartmentIds),
+    requestedDepartmentIds: [...new Set(ids(body, "requestedDepartmentIds", true))],
     email: has(body, "email") ? normalizeEmail(requireString(body, "email")) : null,
     name: has(body, "name") ? requireString(body, "name").trim() : null,
-    volunteerNeedId: has(body, "volunteerNeedId") ? requireString(body, "volunteerNeedId") : null,
+    volunteerNeedId: optionalUuid(body, "volunteerNeedId"),
     guestId: has(body, "guestId") ? requireString(body, "guestId") : null,
   };
 }
@@ -107,6 +120,18 @@ export async function createAccessRequest(
   });
   if (existing) {
     conflict("You already have a pending access request.");
+  }
+
+  const departments = await departmentsIn(organizationId, request.requestedDepartmentIds);
+  if (departments.length !== request.requestedDepartmentIds.length) {
+    validation("requestedDepartmentIds must be departments of this organization.");
+  }
+
+  if (
+    request.volunteerNeedId &&
+    !(await prisma.volunteerNeed.findFirst({ where: { id: request.volunteerNeedId, organizationId }, select: { id: true } }))
+  ) {
+    validation("volunteerNeedId must be a need of this organization.");
   }
   const created = await guard(
     prisma.accessRequest.create({
@@ -177,6 +202,9 @@ export async function decideAccessRequest(
   if (row.status !== "pending") {
     conflict("This request has already been reviewed.");
   }
+  if (row.userId && row.userId === access.actorUserId) {
+    throw new ApiError(403, "forbidden", "You cannot review your own access request.");
+  }
   if (status === "approved") {
     await approve(access, row);
   }
@@ -214,22 +242,35 @@ async function approve(
   if (!row.userId) {
     return;
   }
+  const userId = row.userId;
   if (row.requestedRoleId) {
-    await prisma.organizationMembership.updateMany({
-      where: { userId: row.userId, organizationId: row.organizationId },
-      data: { roleId: row.requestedRoleId },
+    const role = await prisma.role.findUniqueOrThrow({ where: { id: row.requestedRoleId }, include: { permissions: true } });
+    await assertCanGrant(access, row.organizationId, {
+      permissions: effectivePermissions(role),
+      scope: isRoleScope(role.scope) ? role.scope : null,
     });
   }
-  const departmentIds = asStringArray(row.requestedDepartmentIds);
+  // Requests stored before this check could name another organization's departments.
+  const departmentIds = await departmentsIn(row.organizationId, asStringArray(row.requestedDepartmentIds));
+  if (departmentIds.length > 0 && !(await access.isOrgAdmin(row.organizationId))) {
+    throw new ApiError(403, "forbidden", "Only an organization admin can make someone a group manager.");
+  }
   const adminRole = await roleId("ADMIN");
-  for (const departmentId of departmentIds) {
-    await prisma.departmentMembership.upsert({
-      where: { userId_departmentId: { userId: row.userId, departmentId } },
-      update: { roleId: adminRole },
-      create: { userId: row.userId, departmentId, roleId: adminRole },
-    });
-  }
-  void access;
+  await transaction(async (tx) => {
+    if (row.requestedRoleId) {
+      await tx.organizationMembership.updateMany({
+        where: { userId, organizationId: row.organizationId },
+        data: { roleId: row.requestedRoleId },
+      });
+    }
+    for (const departmentId of departmentIds) {
+      await tx.departmentMembership.upsert({
+        where: { userId_departmentId: { userId, departmentId } },
+        update: { roleId: adminRole },
+        create: { userId, departmentId, roleId: adminRole },
+      });
+    }
+  });
 }
 
 async function notifyAdmins(organizationId: string, organizationName: string, requesterEmail: string) {

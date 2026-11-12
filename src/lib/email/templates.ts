@@ -294,7 +294,13 @@ const droppedWithContent = new Set(["script", "style", "head", "title", "iframe"
 const tagPattern = /<!--[\s\S]*?-->|<(\/?)([a-zA-Z][a-zA-Z0-9]*)\b((?:[^>"']|"[^"]*"|'[^']*')*)>/g;
 const attributePattern = /([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*(?:=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
 const placeholderPath = /^[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*$/;
-const safeHref = /^(?:https?:\/\/|mailto:|\{\{)/i;
+const literalHref = /^(?:https?:\/\/|mailto:)/i;
+const placeholderHref = /^\{\{\s*[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*\s*\}\}$/;
+
+/** A link is a fixed URL or exactly one field. Mixing them could mail a code or password to another site. */
+function safeHref(href: string) {
+  return placeholderHref.test(href) || (literalHref.test(href) && !href.includes("{{"));
+}
 
 function escapeText(text: string) {
   return text
@@ -350,7 +356,7 @@ export function sanitizeEmailHtml(html: string) {
     const attrs = attributes(match[3] ?? "");
     if (tag === "a") {
       const href = (attrs.get("href") ?? "").trim().replaceAll("&amp;", "&");
-      output += safeHref.test(href) ? `<a href="${escapeAttribute(href)}">` : "<a>";
+      output += safeHref(href) ? `<a href="${escapeAttribute(href)}">` : "<a>";
     } else if (tag === "span") {
       const path = attrs.get("data-placeholder") ?? "";
       output += placeholderPath.test(path) ? `<span data-placeholder="${path}">` : "<span>";
@@ -459,15 +465,17 @@ function forSubject(value: string) {
 
 /** Subject, full HTML, and plain text. Throws when the template uses a field the context lacks. */
 export function renderEmail(content: EmailTemplateContent, context: EmailContext) {
-  const missing = missingEmailFields(context, content.subject, content.heading, content.preview, content.template);
+  // Stored templates may predate a sanitizer rule, so the current rules apply at send time too.
+  const template = sanitizeEmailHtml(content.template);
+  const missing = missingEmailFields(context, content.subject, content.heading, content.preview, template);
   if (missing.length > 0) {
     throw new Error(`Missing email field ${missing[0]}.`);
   }
   const heading = fillEmailText(htmlEncode(content.heading), context, encodeWithBreaks);
   const preview = fillEmailText(htmlEncode(content.preview), context, htmlEncode);
-  const body = fillEmailText(styleEmailBody(content.template), context, encodeWithBreaks);
+  const body = fillEmailText(styleEmailBody(template), context, encodeWithBreaks);
   const plainHeading = fillEmailText(content.heading, context);
-  const plainBody = fillEmailText(emailHtmlToText(content.template), context);
+  const plainBody = fillEmailText(emailHtmlToText(template), context);
   return {
     subject: fillEmailText(content.subject, context, forSubject),
     html: wrapEmailHtml({ heading, preview, body }),

@@ -1,7 +1,7 @@
 import { Prisma } from "@/generated/prisma/client";
 import { Access } from "@/lib/api/access";
 import { guard, lockOrganization, transaction } from "@/lib/api/db";
-import { conflict, forbidden, notFound, validation } from "@/lib/api/errors";
+import { ApiError, conflict, forbidden, notFound, validation } from "@/lib/api/errors";
 import { linkGuest } from "@/lib/api/features/volunteer-needs";
 import {
   assertTimezone,
@@ -363,65 +363,58 @@ export async function createOrgMembership(access: Access, organizationId: string
   // Resolve outside the transaction. The production pool has one connection, so a
   // query on the global client while the transaction holds it times out.
   const resolvedRoleId = await roleId(request.role, organizationId);
-  let createdAccount = false;
   let organizationName = "";
   let organizationSlug: string | null = null;
   const membership = await transaction(async (tx) => {
     await lockOrganization(tx, organizationId);
-    let user = await tx.user.findUnique({
+    const existing = await tx.user.findUnique({
       where: { email: request.email },
-      include: { profile: true },
+      select: { organizationMemberships: { where: { organizationId }, select: { id: true } } },
     });
-    if (!user) {
-      createdAccount = true;
-      if (!request.password || !request.username) {
-        validation("username and password are required for a new person.");
-      }
-
-      user = await tx.user.create({
-        data: {
-          username: request.username,
-          email: request.email,
-          passwordHash: await hashPassword(request.password),
-          mustChangePassword: true,
-          profile: {
-            create: {
-              firstName: request.firstName,
-              lastName: request.lastName,
-              displayName: request.displayName,
-              timezone: request.timezone,
-              phone: request.phone,
-              zipCode: request.zipCode,
-              notes: request.notes,
-              avatarUrl: request.avatarUrl,
-              description: request.description,
-            },
-          },
-        },
-        include: { profile: true },
-      });
-    } else if (await tx.organizationMembership.findUnique({ where: { userId_organizationId: { userId: user.id, organizationId } } })) {
+    if (existing?.organizationMemberships.length) {
       conflict(
         volunteerAdd
           ? "This person is already a member. Ask an admin to connect you."
           : "This person is already in the organization.",
       );
-    } else if (user.profile) {
-      await tx.userProfile.update({
-        where: { userId: user.id },
-        data: {
-          firstName: request.firstName,
-          lastName: request.lastName,
-          displayName: request.displayName ?? user.profile.displayName,
-          timezone: request.timezone,
-          phone: request.phone ?? user.profile.phone,
-          zipCode: request.zipCode ?? user.profile.zipCode,
-          notes: request.notes ?? user.profile.notes,
-          avatarUrl: request.avatarUrl ?? user.profile.avatarUrl,
-          description: request.description ?? user.profile.description,
-        },
-      });
     }
+
+    // Joining someone else's account to an organization would let its admins edit that account.
+    if (existing) {
+      throw new ApiError(
+        409,
+        "account_exists",
+        volunteerAdd
+          ? "This person already has an account. Ask an admin to invite them."
+          : "This email already has an account. Send them an invitation instead.",
+      );
+    }
+
+    if (!request.password || !request.username) {
+      validation("username and password are required for a new person.");
+    }
+
+    const user = await tx.user.create({
+      data: {
+        username: request.username,
+        email: request.email,
+        passwordHash: await hashPassword(request.password),
+        mustChangePassword: true,
+        profile: {
+          create: {
+            firstName: request.firstName,
+            lastName: request.lastName,
+            displayName: request.displayName,
+            timezone: request.timezone,
+            phone: request.phone,
+            zipCode: request.zipCode,
+            notes: request.notes,
+            avatarUrl: request.avatarUrl,
+            description: request.description,
+          },
+        },
+      },
+    });
 
     await linkGuest(tx, user.email, user.id);
     const organization = await tx.organization.findUniqueOrThrow({
@@ -459,7 +452,7 @@ export async function createOrgMembership(access: Access, organizationId: string
       managedDepartmentIds: request.managedDepartmentIds,
     });
   });
-  if (request.emailUser && createdAccount && request.username && request.password) {
+  if (request.emailUser && request.username && request.password) {
     try {
       await sendEmail({
         to: request.email,
@@ -478,6 +471,24 @@ export async function createOrgMembership(access: Access, organizationId: string
   }
 
   return membership;
+}
+
+/**
+ * Org admins edit a member's account and global profile only while no other organization
+ * shares that person. Changing the login email also requires an account the person has
+ * never signed in to, because the email controls password resets.
+ */
+function assertOrganizationOwnsAccount(
+  account: { isSuperAdmin: boolean; mustChangePassword: boolean; _count: { organizationMemberships: number } },
+  emailChanged: boolean,
+) {
+  if (account.isSuperAdmin || account._count.organizationMemberships > 0) {
+    throw new ApiError(403, "forbidden", "This person belongs to another organization, so only they can change their profile.");
+  }
+
+  if (emailChanged && !account.mustChangePassword) {
+    throw new ApiError(403, "forbidden", "This person has signed in, so only they can change their email.");
+  }
 }
 
 export async function updateOrgMembership(
@@ -538,24 +549,36 @@ export async function updateOrgMembership(
         ? (request.departmentIds.value[0] ?? null)
         : undefined;
 
-    if (request.email.set) {
+    const account = await tx.user.findUniqueOrThrow({
+      where: { id: membership.userId },
+      select: {
+        email: true,
+        isSuperAdmin: true,
+        mustChangePassword: true,
+        profile: true,
+        _count: { select: { organizationMemberships: { where: { organizationId: { not: organizationId } } } } },
+      },
+    });
+    const nextEmail = request.email.set && request.email.value !== account.email ? request.email.value : null;
+    const emailChanged = nextEmail !== null;
+    const profileChanged = (
+      ["firstName", "lastName", "displayName", "timezone", "phone", "zipCode", "notes", "avatarUrl", "description"] as const
+    ).some((field) => {
+      const change: Optional<string | null> = request[field];
+      return change.set && change.value !== (account.profile?.[field] ?? null);
+    });
+    if (emailChanged || profileChanged) {
+      assertOrganizationOwnsAccount(account, emailChanged);
+    }
+
+    if (nextEmail) {
       await tx.user.update({
         where: { id: membership.userId },
-        data: { email: request.email.value },
+        data: { email: nextEmail },
       });
     }
 
-    if (
-      request.firstName.set ||
-      request.lastName.set ||
-      request.displayName.set ||
-      request.timezone.set ||
-      request.phone.set ||
-      request.zipCode.set ||
-      request.notes.set ||
-      request.avatarUrl.set ||
-      request.description.set
-    ) {
+    if (profileChanged) {
       await tx.userProfile.update({
         where: { userId: membership.userId },
         data: {

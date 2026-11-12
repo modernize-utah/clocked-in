@@ -172,6 +172,39 @@ describe("invitations", suite, () => {
     assert.ok(listed.json.items.some((item) => item.id === created.id));
   });
 
+  test("invite codes are long, forgiving to type, and limited on wrong guesses", async () => {
+    const guesser = await signUp("inviteguess");
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const wrong = await callApi("/invitations/accept", {
+        method: "POST",
+        token: guesser.accessToken,
+        body: { code: String(100000 + attempt) },
+      });
+      assertError(wrong, 400, "validation_error", "The code is not valid.");
+    }
+    const blocked = await callApi("/invitations/accept", {
+      method: "POST",
+      token: guesser.accessToken,
+      body: { code: "000000" },
+    });
+    assertError(blocked, 429, "rate_limited", "Too many attempts. Wait a few minutes and try again.");
+
+    const invitee = await signUp("invitetyped");
+    await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/invitations`, {
+      email: invitee.email,
+      role: "MEMBER",
+    });
+    const code = await waitForCode(invitee.email);
+    assert.match(code, /^[A-HJKMNP-TV-Z2-9]{4}-[A-HJKMNP-TV-Z2-9]{4}-[A-HJKMNP-TV-Z2-9]{4}$/);
+    const accepted = await callApi("/invitations/accept", {
+      method: "POST",
+      token: invitee.accessToken,
+      body: { code: ` ${code.replaceAll("-", " ").toLowerCase()} ` },
+    });
+    assert.equal(accepted.status, 200, accepted.text);
+    assert.equal(accepted.json.organizationMembership.organizationId, ctx.org.id);
+  });
+
   test("resend replaces the invite code", async () => {
     const recruit = await signUp("inviteresend");
     const created = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/invitations`, {

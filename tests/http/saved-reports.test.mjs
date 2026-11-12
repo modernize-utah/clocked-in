@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { before, describe, test } from "node:test";
-import { assertError, assertInstant, assertList, assertStatus, assertUuid, callApi, createJson, label, signUp, suite } from "./client.mjs";
+import { assertError, assertInstant, assertList, assertStatus, assertUuid, callApi, createJson, joinOrg, label, signUp, suite } from "./client.mjs";
 
 function valueCard(over = {}) {
   return {
@@ -43,12 +43,7 @@ describe("saved reports", suite, () => {
       title: label("Design project"),
       accessType: "Public",
     });
-    await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/memberships`, {
-      email: ctx.member.email,
-      firstName: ctx.member.firstName,
-      lastName: ctx.member.lastName,
-      role: "MEMBER",
-    });
+    await joinOrg(ctx.admin.accessToken, ctx.org.id, ctx.member, { role: "MEMBER" });
   });
 
   test("an admin saves a named design and a member can read it", async () => {

@@ -15,6 +15,13 @@ import {
 } from "@/lib/api/json";
 import { sendEmail } from "@/lib/api/mail";
 import { linkGuest } from "@/lib/api/features/volunteer-needs";
+import {
+  assertUnderRateLimit,
+  consumeRateLimit,
+  minute,
+  recordRateLimitFailure,
+  type RateLimitRule,
+} from "@/lib/api/rate-limit";
 import { prisma } from "@/lib/prisma";
 import {
   allocateNumericCode,
@@ -99,10 +106,20 @@ async function issueSession(user: Account, db: Db = prisma) {
   return { accessToken, refreshToken, expiresAt: expiresAt.toISOString(), user: userJson(user) };
 }
 
+/** The caller's public IP, when known, for rate limits. */
+export type ClientContext = { ip?: string | null };
+
+/** Wrong guesses allowed on one reset code before it stops working. */
+export const maxResetAttempts = 5;
+
 export async function signUp(
   request: SignUpRequest,
-  options?: { invitationEmail?: string; tenantSlug?: string | null },
+  options?: { invitationEmail?: string; tenantSlug?: string | null } & ClientContext,
 ) {
+  if (options?.ip) {
+    await consumeRateLimit({ key: `signup:ip:${options.ip}`, limit: 20, windowMs: 60 * minute });
+  }
+
   const invitationEmail = options?.invitationEmail;
   if (invitationEmail && invitationEmail !== request.email) {
     validation("Use the email address the invitation was sent to.");
@@ -140,13 +157,24 @@ export async function signUp(
   return issueSession(user);
 }
 
-export async function logIn(request: LogInRequest) {
+export async function logIn(request: LogInRequest, options?: ClientContext) {
+  const rules: RateLimitRule[] = [{ key: `login:user:${request.username}`, limit: 10, windowMs: 15 * minute }];
+  if (options?.ip) {
+    rules.push({ key: `login:ip:${options.ip}`, limit: 50, windowMs: 15 * minute });
+  }
+  for (const rule of rules) {
+    await assertUnderRateLimit(rule);
+  }
+
   const user = await prisma.user.findUnique({ where: { username: request.username }, include: accountInclude });
   if (!user) {
     await verifyDummy(request.password);
   }
 
   if (!user || !(await verifyPassword(request.password, user.passwordHash))) {
+    for (const rule of rules) {
+      await recordRateLimitFailure(rule);
+    }
     unauthorized("The username or password is incorrect.");
   }
 
@@ -188,11 +216,14 @@ export async function logOut(access: Access, request: RefreshTokenRequest) {
   return { ok: true };
 }
 
-/** A reset uses an organization's template and host only when pinned or the person belongs to one. */
+/**
+ * A reset uses an organization's template and host only when the person is an active member,
+ * because that organization's admins edit the template that carries the reset code.
+ */
 async function resetOrganization(userId: string, tenantSlug?: string | null) {
   if (tenantSlug) {
     const pinned = await prisma.organization.findFirst({
-      where: { slug: tenantSlug },
+      where: { slug: tenantSlug, memberships: { some: { userId, isActive: true } } },
       select: { id: true, slug: true },
     });
     if (pinned) {
@@ -209,9 +240,16 @@ async function resetOrganization(userId: string, tenantSlug?: string | null) {
   return memberships.length === 1 ? memberships[0].organization : null;
 }
 
-export async function requestPasswordReset(emailValue: string | null, options?: { tenantSlug?: string | null }) {
+export async function requestPasswordReset(
+  emailValue: string | null,
+  options?: { tenantSlug?: string | null } & ClientContext,
+) {
   if (!emailValue?.trim()) {
     validation("email is required.");
+  }
+
+  if (options?.ip) {
+    await consumeRateLimit({ key: `reset-request:ip:${options.ip}`, limit: 20, windowMs: 60 * minute });
   }
 
   let email: string;
@@ -266,14 +304,44 @@ export async function requestPasswordReset(emailValue: string | null, options?: 
   return { ok: true };
 }
 
-export async function confirmPasswordReset(request: ConfirmPasswordResetRequest) {
+/** A wrong guess counts against every active code for that person, and retires codes that reach the limit. */
+async function countWrongResetCode(userId: string, now: Date) {
+  await prisma.passwordResetCode.updateMany({
+    where: { userId, usedAt: null, expiresAt: { gt: now } },
+    data: { failedAttempts: { increment: 1 } },
+  });
+  await prisma.passwordResetCode.updateMany({
+    where: { userId, usedAt: null, failedAttempts: { gte: maxResetAttempts } },
+    data: { usedAt: now },
+  });
+}
+
+export async function confirmPasswordReset(request: ConfirmPasswordResetRequest, options?: ClientContext) {
+  const ipRule = options?.ip ? { key: `reset-confirm:ip:${options.ip}`, limit: 30, windowMs: 15 * minute } : null;
+  if (ipRule) {
+    await assertUnderRateLimit(ipRule);
+  }
+
+  const now = new Date();
   const user = await prisma.user.findUnique({ where: { email: request.email } });
   const reset = user
     ? await prisma.passwordResetCode.findFirst({
-        where: { userId: user.id, codeHash: hashCode(request.code), usedAt: null, expiresAt: { gt: new Date() } },
+        where: {
+          userId: user.id,
+          codeHash: hashCode(request.code),
+          usedAt: null,
+          expiresAt: { gt: now },
+          failedAttempts: { lt: maxResetAttempts },
+        },
       })
     : null;
   if (!user || !reset) {
+    if (ipRule) {
+      await recordRateLimitFailure(ipRule);
+    }
+    if (user) {
+      await countWrongResetCode(user.id, now);
+    }
     validation("The code is not valid.");
   }
 

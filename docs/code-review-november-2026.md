@@ -11,7 +11,7 @@ Every item has a Linear ticket in the [VolunTime Code Review](https://linear.app
 | Tier | Parent ticket | Items |
 | --- | --- | --- |
 | P0 — Critical | [BAD-123](https://linear.app/baddley/issue/BAD-123) | 8 |
-| P1 — High | [BAD-124](https://linear.app/baddley/issue/BAD-124) | 30 |
+| P1 — High | [BAD-124](https://linear.app/baddley/issue/BAD-124) | 31 |
 | P2 — Medium | [BAD-125](https://linear.app/baddley/issue/BAD-125) | 62 |
 | P3 — Low | [BAD-126](https://linear.app/baddley/issue/BAD-126) | 23 |
 | P4 — Nits | [BAD-127](https://linear.app/baddley/issue/BAD-127) | 9 |
@@ -48,6 +48,12 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
 
 ### SEC-01 — Account takeover through org-scoped email and profile edits · Security, tenant isolation · M · [BAD-128](https://linear.app/baddley/issue/BAD-128)
 
+> **Status: done (12 Nov 2026), on `staging`.** What shipped:
+> - `POST /organizations/{id}/memberships` always creates a new account. An email that already has an account gets 409 `account_exists` and is told to send an invitation; existing accounts join only by accepting an invite. This differs from fix step 2, which proposed creating the invitation automatically.
+> - `PATCH` on a membership changes the email or global profile only while no other organization shares the person and they aren't a SuperAdmin. The email additionally needs an account the person has never signed in to (`mustChangePassword` true). Re-sending a field's current value isn't a change, so the edit form still works. Verified email changes (fix step 3) come with SEC-04.
+> - Import "merge" only touches people already in the organization, and updates names only on accounts no other organization shares.
+> - Tests: a new takeover regression test in `tests/http/memberships.test.mjs`, a merge test in `imports.test.mjs`, and a `joinOrg` (invite then accept) helper that the other test files now use for setup.
+
 - **Where:**
   - `src/lib/api/features/memberships.ts` 403–424: adding an existing user by email overwrites their global `UserProfile`.
   - `src/lib/api/features/memberships.ts` 541–546: `updateOrgMembership` writes `User.email`.
@@ -62,6 +68,12 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
 
 ### SEC-02 — Tenant-edited password-reset template can steal reset codes · Security · S–M · [BAD-129](https://linear.app/baddley/issue/BAD-129)
 
+> **Status: done (12 Nov 2026), on `staging`.** What shipped:
+> - A password reset on a tenant host uses that organization's template and address only when the person is an active member there.
+> - Email links must be a fixed URL with no fields in it, or exactly one field (for example `{{reset.url}}`). Anything else, such as `https://evil/?c={{reset.code}}`, loses its href. The rule runs when a template is saved and again when each email is sent, so templates saved earlier are covered.
+> - Not done: locking the PasswordReset, Invite and Welcome bodies to platform copy (fix step 2). With the link rule in place, an admin can no longer make the code leave the email automatically. Revisit if social-engineering copy becomes a concern.
+> - Tests: sanitizer and send-time unit tests in `tests/email-template.test.ts`, and an HTTP test in `tests/http/auth.test.mjs` for member vs non-member resets on a tenant.
+
 - **Where:**
   - `src/lib/api/features/auth.ts` 192–210 (`resetOrganization` picks the pinned tenant even for non-members) and 250–256.
   - `src/lib/email/templates.ts` 296–297 and 351–353 (`{{reset.code}}` is substituted inside `href`).
@@ -74,6 +86,17 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
 - **Tests:** a reset for a non-member on a tenant host uses the platform template. A placeholder inside `href` is rejected when the template is saved.
 
 ### SEC-03 — Brute-forceable 6-digit reset codes and no rate limiting · Security · M · [BAD-130](https://linear.app/baddley/issue/BAD-130)
+
+> **Status: done (12 Nov 2026), on `staging`.** What shipped:
+> - A reset code stops working after 5 wrong guesses. A new `PasswordResetCode.failedAttempts` column counts them across the person's active codes.
+> - A database-backed fixed-window limiter (`src/lib/api/rate-limit.ts`, new `RateLimit` table with hashed keys) returns 429 `rate_limited`. Limits:
+>   - Login: 10 failures per username and 50 per IP in 15 minutes.
+>   - Reset confirm: 30 failures per IP in 15 minutes.
+>   - Reset request and sign-up: 20 per IP per hour.
+> - The IP is the Vercel-set `x-forwarded-for`. Loopback and private addresses are skipped, so local runs aren't limited.
+> - Migration `20261112210000_auth_rate_limits` was applied to staging, together with the two 5 Nov migrations staging was still missing. **Production is also missing `20261105180000_paid_rates` and `20261105181000_paid_in_kind_zero`**, which `main` already needs, so run `db:deploy` for production before the next release.
+> - Deferred: making the reset request `POST` (the mobile app uses `GET`), 32-byte link tokens, and identical sign-up responses for taken emails. The last needs the email verification from SEC-04.
+> - Tests in `tests/http/auth.test.mjs`: five wrong guesses retire a code, ten wrong passwords lock a username, and the per-IP limit on reset confirmations.
 
 - **Where:**
   - `src/lib/api/features/auth.ts` 269–278 (no counter of failed attempts) and 143–154 (login).
@@ -89,6 +112,13 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
 - **Tests:** the 6th wrong code fails even with the right code. The rate limit returns 429.
 
 ### SEC-04 — Invite codes are guessable, the invite page leaks PII, and email is never verified · Security · M · [BAD-131](https://linear.app/baddley/issue/BAD-131)
+
+> **Status: invite hijacking fixed (12 Nov 2026), on `staging`; email verification split into SEC-04b ([BAD-260](https://linear.app/baddley/issue/BAD-260)).** What shipped:
+> - Invite codes are 12 characters from an unambiguous alphabet, about 59 bits, shown as `ABCD-EFGH-JKMN`. Typed codes ignore case, spaces and dashes, and 6-digit invites already sent still work until they expire.
+> - Wrong codes are rate limited: 10 per account and 30 per IP in 15 minutes. The signup page's pre-login invite lookup shares the IP limit.
+> - Pre-login invite details (fix step 2) now need a code that can't be guessed, so they stay as a convenience for the real invitee.
+> - Not in this change: email verification on sign-up and email change, the current-password check on email change, and gating `linkGuest` on a verified email (fix steps 3–4). They need a new verification flow with web and mobile UI, now tracked as SEC-04b.
+> - Tests: `tests/invite-code.test.ts`, and a new HTTP test in `tests/http/invitations.test.mjs` for typed variants and the accept limit. The stale tenant test in `organizations.test.mjs` now passes and checks the new code format in invite links.
 
 - **Where:**
   - `src/lib/api/security.ts` 20–33 (6-digit codes valid for 7 days).
@@ -110,6 +140,12 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
 
 ### SEC-05 — Access-request approval grants department admin in other orgs · Tenant isolation · S · [BAD-132](https://linear.app/baddley/issue/BAD-132)
 
+> **Status: done (12 Nov 2026), on `staging`.** What shipped:
+> - On creation, `requestedDepartmentIds` must be valid ids of departments in that organization, and `volunteerNeedId` must be one of its needs; anything else gets 400.
+> - Approval filters again, so requests stored before this fix can't grant foreign departments.
+> - The role change and department grants now run in one transaction.
+> - Test in `tests/http/voluntime-feedback.test.mjs`: a cross-org request is refused, and a planted legacy request with a foreign department grants nothing when approved.
+
 - **Where:** `src/lib/api/features/access-requests.ts` 70–80 (parse), 112–122 (stored without checks), and 222–231 (approval upserts `DepartmentMembership` with role ADMIN for every ID).
 - **Problem:** A volunteer in org B creates org A, files an access request in A listing B's department IDs, and approves it themselves. They become a department ADMIN in org B.
 - **Fix:**
@@ -119,6 +155,15 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
 - **Tests:** a foreign department ID is rejected with 400 at creation and ignored at approval.
 
 ### SEC-06 — Privilege escalation through roles, self-approval and import · Security · M · [BAD-133](https://linear.app/baddley/issue/BAD-133)
+
+> **Status: done (12 Nov 2026), on `staging`.** What shipped:
+> - A shared rule, `assertCanGrant` in `roles.ts`: anyone but an organization admin can grant only permissions they hold, and no wider scope than their own.
+> - It applies when creating a role, and when editing one (only newly added permissions and a changed scope are checked, so renames still work).
+> - It applies to the role an access-request approval would give.
+> - It applies to each role in a people import. An importer gets the new accounts' passwords, so a row whose role the importer couldn't grant becomes a row error.
+> - Nobody can review their own access request, and granting group-manager rights through a request needs an organization admin.
+> - Deferred: removing temporary passwords from import responses (fix step 4). Admins use them to hand out accounts, so this needs the email-a-link flow first.
+> - Test in `tests/http/voluntime-feedback.test.mjs` covering all three routes. Also fixed the stale reserved-username test in that file.
 
 - **Where:**
   - `src/lib/api/features/roles.ts` 157–200: a `manage_roles` holder can add `manage_organization` to their own role.
@@ -132,6 +177,14 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
 - **Tests:** a role editor cannot escalate their own role, and self-approval returns 403.
 
 ### DATA-01 — Production pool of one connection, and transactions that query outside it · Performance, correctness · M **(verify)** · [BAD-134](https://linear.app/baddley/issue/BAD-134)
+
+> **Status: done (12 Nov 2026), on `staging`.** What shipped:
+> - Confirmed locally. With the pool forced to one connection, the old code failed 3 more clock and need tests and logged 4 transaction errors. The fixed code logged none.
+> - `clockOut`, `cancelClock` and `resetClock` now run their access, project, category, tag and rate checks before the transaction. Inside the lock they re-read the timer and return 409 if it changed in between.
+> - Need vetting, un-vetting and sign-up deletion check access before their transactions.
+> - The Prisma Postgres pool is now 3 connections with a 5-second connection timeout, instead of 1 with none.
+> - A new `DATABASE_POOL_MAX` override exists; set it to `1` locally or in CI to catch this bug class. The full HTTP suite passes with it (189/191, only the two known stale tests failing).
+> - Not done: `attachDatabasePool` from `@vercel/functions` (not a dependency yet), and a lint rule against the global client inside transactions. Run TEST-01's CI job with `DATABASE_POOL_MAX=1` to cover this instead.
 
 - **Where:**
   - `src/lib/prisma-connection.ts` 23–28: `max: 1`, no `connectionTimeoutMillis`, 5 s idle timeout.
@@ -151,6 +204,20 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
 
 ### REPO-01 — Credentials and personal data tracked in git · Security, hygiene · S · [BAD-135](https://linear.app/baddley/issue/BAD-135)
 
+> **Status: partly done (12 Nov 2026), on `staging`. Owner decisions needed.**
+> - **The GitHub repository `jbaddley/clocked-in` is public.** Everything below, including the real-name workbook, client feedback PDFs and the project brief in `docs/base/`, has been readable by anyone and stays in git history.
+> - Done:
+>   - Deleted `Untitled`. Its Azure SQL string had only a placeholder password (`YOUR_PASSWORD`), so no live secret leaked, just the host and user.
+>   - Deleted `scripts/diag-add-person.mjs`.
+>   - Stopped tracking `docs/base/2026 Volunteer Hours.xlsx` and added it to `.gitignore`. A copy is at `~/code/clocked-in-private/`, because pulling this change removes the file from a checkout. The seed reads `CASWJ_WORKBOOK_PATH` or the old path.
+>   - The `dworkman` seed account now gets a random temporary password, printed once, instead of the hard-coded `dworkman_temp`.
+> - Still open, for the owner:
+>   1. Make the repository private.
+>   2. Decide whether to rewrite history (for example with `git filter-repo`) to purge the workbook and PDFs.
+>   3. Decide whether the client PDFs and brief belong in the repo.
+>   4. Confirm the Azure SQL server `clocked-in.database.windows.net` is decommissioned.
+>   5. If any database was seeded with `dworkman_temp` and that account has never signed in, change its password.
+
 - **Where:**
   - `Untitled` at the repo root: an Azure SQL connection string with host `clocked-in.database.windows.net` and user `init_admin`.
   - `docs/base/2026 Volunteer Hours.xlsx`: real names (the README says so).
@@ -169,6 +236,23 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
 ## P1 — High (next 2–4 weeks)
 
 ### Security and tenant isolation
+
+#### SEC-04b — Verify email ownership on sign-up and email change · M · [BAD-260](https://linear.app/baddley/issue/BAD-260)
+
+Split out of SEC-04. The app never checks that a person controls their account's email:
+
+- Sign-up and self-service email changes need no verification, and no password for the change.
+- `linkGuest` hands an account every guest volunteer sign-up made with that email, across organizations.
+- Sign-up reveals whether an email already has an account.
+- Org admins can't fix the email on an account they created once the person has signed in.
+
+**Fix:**
+
+1. Add `User.emailVerifiedAt`. Treat accounts created by accepting an invite as verified.
+2. Send a verification code on sign-up and on email change. Hold the change as `pendingEmail` until confirmed, and require the current password to start it.
+3. Run `linkGuest` only for verified emails.
+4. Return the same sign-up response either way.
+5. Build the web and mobile UI for the verification step.
 
 #### SEC-07 — Every member can read all members' emails and pay rates · S · [BAD-136](https://linear.app/baddley/issue/BAD-136)
 

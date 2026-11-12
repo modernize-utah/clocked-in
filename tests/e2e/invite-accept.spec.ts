@@ -51,7 +51,7 @@ test("admin invite is accepted and the person appears on People", async ({ page,
 async function waitForInviteCode(to: string) {
   const sink = process.env.MAIL_SINK_URL || "http://127.0.0.1:5399";
   const deadline = Date.now() + 4000;
-  const pattern = /Use this code to accept the invite:\s*(\d{6})/;
+  const pattern = /Use this code to accept the invite:\s*([A-Z0-9-]{14})/;
   while (Date.now() < deadline) {
     const response = await fetch(`${sink}/emails?to=${encodeURIComponent(to)}`).catch((error: unknown) => {
       throw new Error(`The mail sink at ${sink} is not reachable: ${error instanceof Error ? error.message : String(error)}`);

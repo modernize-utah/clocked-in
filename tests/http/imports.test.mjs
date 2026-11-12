@@ -10,6 +10,7 @@ import {
   logIn,
   signUp,
   suite,
+  joinOrg,
 } from "./client.mjs";
 
 describe("imports", suite, () => {
@@ -20,12 +21,7 @@ describe("imports", suite, () => {
     ctx.member = await signUp("importmember");
     ctx.existing = await signUp("importexisting");
     ctx.org = await createJson(ctx.admin.accessToken, "/organizations", { name: label("Import org") });
-    await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/memberships`, {
-      email: ctx.member.email,
-      firstName: ctx.member.firstName,
-      lastName: ctx.member.lastName,
-      role: "MEMBER",
-    });
+    await joinOrg(ctx.admin.accessToken, ctx.org.id, ctx.member, { role: "MEMBER" });
     ctx.department = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/departments`, {
       name: label("Import group"),
     });
@@ -74,7 +70,7 @@ describe("imports", suite, () => {
     assert.equal(created.json.errors[1].message, "lastName is required.");
     assert.equal(created.json.passwords.length, 1);
     assert.equal(created.json.passwords[0].email, person.email);
-    assert.equal(created.json.passwords[0].username, "alovelace");
+    assert.match(created.json.passwords[0].username, /^alovelace\d*$/);
     assert.ok(created.json.passwords[0].temporaryPassword.length >= 16);
 
     const session = await logIn(created.json.passwords[0].username, created.json.passwords[0].temporaryPassword, {
@@ -114,6 +110,17 @@ describe("imports", suite, () => {
     assert.equal(skipped.json.created, 0);
     const stillOut = await callApi(`/organizations/${ctx.org.id}/memberships?limit=100`, { token: ctx.admin.accessToken });
     assert.equal(stillOut.json.items.some((item) => item.user.email === ctx.existing.email), false);
+
+    const merged = await callApi(`/organizations/${ctx.org.id}/imports/people`, {
+      method: "POST",
+      token: ctx.admin.accessToken,
+      body: { rows: [{ email: ctx.existing.email, firstName: "Merged", lastName: "Outsider", _action: "merge" }] },
+    });
+    assert.equal(merged.status, 200, merged.text);
+    const notJoined = await callApi(`/organizations/${ctx.org.id}/memberships?limit=100`, { token: ctx.admin.accessToken });
+    assert.equal(notJoined.json.items.some((item) => item.user.email === ctx.existing.email), false);
+    const outsider = await callApi("/users/me", { token: ctx.existing.accessToken });
+    assert.equal(outsider.json.profile.firstName, ctx.existing.firstName);
   });
 
   test("no longer imports groups", async () => {

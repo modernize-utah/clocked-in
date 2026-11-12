@@ -3,7 +3,9 @@ import { Prisma } from "@/generated/prisma/client";
 import { Access } from "@/lib/api/access";
 import { lockOrganization, transaction } from "@/lib/api/db";
 import { ApiError, validation } from "@/lib/api/errors";
+import { assertCanGrant, effectivePermissions } from "@/lib/api/features/roles";
 import { linkGuest } from "@/lib/api/features/volunteer-needs";
+import { isRoleScope } from "@/lib/permissions";
 import {
   type AccessType,
   assertTimezone,
@@ -218,10 +220,22 @@ export async function importPeople(access: Access, organizationId: string, rows:
   }
 
   const roleRows = await prisma.role.findMany({
-    where: { code: { in: ["MEMBER", "VOLUNTEER", "ADMIN"] } },
-    select: { id: true, code: true },
+    where: { code: { in: ["MEMBER", "VOLUNTEER", "ADMIN"] }, organizationId: null },
+    include: { permissions: true },
   });
   const roleIds = new Map(roleRows.map((role) => [role.code, role.id]));
+  // An importer receives each new account's password, so they may only create roles they could grant.
+  const importableRoles = new Set<string>();
+  for (const role of roleRows) {
+    const allowed = await assertCanGrant(access, organizationId, {
+      permissions: effectivePermissions(role),
+      scope: isRoleScope(role.scope) ? role.scope : null,
+    }).then(
+      () => true,
+      () => false,
+    );
+    if (allowed) importableRoles.add(role.code);
+  }
   const seenEmails = new Set<string>();
   const seenUsernames = new Set<string>();
   const result = await importRows(rows, async (row) => {
@@ -229,47 +243,31 @@ export async function importPeople(access: Access, organizationId: string, rows:
       await lockOrganization(tx, organizationId);
       const email = normalizeEmail(requiredText(row, "email"));
       const action = String(row._action ?? "").toLowerCase();
-      const existing = await tx.user.findUnique({
-        where: { email },
-        include: { profile: true, organizationMemberships: { where: { organizationId }, select: { id: true } } },
-      });
+      const existing = await tx.user.findUnique({ where: { email }, select: { id: true } });
       if (action === "skip" || (action !== "merge" && (seenEmails.has(email) || existing))) {
         return { kind: "skip", email } as const;
       }
       if (action === "merge") {
         const firstName = personName(requiredText(row, "firstName"), "firstName");
         const lastName = personName(requiredText(row, "lastName"), "lastName");
-        const match =
-          existing ??
-          (await tx.user.findFirst({
-            where: {
-              profile: { firstName, lastName },
-              organizationMemberships: { some: { organizationId } },
-            },
-            include: { profile: true, organizationMemberships: { where: { organizationId }, select: { id: true } } },
-          }));
-        if (!match) {
-          return { kind: "skip", email } as const;
-        }
-        if (match.profile) {
+        // Merge only updates people already in this organization, and only accounts no other organization shares.
+        const match = await tx.user.findFirst({
+          where: {
+            ...(existing ? { id: existing.id } : { profile: { firstName, lastName } }),
+            organizationMemberships: { some: { organizationId } },
+          },
+          select: {
+            id: true,
+            isSuperAdmin: true,
+            profile: { select: { id: true } },
+            _count: { select: { organizationMemberships: { where: { organizationId: { not: organizationId } } } } },
+          },
+        });
+        if (match?.profile && !match.isSuperAdmin && match._count.organizationMemberships === 0) {
           await tx.userProfile.update({
             where: { userId: match.id },
             data: { firstName, lastName },
           });
-        }
-        if (match.organizationMemberships.length === 0) {
-          const volunteerRole = roleIds.get("VOLUNTEER");
-          if (volunteerRole) {
-            await tx.organizationMembership.create({
-              data: {
-                userId: match.id,
-                organizationId,
-                roleId: volunteerRole,
-                rateType: organization.defaultRateType,
-                isActive: true,
-              },
-            });
-          }
         }
         return { kind: "skip", email } as const;
       }
@@ -288,6 +286,9 @@ export async function importPeople(access: Access, organizationId: string, rows:
       const memberRoleId = roleIds.get("MEMBER");
       if (!roleId || !memberRoleId) {
         validation("role must be MEMBER, VOLUNTEER, or ADMIN.");
+      }
+      if (!importableRoles.has(role)) {
+        validation(`You cannot import people with the ${role} role.`);
       }
 
       const departmentName = text(row, "primaryDepartment");

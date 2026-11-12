@@ -28,7 +28,8 @@ export const baseCaswjTheme = {
   divergingPalette: themePalette(["#FF5E9F", "#FF9EC4", "#FFD6E6", "#FFFFFF", "#B8E8DE", "#4EBFAE", "#001836"]),
 };
 
-export const workbookPath = path.resolve(process.cwd(), "docs/base/2026 Volunteer Hours.xlsx");
+/** Real names, so it is not in git. Keep a local copy at this path, or point CASWJ_WORKBOOK_PATH at one. */
+export const workbookPath = path.resolve(process.cwd(), process.env.CASWJ_WORKBOOK_PATH || "docs/base/2026 Volunteer Hours.xlsx");
 export const anonWorkbookPath = path.resolve(process.cwd(), "docs/base/clockify-export-ANONYMIZED-sample.xlsx");
 export const fallbackProjectTitle = "No Specific Project";
 export const caswjSourceRefPrefix = "caswj-log:";

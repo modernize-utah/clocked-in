@@ -16,6 +16,7 @@ import {
   signUp,
   suite,
   waitForEmails,
+  joinOrg,
 } from "./client.mjs";
 
 const needKeys = [
@@ -88,12 +89,7 @@ describe("volunteer needs", suite, () => {
     ctx.admin = await signUp("needadmin");
     ctx.member = await signUp("needmember");
     ctx.org = await createJson(ctx.admin.accessToken, "/organizations", { name: label("Need org") });
-    await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/memberships`, {
-      email: ctx.member.email,
-      firstName: "Ada",
-      lastName: "Lovelace",
-      role: "MEMBER",
-    });
+    await joinOrg(ctx.admin.accessToken, ctx.org.id, ctx.member, { role: "MEMBER" });
     ctx.form = question();
     ctx.need = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/volunteer-needs`, {
       name: label("Setup"),

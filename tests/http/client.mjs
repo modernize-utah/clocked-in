@@ -30,7 +30,7 @@ export function missingId() {
   return randomUUID();
 }
 
-export async function callApi(path, { method = "GET", token, apiKey, tenant, body, query } = {}) {
+export async function callApi(path, { method = "GET", token, apiKey, tenant, body, query, headers: extraHeaders } = {}) {
   const url = new URL(path, apiBaseUrl);
   if (query) {
     for (const [key, value] of Object.entries(query)) {
@@ -53,6 +53,7 @@ export async function callApi(path, { method = "GET", token, apiKey, tenant, bod
   if (tenant) {
     headers["x-voluntime-tenant"] = tenant;
   }
+  Object.assign(headers, extraHeaders);
 
   const response = await fetch(url, {
     method,
@@ -533,6 +534,11 @@ async function withDatabase(run) {
   }
 }
 
+/** Runs one SQL statement, for tests that must plant rows the API would refuse. */
+export async function queryDatabase(sql, params = []) {
+  return withDatabase((client) => client.query(sql, params));
+}
+
 export async function grantSuperAdmin(userId) {
   await withDatabase(async (client) => {
     const result = await client.query('UPDATE "User" SET "isSuperAdmin" = true WHERE id = $1::uuid', [userId]);
@@ -644,7 +650,7 @@ export async function waitForLinearIssue(title, predicate) {
 
 export async function waitForCode(email) {
   const deadline = Date.now() + 8000;
-  const pattern = /Use this code to (?:reset your VolunTime password|accept the invite):\s*(\d{6})/;
+  const pattern = /Use this code to (?:reset your VolunTime password|accept the invite):\s*([A-Z0-9][A-Z0-9-]*)/;
   let last = "";
   while (Date.now() < deadline) {
     const response = await fetch(`${mailSinkUrl}/emails?to=${encodeURIComponent(email)}`);
@@ -674,6 +680,28 @@ export async function acceptInvite(token, email) {
   });
   assertStatus(response, 200);
   return response.json;
+}
+
+/** Adds an existing account to an organization the way people join: invite, then accept. */
+export async function joinOrg(adminToken, organizationId, person, { role = "MEMBER", departmentIds, managedDepartmentIds } = {}) {
+  await createJson(adminToken, `/organizations/${organizationId}/invitations`, {
+    email: person.email,
+    role,
+    firstName: person.firstName,
+    lastName: person.lastName,
+  });
+  const accepted = await acceptInvite(person.accessToken, person.email);
+  let membership = accepted.organizationMembership;
+  if (departmentIds || managedDepartmentIds) {
+    const response = await callApi(`/organizations/${organizationId}/memberships/${membership.id}`, {
+      method: "PATCH",
+      token: adminToken,
+      body: { ...(departmentIds ? { departmentIds } : {}), ...(managedDepartmentIds ? { managedDepartmentIds } : {}) },
+    });
+    assertStatus(response, 200);
+    membership = response.json;
+  }
+  return membership;
 }
 
 export const suite = { concurrency: false, timeout: 180_000 };

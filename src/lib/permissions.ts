@@ -125,6 +125,10 @@ export function apiKeyPermissions(isAdmin: boolean, canWrite: boolean): Permissi
   return readKeyPermissions;
 }
 
+export function isRoleScope(value: string): value is RoleScope {
+  return value === "organization" || value === "assigned_groups" || value === "self";
+}
+
 export function isPermission(value: string): value is Permission {
   return (permissions as readonly string[]).includes(value);
 }

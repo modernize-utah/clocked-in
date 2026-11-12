@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { before, describe, test } from "node:test";
-import { assertError, assertList, callApi, createJson, identity, label, signUp, suite } from "./client.mjs";
+import { assertError, assertList, callApi, createJson, joinOrg, identity, label, signUp, suite } from "./client.mjs";
 
 describe("member connections", suite, () => {
   const ctx = {};
@@ -24,19 +24,9 @@ describe("member connections", suite, () => {
       perHourRate: 80,
     });
     for (const person of [ctx.volunteer, ctx.other]) {
-      await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/memberships`, {
-        email: person.email,
-        firstName: person.firstName,
-        lastName: person.lastName,
-        role: "VOLUNTEER",
-      });
+      await joinOrg(ctx.admin.accessToken, ctx.org.id, person, { role: "VOLUNTEER" });
     }
-    await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/memberships`, {
-      email: ctx.member.email,
-      firstName: ctx.member.firstName,
-      lastName: ctx.member.lastName,
-      role: "MEMBER",
-    });
+    await joinOrg(ctx.admin.accessToken, ctx.org.id, ctx.member, { role: "MEMBER" });
     const rates = await callApi(`/organizations/${ctx.org.id}/hourly-rates`, { token: ctx.admin.accessToken });
     ctx.defaultRate = rates.json.items.find((item) => item.isDefault);
   });

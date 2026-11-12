@@ -14,7 +14,8 @@ import {
 } from "@/lib/api/features/memberships";
 import { readPreferences } from "@/lib/api/features/organizations";
 import { labels } from "@/lib/labels";
-import { allocateNumericCode, appUrl, hashCode, inviteMs } from "@/lib/api/security";
+import { appUrl, hashCode, inviteCode, inviteMs, normalizeInviteCode } from "@/lib/api/security";
+import { assertUnderRateLimit, minute, recordRateLimitFailure, type RateLimitRule } from "@/lib/api/rate-limit";
 import { prisma } from "@/lib/prisma";
 
 const invitationInclude = { role: true } as const;
@@ -109,11 +110,23 @@ export async function previewUsername(firstName: string, lastName: string) {
   return { username: "", base, collided: true };
 }
 
-function mailedCode() {
-  return allocateNumericCode(async (codeHash) => {
-    const existing = await prisma.invitation.findUnique({ where: { codeHash }, select: { id: true } });
-    return existing !== null;
-  });
+function inviteHash(code: string) {
+  return hashCode(normalizeInviteCode(code));
+}
+
+async function mailedCode() {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const code = inviteCode();
+    if (!(await prisma.invitation.findUnique({ where: { codeHash: inviteHash(code) }, select: { id: true } }))) {
+      return code;
+    }
+  }
+  throw new Error("Could not allocate an invite code.");
+}
+
+/** Wrong invite codes from one address, or by one account, are limited so codes cannot be guessed. */
+function lookupRule(ip: string | null | undefined): RateLimitRule | null {
+  return ip ? { key: `invite-lookup:ip:${ip}`, limit: 30, windowMs: 15 * minute } : null;
 }
 
 function inviteTarget(
@@ -143,7 +156,7 @@ async function create(
         organizationId,
         departmentId,
         roleId: await roleId(request.role, organizationId),
-        codeHash: hashCode(code),
+        codeHash: inviteHash(code),
         invitedByUserId: access.actorUserId,
         expiresAt: new Date(now.getTime() + inviteMs),
         createdAt: now,
@@ -260,7 +273,7 @@ async function resend(
     prisma.invitation.update({
       where: { id: invitation.id },
       data: {
-        codeHash: hashCode(code),
+        codeHash: inviteHash(code),
         expiresAt: new Date(now.getTime() + inviteMs),
         createdAt: now,
       },
@@ -318,14 +331,22 @@ export function acceptAuthRedirect(code: string, userExists: boolean) {
   return `${userExists ? "/login" : "/signup"}?next=${encodeURIComponent(next)}`;
 }
 
-export async function invitationAccount(code: string, pinnedOrganizationId?: string | null) {
+export async function invitationAccount(code: string, pinnedOrganizationId?: string | null, options?: { ip?: string | null }) {
   const trimmed = code.trim();
   if (!trimmed) {
     return null;
   }
 
-  const found = await prisma.invitation.findUnique({ where: { codeHash: hashCode(trimmed) } });
+  const rule = lookupRule(options?.ip);
+  if (rule) {
+    await assertUnderRateLimit(rule);
+  }
+
+  const found = await prisma.invitation.findUnique({ where: { codeHash: inviteHash(trimmed) } });
   if (!found || !usable(found, new Date())) {
+    if (rule) {
+      await recordRateLimitFailure(rule);
+    }
     return null;
   }
 
@@ -344,13 +365,22 @@ export async function invitationAccount(code: string, pinnedOrganizationId?: str
   };
 }
 
-export async function acceptInvitation(access: Access, request: AcceptInvitationRequest) {
+export async function acceptInvitation(access: Access, request: AcceptInvitationRequest, options?: { ip?: string | null }) {
   const caller = access.requireHuman();
+  const rules = [{ key: `invite-accept:user:${caller.id}`, limit: 10, windowMs: 15 * minute }, lookupRule(options?.ip)].filter(
+    (rule): rule is RateLimitRule => rule !== null,
+  );
+  for (const rule of rules) {
+    await assertUnderRateLimit(rule);
+  }
+
   const pinned = await access.pinnedOrganization();
   const now = new Date();
-  const codeHash = hashCode(request.code);
-  const found = await prisma.invitation.findUnique({ where: { codeHash } });
+  const found = await prisma.invitation.findUnique({ where: { codeHash: inviteHash(request.code) } });
   if (!found || !usable(found, now)) {
+    for (const rule of rules) {
+      await recordRateLimitFailure(rule);
+    }
     validation("The code is not valid.");
   }
 

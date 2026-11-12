@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Access } from "@/lib/api/access";
 import { guard } from "@/lib/api/db";
-import { conflict, forbidden, notFound, validation } from "@/lib/api/errors";
+import { ApiError, conflict, forbidden, notFound, validation } from "@/lib/api/errors";
 import { Body, has, list, page, requireString } from "@/lib/api/json";
 import {
   allPermissions,
@@ -14,6 +14,39 @@ import {
 import { prisma } from "@/lib/prisma";
 
 const roleInclude = { permissions: true } as const;
+
+const scopeRank: Record<RoleScope, number> = { self: 0, assigned_groups: 1, organization: 2 };
+
+/** A role's permissions: its stored rows, or the defaults for its code when it has none. */
+export function effectivePermissions(role: { code: string; permissions: { permission: string; allowed: boolean }[] }) {
+  return role.permissions.length
+    ? role.permissions.filter((item) => item.allowed && isPermission(item.permission)).map((item) => item.permission as Permission)
+    : defaultPermissionsForCode(role.code);
+}
+
+/**
+ * Anyone but an organization admin may grant only permissions they hold, and no wider scope than their own,
+ * so holding manage_roles, approve_access_requests, or import_people cannot become admin.
+ */
+export async function assertCanGrant(
+  access: Access,
+  organizationId: string,
+  grant: { permissions: Iterable<Permission>; scope?: RoleScope | null },
+) {
+  if (await access.isOrgAdmin(organizationId)) {
+    return;
+  }
+
+  const held = await access.permissionsFor(organizationId);
+  const missing = [...grant.permissions].find((permission) => !held.has(permission));
+  if (missing) {
+    throw new ApiError(403, "forbidden", `You can only grant permissions you have, and ${missing} is not one of them.`);
+  }
+
+  if (grant.scope && scopeRank[grant.scope] > scopeRank[await access.roleScope(organizationId)]) {
+    throw new ApiError(403, "forbidden", "You can only grant a scope as wide as your own.");
+  }
+}
 
 function normalizeScope(value: string): RoleScope {
   const scope = value.trim();
@@ -42,9 +75,7 @@ function roleJson(role: {
   scope: string;
   permissions: { permission: string; allowed: boolean }[];
 }) {
-  const granted = role.permissions.length
-    ? role.permissions.filter((item) => item.allowed).map((item) => item.permission)
-    : defaultPermissionsForCode(role.code);
+  const granted = effectivePermissions(role);
   return {
     id: role.id,
     code: role.code,
@@ -129,6 +160,7 @@ export async function createOrganizationRole(
   request: ReturnType<typeof parseCreateRole>,
 ) {
   await access.requirePermission(organizationId, "manage_roles");
+  await assertCanGrant(access, organizationId, { permissions: request.permissions, scope: request.scope });
   const existing = await prisma.role.findFirst({
     where: { code: request.code, OR: [{ organizationId: null }, { organizationId }] },
   });
@@ -169,6 +201,11 @@ export async function updateOrganizationRole(
   if (role.isSystem && !access.isSuperAdmin) {
     forbidden();
   }
+  const current = new Set(effectivePermissions(role));
+  await assertCanGrant(access, organizationId, {
+    permissions: (request.permissions ?? []).filter((permission) => !current.has(permission)),
+    scope: request.scope && request.scope !== role.scope ? request.scope : null,
+  });
   if (role.isSystem && role.code === "ADMIN" && request.permissions) {
     if (!request.permissions.includes("manage_roles") || !request.permissions.includes("manage_members")) {
       validation("Admin must keep manage_roles and manage_members.");

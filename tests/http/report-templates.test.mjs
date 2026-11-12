@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { before, describe, test } from "node:test";
-import { assertError, assertUuid, callApi, createJson, grantSuperAdmin, label, signUp, suite } from "./client.mjs";
+import { assertError, assertUuid, callApi, createJson, joinOrg, grantSuperAdmin, label, signUp, suite } from "./client.mjs";
 
 function valueCard(over = {}) {
   return {
@@ -35,12 +35,7 @@ describe("report templates", suite, () => {
     ctx.superAdmin = await signUp("tmplsuper");
     await grantSuperAdmin(ctx.superAdmin.user.id);
     ctx.org = await createJson(ctx.admin.accessToken, "/organizations", { name: label("Template org") });
-    await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/memberships`, {
-      email: ctx.member.email,
-      firstName: ctx.member.firstName,
-      lastName: ctx.member.lastName,
-      role: "MEMBER",
-    });
+    await joinOrg(ctx.admin.accessToken, ctx.org.id, ctx.member, { role: "MEMBER" });
     ctx.path = `/organizations/${ctx.org.id}/report-templates`;
   });
 
