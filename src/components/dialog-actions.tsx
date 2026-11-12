@@ -18,18 +18,19 @@ import { DialogFooter } from "@/components/ui/dialog";
 const DialogActionsContext = createContext<{
   target: HTMLElement | null;
   setTarget: (node: HTMLElement | null) => void;
+  plain: boolean;
 } | null>(null);
 
-export function DialogActionsProvider({ children }: { children: ReactNode }) {
+export function DialogActionsProvider({ children, plain = false }: { children: ReactNode; plain?: boolean }) {
   const [target, setTarget] = useState<HTMLElement | null>(null);
-  const value = useMemo(() => ({ target, setTarget }), [target]);
+  const value = useMemo(() => ({ target, setTarget, plain }), [target, plain]);
   return <DialogActionsContext.Provider value={value}>{children}</DialogActionsContext.Provider>;
 }
 
-export function DialogActionsSlot() {
+export function DialogActionsSlot({ className }: { className?: string }) {
   const context = useContext(DialogActionsContext);
   if (!context) return null;
-  return <div ref={(node) => context.setTarget(node)} className='empty:hidden' />;
+  return <div ref={(node) => context.setTarget(node)} className={cn("empty:hidden", className)} />;
 }
 
 export function DialogActions({
@@ -45,6 +46,9 @@ export function DialogActions({
   const actions = form ? withForm(children, form) : children;
   if (context) {
     if (!context.target) return null;
+    if (context.plain) {
+      return createPortal(<div className={cn("flex flex-wrap justify-end gap-2", className)}>{actions}</div>, context.target);
+    }
     return createPortal(<DialogFooter className={className}>{actions}</DialogFooter>, context.target);
   }
 

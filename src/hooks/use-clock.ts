@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { clockInAction, clockOutAction, type Placement } from "@/app/actions/entries";
+import { cancelClockAction, clockInAction, clockOutAction, resetClockAction, type Placement } from "@/app/actions/entries";
 import { useActionMutation } from "@/hooks/use-action-mutation";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { keys } from "@/lib/queries";
@@ -29,5 +29,13 @@ export function useClock() {
     invalidate,
     onSuccess: () => queryClient.setQueryData(keys.openPunch(viewer.id), null),
   });
-  return { clockIn, clockOut };
+  const cancelClock = useActionMutation<void, void>(cancelClockAction, {
+    invalidate,
+    onSuccess: () => queryClient.setQueryData(keys.openPunch(viewer.id), null),
+  });
+  const resetClock = useActionMutation<void, TimeEntry>(resetClockAction, {
+    invalidate,
+    onSuccess: (entry) => queryClient.setQueryData(keys.openPunch(viewer.id), entry ?? null),
+  });
+  return { clockIn, clockOut, cancelClock, resetClock };
 }

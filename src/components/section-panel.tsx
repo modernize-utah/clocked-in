@@ -7,10 +7,12 @@ export function SectionPanel({
   children,
   footer,
   scrollKey,
+  contained = false,
 }: {
   children: React.ReactNode;
   footer?: React.ReactNode;
   scrollKey?: string;
+  contained?: boolean;
 }) {
   const pathname = usePathname();
   const scroller = useRef<HTMLDivElement>(null);
@@ -19,6 +21,15 @@ export function SectionPanel({
     scroller.current?.scrollTo(0, 0);
     scroller.current?.closest("[data-shell-frame]")?.scrollTo(0, 0);
   }, [pathname, scrollKey]);
+
+  if (contained) {
+    return (
+      <div ref={scroller} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-0.5 lg:pe-4">
+        <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+        {footer ? <div className="shrink-0">{footer}</div> : null}
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-w-0 flex-col lg:min-h-0">

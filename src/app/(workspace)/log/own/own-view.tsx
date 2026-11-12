@@ -20,24 +20,25 @@ import { dayLabel, formatClock, formatMinutes, formatTime } from "@/lib/format";
 import type { DateRange, TimeEntry } from "@/lib/types";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { UnclassifiedBanner } from "@/components/unclassified-banner";
+import { logPaneClass, logScrollClass } from "../pane";
 
 export function OwnTimeView({ range }: { range: DateRange }) {
   return (
-    <div className="flex flex-col gap-6">
+    <div className={logPaneClass}>
       <UnclassifiedBanner />
-      <Tabs defaultValue={range.from || range.to ? "entries" : "timer"}>
-        <TabsList variant="line">
+      <Tabs defaultValue={range.from || range.to ? "entries" : "timer"} className="min-h-0 flex-1">
+        <TabsList variant="line" className="shrink-0">
           <TabsTrigger value="timer">Timer</TabsTrigger>
           <TabsTrigger value="manual">Manual</TabsTrigger>
           <TabsTrigger value="entries">Entries</TabsTrigger>
         </TabsList>
-        <TabsContent value="timer" className="mt-4">
+        <TabsContent value="timer" className={`mt-4 ${logScrollClass}`}>
           <TimerCard />
         </TabsContent>
-        <TabsContent value="manual" className="mt-4">
+        <TabsContent value="manual" className={`mt-4 ${logScrollClass}`}>
           <ManualEntryCard />
         </TabsContent>
-        <TabsContent value="entries" className="mt-4">
+        <TabsContent value="entries" className={`mt-4 ${logScrollClass}`}>
           <EntriesCard range={range} />
         </TabsContent>
       </Tabs>
@@ -49,12 +50,15 @@ function TimerCard() {
   const { punch } = useOpenPunch();
   const elapsed = useElapsed(punch?.startedAt);
   const { names } = useLookups();
-  const { clockIn, clockOut } = useClock();
+  const { clockIn, clockOut, cancelClock, resetClock } = useClock();
   const placement = usePlacement();
   const [description, setDescription] = useState("");
   const [confirming, setConfirming] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const running = Boolean(punch);
   const canStart = placement.punchReady;
+  const longerThanADay = Boolean(punch?.startedAt && Date.now() - new Date(punch.startedAt).getTime() >= 24 * 60 * 60 * 1000);
 
   return (
     <Card className="gap-0 py-0">
@@ -97,21 +101,35 @@ function TimerCard() {
             size="lg"
             variant={running ? "destructive" : "default"}
             className="h-10 min-w-32"
-            disabled={clockIn.isPending || clockOut.isPending || (!running && !canStart)}
+            disabled={clockIn.isPending || clockOut.isPending || cancelClock.isPending || resetClock.isPending || (!running && !canStart)}
           >
             {running ? <SquareIcon className="fill-current" /> : <PlayIcon className="fill-current" />}
             {running ? "Stop" : "Start timer"}
           </Button>
         </div>
       </form>
-      <div className="border-t bg-muted/30 p-4">
+      <div className="flex flex-col gap-4 border-t bg-muted/30 p-4">
         <PlacementFields state={placement} compact optional />
+        {running ? (
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" onClick={() => setResetting(true)} disabled={resetClock.isPending || cancelClock.isPending}>
+              Reset start
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => setDiscarding(true)} disabled={resetClock.isPending || cancelClock.isPending}>
+              Cancel timer
+            </Button>
+          </div>
+        ) : null}
       </div>
       <ConfirmDialog
         open={confirming}
         onOpenChange={setConfirming}
         title="Check this time before saving"
-        description="Confirm the project, task category, and group are right, then save. You can leave them blank and classify later."
+        description={
+          longerThanADay
+            ? "This timer has been running longer than 24 hours. Saving keeps the first 24 hours, the most one entry can hold. You can leave the project, task category, and group blank and classify later."
+            : "Confirm the project, task category, and group are right, then save. You can leave them blank and classify later."
+        }
         confirmLabel="Save time"
         onConfirm={() => {
           const next = placement.placement(description);
@@ -130,6 +148,28 @@ function TimerCard() {
               },
             },
           );
+        }}
+      />
+      <ConfirmDialog
+        open={resetting}
+        onOpenChange={setResetting}
+        title="Reset this timer?"
+        description="The clock starts over from now. The time so far is not saved."
+        confirmLabel="Reset start"
+        onConfirm={() => {
+          setResetting(false);
+          resetClock.mutate();
+        }}
+      />
+      <ConfirmDialog
+        open={discarding}
+        onOpenChange={setDiscarding}
+        title="Cancel this timer?"
+        description="This discards the running timer. Nothing is saved."
+        confirmLabel="Cancel timer"
+        onConfirm={() => {
+          setDiscarding(false);
+          cancelClock.mutate();
         }}
       />
     </Card>

@@ -13,10 +13,10 @@ import {
   type OrganizationPreferences,
 } from "@/lib/api/features/organizations";
 import { createTheme, deleteTheme, updateTheme, type ThemeWriteRequest } from "@/lib/api/features/themes";
-import { forbidden, validation } from "@/lib/api/errors";
-import { brandField, isBrandKind, isVercelBlobUrl, type BrandKind } from "@/lib/brand";
+import { requireBrandKind, removeOrganizationBrand, uploadOrganizationBrand } from "@/lib/api/features/brand";
+import { forbidden } from "@/lib/api/errors";
+import { type BrandKind } from "@/lib/brand";
 import { run, text } from "@/lib/server/action";
-import { deleteBrandAsset, putBrandAsset, resizeBrandImage, storedBrandUrl } from "@/lib/server/brand-assets";
 import { getOrganizations } from "@/lib/server/dal";
 import { requireAccess } from "@/lib/server/session";
 import { writeOrganization } from "@/lib/server/session-cookies";
@@ -184,14 +184,6 @@ export async function deleteThemeAction(organizationId: string, themeId: string)
   }, "Theme deleted.");
 }
 
-function requireBrandKind(kind: string): BrandKind {
-  if (!isBrandKind(kind)) {
-    validation("kind must be mark, wordmark, or wordmarkOnLight.");
-  }
-
-  return kind;
-}
-
 export async function uploadOrganizationBrandAction(
   organizationId: string,
   kind: BrandKind,
@@ -200,24 +192,7 @@ export async function uploadOrganizationBrandAction(
   return run(async () => {
     const access = await requireAccess();
     const asset = requireBrandKind(kind);
-    const organization = await getOrganization(access, organizationId);
-    const file = formData.get("file");
-    if (!(file instanceof File)) {
-      validation("Choose an image to upload.");
-    }
-
-    const buffer = await resizeBrandImage(file, asset);
-    const blob = await putBrandAsset(organizationId, asset, buffer);
-    const previous = storedBrandUrl(organization, asset);
-    await updateOrganization(
-      access,
-      organizationId,
-      parseUpdateOrganization({ [brandField(asset)]: blob.url }),
-    );
-    if (previous && isVercelBlobUrl(previous) && previous !== blob.url) {
-      await deleteBrandAsset(previous);
-    }
-
+    await uploadOrganizationBrand(access, organizationId, asset, formData.get("file"));
     refresh();
   }, `${assetLabel(kind)} saved.`);
 }
@@ -229,10 +204,7 @@ export async function removeOrganizationBrandAction(
   return run(async () => {
     const access = await requireAccess();
     const asset = requireBrandKind(kind);
-    const organization = await getOrganization(access, organizationId);
-    const previous = storedBrandUrl(organization, asset);
-    await updateOrganization(access, organizationId, parseUpdateOrganization({ [brandField(asset)]: null }));
-    await deleteBrandAsset(previous);
+    await removeOrganizationBrand(access, organizationId, asset);
     refresh();
   }, `${assetLabel(kind)} removed.`);
 }

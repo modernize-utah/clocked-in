@@ -10,6 +10,7 @@ import { useWorkspace } from "@/hooks/use-workspace";
 import { canLogMemberTime } from "@/lib/roles";
 import { EmptyState } from "@/components/empty-state";
 import { PageSkeleton } from "@/components/skeletons";
+import { logScrollClass } from "../pane";
 
 export function MemberTimeView() {
   const { viewer, isAdmin, isCoordinator, groupDepartments } = useWorkspace();
@@ -23,7 +24,7 @@ export function MemberTimeView() {
   const eligible = selectableMembers(scoped, viewer.id, { excludeSelf: true, activeOnly: true });
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className={logScrollClass}>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

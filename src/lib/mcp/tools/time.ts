@@ -10,8 +10,11 @@ import {
   updateCollective,
 } from "@/lib/api/features/collective";
 import {
+  cancelClock,
   clockIn,
   clockOut,
+  parseClockTarget,
+  resetClock,
   createTimeEntry,
   deleteTimeEntry,
   getTimeEntry,
@@ -97,6 +100,15 @@ export function registerTimeTools(server: McpServer) {
       }
       return clockOut(mcpAccess(), parseClockOut(body));
     },
+  );
+
+  tool(server, "cancel_clock", "Discard a user's running timer without saving it. userId is required for organization API keys.", { userId: guid }, async ({ userId }) => {
+    await cancelClock(mcpAccess(), parseClockTarget({ userId }));
+    return "cancelled";
+  });
+
+  tool(server, "reset_clock", "Restart a user's running timer from now. The time so far is not saved. userId is required for organization API keys.", { userId: guid }, ({ userId }) =>
+    resetClock(mcpAccess(), parseClockTarget({ userId })),
   );
 
   tool(

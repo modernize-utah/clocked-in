@@ -20,6 +20,7 @@ import { connectionPersonName, memberRelationships, relationshipFor } from "@/li
 import { connectionsQuery, keys } from "@/lib/queries";
 import { canLogConnectionTime } from "@/lib/roles";
 import { PersonIdentityFields, readPersonIdentity } from "@/components/entity-forms/person-identity-fields";
+import { logScrollClass } from "../pane";
 
 const relationshipOptions = memberRelationships.map((relationship) => ({ value: relationship, label: relationship }));
 
@@ -47,7 +48,7 @@ export function ConnectionsTimeView() {
   });
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className={logScrollClass}>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
