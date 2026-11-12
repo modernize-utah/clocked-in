@@ -333,6 +333,24 @@ describe("time entries", suite, () => {
     assert.deepEqual(closed.json.tagIds, [ctx.tag.id]);
     const none = await callApi("/time/clock-out", { method: "POST", token: ctx.admin.accessToken, body: {} });
     assertError(none, 409, "conflict", "No open punch.");
+    const restarted = await createJson(ctx.admin.accessToken, "/time/clock-in", {
+      organizationId: ctx.org.id,
+      projectId: ctx.project.id,
+      taskCategoryId: ctx.category.id,
+      description: "Restart me",
+    });
+    const reset = await callApi("/time/clock-reset", { method: "POST", token: ctx.admin.accessToken, body: {} });
+    assert.equal(reset.status, 200);
+    assert.equal(reset.json.id, restarted.id);
+    assert.equal(reset.json.endedAt, null);
+    assert.equal(reset.json.durationMinutes, null);
+    assert.ok(new Date(reset.json.startedAt).getTime() >= new Date(restarted.startedAt).getTime());
+    const cancelled = await callApi("/time/clock-cancel", { method: "POST", token: ctx.admin.accessToken, body: {} });
+    assert.equal(cancelled.status, 204);
+    const afterCancel = await callApi("/time/clock-out", { method: "POST", token: ctx.admin.accessToken, body: {} });
+    assertError(afterCancel, 409, "conflict", "No open punch.");
+    const cancelMissing = await callApi("/time/clock-cancel", { method: "POST", token: ctx.admin.accessToken, body: {} });
+    assertError(cancelMissing, 409, "conflict", "No open punch.");
     const times = await callApi(`/time-entries/${open.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,

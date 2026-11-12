@@ -7,7 +7,7 @@ import { useWorkspace } from "@/hooks/use-workspace";
 import { connectionsQuery } from "@/lib/queries";
 import { canLogConnectionTime, canLogGroupTime, canLogMemberTime } from "@/lib/roles";
 
-export function LogNav() {
+function useLogNavItems() {
   const { isAdmin, role, groupDepartments, organization } = useWorkspace();
   const connections = useQuery({
     ...connectionsQuery(organization?.id ?? ""),
@@ -21,11 +21,22 @@ export function LogNav() {
         connectionCount: connections.data?.length ?? 0,
       })
     : false;
-  const items = [
+  return [
     { href: "/log/own", label: "Log Own Time", icon: TimerIcon },
     ...(canLogMemberTime(isAdmin, groupDepartments) ? [{ href: "/log/member", label: "Log Member Time", icon: UserRoundIcon }] : []),
     ...(showConnections ? [{ href: "/log/connections", label: "Log Connection Time", icon: Link2Icon }] : []),
     ...(canLogGroupTime(groupDepartments) ? [{ href: "/log/group", label: "Log Group Time", icon: UsersIcon }] : []),
   ];
-  return <SectionNav items={items} />;
+}
+
+/** Desktop section list. The compact menu lives in the page header. */
+export function LogNav() {
+  return <SectionNav items={useLogNavItems()} mobile="none" />;
+}
+
+/** Icon button for the current log type. Hidden when there is only one choice. */
+export function LogTypeMenu() {
+  const items = useLogNavItems();
+  if (items.length < 2) return null;
+  return <SectionNav items={items} desktop={false} label="Log type" mobile="icon" />;
 }

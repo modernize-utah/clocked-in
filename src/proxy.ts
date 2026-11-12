@@ -47,6 +47,40 @@ function matches(pathname: string, prefixes: string[]) {
   return prefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
+/** Expo web runs on another local port and calls this API with a bearer token. */
+function browserOrigin(value: string | null) {
+  if (!value) return null;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+  const host = url.hostname.toLowerCase();
+  if (host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "::1") {
+    return url.origin;
+  }
+  const parts = host.split(".").map(Number);
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return null;
+  }
+  const [first, second] = parts;
+  const privateAddress =
+    first === 10 || (first === 192 && second === 168) || (first === 172 && second !== undefined && second >= 16 && second <= 31);
+  return privateAddress ? url.origin : null;
+}
+
+function withCors(response: NextResponse, origin: string | null) {
+  if (!origin) return response;
+  response.headers.set("Access-Control-Allow-Origin", origin);
+  response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD");
+  response.headers.set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Api-Key");
+  response.headers.set("Access-Control-Max-Age", "600");
+  response.headers.append("Vary", "Origin");
+  return response;
+}
+
 function rewriteFeedbackApi(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
   if (pathname !== "/feedback" && !pathname.startsWith("/feedback/")) {
@@ -83,11 +117,16 @@ function rewriteFeedbackApi(request: NextRequest) {
 }
 
 export async function proxy(request: NextRequest) {
+  const origin = browserOrigin(request.headers.get("origin"));
+  if (origin && request.method === "OPTIONS") {
+    return withCors(new NextResponse(null, { status: 204 }), origin);
+  }
+
   const tenantSlug = resolveRequestTenantSlug(request.headers);
   const feedbackApiUrl = rewriteFeedbackApi(request);
 
   if (request.headers.has("authorization")) {
-    return feedbackApiUrl ? NextResponse.rewrite(feedbackApiUrl) : NextResponse.next();
+    return withCors(feedbackApiUrl ? NextResponse.rewrite(feedbackApiUrl) : NextResponse.next(), origin);
   }
 
   const { pathname, search } = request.nextUrl;
@@ -137,7 +176,7 @@ export async function proxy(request: NextRequest) {
     writeSession(response.cookies, issued);
   }
 
-  return response;
+  return withCors(response, origin);
 }
 
 export const config = {

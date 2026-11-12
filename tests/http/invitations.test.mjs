@@ -171,4 +171,46 @@ describe("invitations", suite, () => {
     assertList(listed.json);
     assert.ok(listed.json.items.some((item) => item.id === created.id));
   });
+
+  test("resend replaces the invite code", async () => {
+    const recruit = await signUp("inviteresend");
+    const created = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/invitations`, {
+      email: recruit.email,
+      role: "VOLUNTEER",
+    });
+    const first = await waitForCode(recruit.email);
+    const resent = await callApi(`/organizations/${ctx.org.id}/invitations/${created.id}/resend`, {
+      method: "POST",
+      token: ctx.admin.accessToken,
+    });
+    assert.equal(resent.status, 200);
+    assertInvitation(resent.json, {
+      email: recruit.email,
+      organizationId: ctx.org.id,
+      departmentId: null,
+      role: "VOLUNTEER",
+    });
+    assert.equal(resent.json.id, created.id);
+    const second = await waitForCode(recruit.email);
+    assert.notEqual(second, first);
+    const forbidden = await callApi(`/organizations/${ctx.org.id}/invitations/${created.id}/resend`, {
+      method: "POST",
+      token: ctx.member.accessToken,
+    });
+    assertError(forbidden, 403, "forbidden", "Forbidden.");
+    const missing = await callApi(`/organizations/${ctx.org.id}/invitations/${missingId()}/resend`, {
+      method: "POST",
+      token: ctx.admin.accessToken,
+    });
+    assertError(missing, 404, "not_found", "Not found.");
+    await callApi(`/organizations/${ctx.org.id}/invitations/${created.id}`, {
+      method: "DELETE",
+      token: ctx.admin.accessToken,
+    });
+    const revoked = await callApi(`/organizations/${ctx.org.id}/invitations/${created.id}/resend`, {
+      method: "POST",
+      token: ctx.admin.accessToken,
+    });
+    assertError(revoked, 409, "conflict", "This invite has been revoked.");
+  });
 });

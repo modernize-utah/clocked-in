@@ -14,7 +14,7 @@ export function UnclassifiedBanner() {
   const count = data?.count ?? 0;
   if (count === 0) return null;
   return (
-    <div className="rounded-lg border border-highlight/40 bg-highlight/10 px-4 py-3 text-sm">
+    <div className="shrink-0 rounded-lg border border-highlight/40 bg-highlight/10 px-4 py-3 text-sm">
       <p>
         {count === 1 ? "1 time entry needs" : `${count} time entries need`} a project, task category, or group.{" "}
         <Link href="/entries?unclassified=1" className="font-medium underline underline-offset-2">

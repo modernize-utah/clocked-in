@@ -386,6 +386,10 @@ export type ClockOutRequest = {
   userId: string | null;
 };
 
+export function parseClockTarget(body: Body) {
+  return { userId: has(body, "userId") ? optionalUuid(body, "userId") : null };
+}
+
 export function parseClockOut(body: Body): ClockOutRequest {
   return {
     description: optional(body, "description", (b, k) => description(optionalString(b, k))),
@@ -1024,6 +1028,10 @@ export async function clockOut(access: Access, request: ClockOutRequest) {
     if (durationMinutes < 1) {
       endedAt = new Date(startedAt.getTime() + 60000);
       durationMinutes = 1;
+    } else if (durationMinutes > 1440) {
+      // One entry holds at most 24 hours. A timer left running longer still closes.
+      durationMinutes = 1440;
+      endedAt = new Date(startedAt.getTime() + 1440 * 60000);
     }
 
     assertDurationMinutes(durationMinutes);
@@ -1072,6 +1080,57 @@ export async function clockOut(access: Access, request: ClockOutRequest) {
     }
   }
   return json;
+}
+
+async function requireOpenPunch(tx: Prisma.TransactionClient, userId: string, organizationId?: string) {
+  const open = await tx.userTimeEntry.findFirst({
+    where: { userId, mode: "Punch", endedAt: null, ...(organizationId ? { organizationId } : {}) },
+  });
+  if (!open) {
+    conflict("No open punch.");
+  }
+  return open;
+}
+
+/** Drops the running timer. Nothing is saved. */
+export async function cancelClock(access: Access, request: { userId: string | null }) {
+  const pinned = await access.pinnedOrganization();
+  const userId = punchUserId(access, request.userId);
+  await transaction(async (tx) => {
+    await lockUser(tx, userId);
+    const open = await requireOpenPunch(tx, userId, pinned?.id);
+    await assertCanWriteUserEntry(access, userId, open.organizationId, open.departmentId);
+    await tx.userTimeEntry.delete({ where: { id: open.id } });
+  });
+}
+
+/** Keeps the running timer and its details, and starts the clock over from now. */
+export async function resetClock(access: Access, request: { userId: string | null }) {
+  const pinned = await access.pinnedOrganization();
+  const userId = punchUserId(access, request.userId);
+  const user = await prisma.user.findUnique({ where: { id: userId }, include: accountInclude });
+  if (!user) {
+    notFound();
+  }
+
+  const startedAt = utcNow();
+  const entry = await transaction(async (tx) => {
+    await lockUser(tx, userId);
+    const open = await requireOpenPunch(tx, userId, pinned?.id);
+    await assertCanWriteUserEntry(access, userId, open.organizationId, open.departmentId);
+    return tx.userTimeEntry.update({
+      where: { id: open.id },
+      data: {
+        startedAt,
+        occurredOn: localDate(startedAt, timeZoneOf(user)),
+        endedAt: null,
+        durationMinutes: null,
+        inKindValue: null,
+      },
+      include: entryInclude,
+    });
+  });
+  return timeEntryJson(entry);
 }
 
 export async function countUnclassified(access: Access, organizationId: string) {

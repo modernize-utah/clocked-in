@@ -126,6 +126,7 @@ Both return:
 ```
 
 - `GET /users/me` and `PATCH /users/me`
+- `GET /users/me/workspace?organizationId=` returns the caller's apex workspace. `organizationId` is optional. An unknown or inaccessible id is ignored and the first organization is selected, matching the website when no organization cookie is stored. The response is `{ "viewer", "organizations", "organization", "isAdmin", "isCoordinator", "canSelectRate", "role", "permissions", "groupDepartments" }`. `viewer` is `{ "id", "username", "email", "isSuperAdmin", "name", "initials", "avatarUrl", "timezone" }`. `organizations` is the same list as `GET /organizations` with `limit=100`. `organization` is the selected item or null. `role` is the active membership role code, or null. `permissions` is that organization's permission set. `groupDepartments` is `"all"` for an admin and otherwise the department ids the caller administers. `isCoordinator` is true when `groupDepartments` is a non-empty list. A tenant host and `x-voluntime-tenant` do not pin this route. An API key is forbidden. `mustChangePassword` still returns 403 `password_change_required`.
 - `GET /users` is SuperAdmin only, sorted by `username`
 - `GET /users/{id}` is the user, a SuperAdmin, or someone who shares an organization. Sharing means the caller has an active membership in an organization the user belongs to. `phone`, `zipCode`, and `notes` are null unless the caller is the user, a SuperAdmin, or an admin of a shared organization.
 - `PATCH /users/{id}` is the user or a SuperAdmin

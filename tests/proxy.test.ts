@@ -18,6 +18,38 @@ after(() => {
   process.env = originalEnv;
 });
 
+test("local browser clients can call the API from another port", async () => {
+  const preflight = await proxy(
+    new NextRequest("http://127.0.0.1:3025/auth/login", {
+      method: "OPTIONS",
+      headers: {
+        origin: "http://localhost:8081",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "content-type",
+      },
+    }),
+  );
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get("access-control-allow-origin"), "http://localhost:8081");
+  assert.match(preflight.headers.get("access-control-allow-headers") ?? "", /content-type/i);
+
+  const login = await proxy(
+    new NextRequest("http://127.0.0.1:3025/auth/login", {
+      method: "POST",
+      headers: { origin: "http://192.168.0.123:8081", "content-type": "application/json" },
+    }),
+  );
+  assert.equal(login.headers.get("access-control-allow-origin"), "http://192.168.0.123:8081");
+
+  const website = await proxy(
+    new NextRequest("http://voluntime.app/auth/login", {
+      method: "POST",
+      headers: { origin: "https://evil.example", "content-type": "application/json" },
+    }),
+  );
+  assert.equal(website.headers.get("access-control-allow-origin"), null);
+});
+
 test("bearer API requests stay on Next even with an obsolete forwarding setting", async () => {
   const response = await proxy(
     new NextRequest("http://example.test/organizations", {

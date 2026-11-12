@@ -1,6 +1,5 @@
-import { SectionLayout } from "@/components/section-layout";
-import { LogNav } from "./log-nav";
+import { LogSection } from "./log-section";
 
 export default function LogLayout({ children }: LayoutProps<"/log">) {
-  return <SectionLayout nav={<LogNav />}>{children}</SectionLayout>;
+  return <LogSection>{children}</LogSection>;
 }

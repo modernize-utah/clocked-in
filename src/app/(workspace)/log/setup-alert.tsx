@@ -23,7 +23,7 @@ export function SetupAlert({
         : `a ${copy.taskCategory.toLowerCase()}`;
 
   return (
-    <div role="alert" className="flex items-start gap-3 rounded-xl bg-muted px-4 py-3 text-sm ring-1 ring-foreground/10">
+    <div role="alert" className="flex shrink-0 items-start gap-3 rounded-xl bg-muted px-4 py-3 text-sm ring-1 ring-foreground/10">
       <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
       <p>
         {isAdmin

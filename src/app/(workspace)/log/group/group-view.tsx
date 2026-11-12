@@ -28,6 +28,7 @@ import { dayLabel, formatCurrency, formatMinutes, formatTime, toDateOnly } from 
 import { keys } from "@/lib/queries";
 import { canLogGroupTime } from "@/lib/roles";
 import type { GroupSession, Paged } from "@/lib/types";
+import { logPaneClass, logScrollClass } from "../pane";
 import { SetupAlert } from "../setup-alert";
 
 function sessionMinutes(session: GroupSession) {
@@ -78,16 +79,16 @@ export function GroupTimeView() {
   if (!allowed) return null;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className={logPaneClass}>
       {missingProject || missingCategory ? (
         <SetupAlert isAdmin={isAdmin} missingProject={missingProject} missingCategory={missingCategory} action="save group time" />
       ) : null}
-      <Tabs defaultValue="record">
-        <TabsList variant="line">
+      <Tabs defaultValue="record" className="min-h-0 flex-1">
+        <TabsList variant="line" className="shrink-0">
           <TabsTrigger value="record">Record</TabsTrigger>
           <TabsTrigger value="entries">Entries</TabsTrigger>
         </TabsList>
-        <TabsContent value="record" className="mt-4">
+        <TabsContent value="record" className={`mt-4 ${logScrollClass}`}>
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -103,7 +104,7 @@ export function GroupTimeView() {
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="entries" className="mt-4 flex flex-col gap-6">
+        <TabsContent value="entries" className={`mt-4 flex flex-col gap-6 ${logScrollClass}`}>
           {sessions.length ? (
             <p className="text-sm text-muted-foreground">
               {sessions.length} session{sessions.length === 1 ? "" : "s"} · {formatCurrency(totalValue)} in-kind

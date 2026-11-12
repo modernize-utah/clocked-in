@@ -2,7 +2,10 @@
 
 import {
   clockIn,
+  cancelClock,
   clockOut,
+  parseClockTarget,
+  resetClock,
   createTimeEntries,
   createTimeEntry,
   deleteTimeEntry,
@@ -117,6 +120,20 @@ export async function clockInAction(placement: Placement) {
     const access = await requireAccess();
     return clockIn(access, parseClockIn(body(placement)));
   }, "Timer started.");
+}
+
+export async function cancelClockAction() {
+  return run(async () => {
+    const access = await requireAccess();
+    await cancelClock(access, parseClockTarget({}));
+  }, "Timer cancelled.");
+}
+
+export async function resetClockAction() {
+  return run(async () => {
+    const access = await requireAccess();
+    return resetClock(access, parseClockTarget({}));
+  }, "Timer restarted.");
 }
 
 export async function clockOutAction(

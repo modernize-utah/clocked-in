@@ -72,6 +72,26 @@ export async function callApi(path, { method = "GET", token, apiKey, tenant, bod
   return { status: response.status, json, text, headers: response.headers };
 }
 
+export async function callForm(path, { method = "POST", token, form } = {}) {
+  const headers = {};
+  if (token) {
+    headers.authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(new URL(path, apiBaseUrl), { method, headers, body: form });
+  const text = await response.text();
+  let json = null;
+  if (text) {
+    try {
+      json = JSON.parse(text);
+    } catch {
+      json = null;
+    }
+  }
+
+  return { status: response.status, json, text, headers: response.headers };
+}
+
 export function assertStatus(response, status) {
   assert.equal(response.status, status, `expected ${status}, got ${response.status}: ${response.text.slice(0, 600)}`);
 }
