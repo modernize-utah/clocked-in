@@ -188,11 +188,14 @@ export async function logOut(access: Access, request: RefreshTokenRequest) {
   return { ok: true };
 }
 
-/** A reset uses an organization's template and host only when pinned or the person belongs to one. */
+/**
+ * A reset uses an organization's template and host only when the person is an active member,
+ * because that organization's admins edit the template that carries the reset code.
+ */
 async function resetOrganization(userId: string, tenantSlug?: string | null) {
   if (tenantSlug) {
     const pinned = await prisma.organization.findFirst({
-      where: { slug: tenantSlug },
+      where: { slug: tenantSlug, memberships: { some: { userId, isActive: true } } },
       select: { id: true, slug: true },
     });
     if (pinned) {
