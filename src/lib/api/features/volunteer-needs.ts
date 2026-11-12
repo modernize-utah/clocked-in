@@ -682,10 +682,11 @@ export async function signUpForNeed(
 }
 
 async function changeVetting(access: Access, needId: string, signupId: string, vetted: boolean) {
+  // Access checks use the global client, so they run before the transaction holds the connection.
+  const need = await prisma.volunteerNeed.findUnique({ where: { id: needId } });
+  if (!need) notFound();
+  await access.requireOrganization(need.organizationId, true);
   await transaction(async (tx) => {
-    const need = await tx.volunteerNeed.findUnique({ where: { id: needId } });
-    if (!need) notFound();
-    await access.requireOrganization(need.organizationId, true);
     await tx.$queryRaw`SELECT "id" FROM "VolunteerNeed" WHERE "id" = CAST(${need.id} AS uuid) FOR UPDATE`;
     const locked = await tx.volunteerNeed.findUniqueOrThrow({ where: { id: need.id } });
     const signup = await tx.volunteerSignup.findFirst({ where: { id: signupId, volunteerNeedId: need.id } });
@@ -711,10 +712,10 @@ export function unvetSignup(access: Access, needId: string, signupId: string) {
 }
 
 export async function deleteSignup(access: Access, needId: string, signupId: string) {
+  const need = await prisma.volunteerNeed.findUnique({ where: { id: needId } });
+  if (!need) notFound();
+  await access.requireOrganization(need.organizationId, true);
   await transaction(async (tx) => {
-    const need = await tx.volunteerNeed.findUnique({ where: { id: needId } });
-    if (!need) notFound();
-    await access.requireOrganization(need.organizationId, true);
     await tx.$queryRaw`SELECT "id" FROM "VolunteerNeed" WHERE "id" = CAST(${need.id} AS uuid) FOR UPDATE`;
     const locked = await tx.volunteerNeed.findUniqueOrThrow({ where: { id: need.id } });
     const signup = await tx.volunteerSignup.findFirst({ where: { id: signupId, volunteerNeedId: need.id } });

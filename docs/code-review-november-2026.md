@@ -178,6 +178,14 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
 
 ### DATA-01 — Production pool of one connection, and transactions that query outside it · Performance, correctness · M **(verify)** · [BAD-134](https://linear.app/baddley/issue/BAD-134)
 
+> **Status: done (12 Nov 2026), on `staging`.** What shipped:
+> - Confirmed locally. With the pool forced to one connection, the old code failed 3 more clock and need tests and logged 4 transaction errors. The fixed code logged none.
+> - `clockOut`, `cancelClock` and `resetClock` now run their access, project, category, tag and rate checks before the transaction. Inside the lock they re-read the timer and return 409 if it changed in between.
+> - Need vetting, un-vetting and sign-up deletion check access before their transactions.
+> - The Prisma Postgres pool is now 3 connections with a 5-second connection timeout, instead of 1 with none.
+> - A new `DATABASE_POOL_MAX` override exists; set it to `1` locally or in CI to catch this bug class. The full HTTP suite passes with it (189/191, only the two known stale tests failing).
+> - Not done: `attachDatabasePool` from `@vercel/functions` (not a dependency yet), and a lint rule against the global client inside transactions. Run TEST-01's CI job with `DATABASE_POOL_MAX=1` to cover this instead.
+
 - **Where:**
   - `src/lib/prisma-connection.ts` 23–28: `max: 1`, no `connectionTimeoutMillis`, 5 s idle timeout.
   - Global `prisma.*` calls inside `transaction()`:

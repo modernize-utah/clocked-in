@@ -2,7 +2,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { Access, Account, accountInclude } from "@/lib/api/access";
 import { volunteerConnectedOrganizationIds, volunteerConnectedTo } from "@/lib/api/features/connections";
 import { readPreferences } from "@/lib/api/features/organizations";
-import { guard, lockUser, transaction } from "@/lib/api/db";
+import { Db, guard, lockUser, transaction } from "@/lib/api/db";
 import { conflict, forbidden, notFound, validation } from "@/lib/api/errors";
 import {
   asDateOnly,
@@ -1002,23 +1002,28 @@ export async function clockIn(access: Access, request: { placement: EntryPlaceme
 export async function clockOut(access: Access, request: ClockOutRequest) {
   const pinned = await access.pinnedOrganization();
   const userId = punchUserId(access, request.userId);
+  // Checks run before the transaction: they use the global client, and the production pool has one connection.
+  const open = await requireOpenPunch(prisma, userId, pinned?.id);
+  const departmentId = request.departmentId.set ? request.departmentId.value : open.departmentId;
+  const projectId = request.projectId.set ? request.projectId.value : open.projectId;
+  const taskCategoryId = request.taskCategoryId.set ? request.taskCategoryId.value : open.taskCategoryId;
+  await assertCanWriteUserEntry(access, userId, open.organizationId, departmentId);
+  if (projectId) await assertProject(access, userId, open.organizationId, departmentId, projectId);
+  if (taskCategoryId) await assertTaskCategory(open.organizationId, taskCategoryId);
+  const tagIds = request.tagIds.set ? await tagIdsFor(open.organizationId, request.tagIds.value) : null;
+  const rateType = open.hourlyRateId
+    ? ((await prisma.hourlyRate.findUnique({ where: { id: open.hourlyRateId }, select: { type: true } }))?.type ?? "Volunteer")
+    : "Volunteer";
+
   const entry = await transaction(async (tx) => {
     await lockUser(tx, userId);
-    const open = await tx.userTimeEntry.findFirst({
-      where: { userId, mode: "Punch", endedAt: null, ...(pinned ? { organizationId: pinned.id } : {}) },
-    });
-    if (!open?.startedAt) {
+    const locked = await requireOpenPunch(tx, userId, pinned?.id);
+    assertSamePunch(open, locked);
+    if (!locked.startedAt) {
       conflict("No open punch.");
     }
 
-    const departmentId = request.departmentId.set ? request.departmentId.value : open.departmentId;
-    const projectId = request.projectId.set ? request.projectId.value : open.projectId;
-    const taskCategoryId = request.taskCategoryId.set ? request.taskCategoryId.value : open.taskCategoryId;
-    await assertCanWriteUserEntry(access, userId, open.organizationId, departmentId);
-    if (projectId) await assertProject(access, userId, open.organizationId, departmentId, projectId);
-    if (taskCategoryId) await assertTaskCategory(open.organizationId, taskCategoryId);
-
-    const startedAt = open.startedAt;
+    const startedAt = locked.startedAt;
     let endedAt = utcNow();
     if (endedAt <= startedAt) {
       endedAt = new Date(startedAt.getTime() + 1000);
@@ -1035,17 +1040,13 @@ export async function clockOut(access: Access, request: ClockOutRequest) {
     }
 
     assertDurationMinutes(durationMinutes);
-    const tagIds = request.tagIds.set ? await tagIdsFor(open.organizationId, request.tagIds.value) : null;
-    const rateType = open.hourlyRateId
-      ? ((await tx.hourlyRate.findUnique({ where: { id: open.hourlyRateId }, select: { type: true } }))?.type ?? "Volunteer")
-      : "Volunteer";
     return tx.userTimeEntry.update({
-      where: { id: open.id },
+      where: { id: locked.id },
       data: {
         endedAt,
         durationMinutes,
-        inKindValue: entryInKind(rateType, durationMinutes, Number(open.hourlyRate)),
-        description: or(request.description, open.description),
+        inKindValue: entryInKind(rateType, durationMinutes, Number(locked.hourlyRate)),
+        description: or(request.description, locked.description),
         departmentId,
         projectId,
         taskCategoryId,
@@ -1082,8 +1083,8 @@ export async function clockOut(access: Access, request: ClockOutRequest) {
   return json;
 }
 
-async function requireOpenPunch(tx: Prisma.TransactionClient, userId: string, organizationId?: string) {
-  const open = await tx.userTimeEntry.findFirst({
+async function requireOpenPunch(db: Db, userId: string, organizationId?: string) {
+  const open = await db.userTimeEntry.findFirst({
     where: { userId, mode: "Punch", endedAt: null, ...(organizationId ? { organizationId } : {}) },
   });
   if (!open) {
@@ -1092,15 +1093,34 @@ async function requireOpenPunch(tx: Prisma.TransactionClient, userId: string, or
   return open;
 }
 
+/** The timer checked before a transaction must still be the one the transaction locked. */
+function assertSamePunch(
+  checked: { id: string; organizationId: string; departmentId: string | null; projectId: string | null; taskCategoryId: string | null; hourlyRateId: string | null },
+  locked: typeof checked,
+) {
+  if (
+    checked.id !== locked.id ||
+    checked.organizationId !== locked.organizationId ||
+    checked.departmentId !== locked.departmentId ||
+    checked.projectId !== locked.projectId ||
+    checked.taskCategoryId !== locked.taskCategoryId ||
+    checked.hourlyRateId !== locked.hourlyRateId
+  ) {
+    conflict("The timer changed. Try again.");
+  }
+}
+
 /** Drops the running timer. Nothing is saved. */
 export async function cancelClock(access: Access, request: { userId: string | null }) {
   const pinned = await access.pinnedOrganization();
   const userId = punchUserId(access, request.userId);
+  const open = await requireOpenPunch(prisma, userId, pinned?.id);
+  await assertCanWriteUserEntry(access, userId, open.organizationId, open.departmentId);
   await transaction(async (tx) => {
     await lockUser(tx, userId);
-    const open = await requireOpenPunch(tx, userId, pinned?.id);
-    await assertCanWriteUserEntry(access, userId, open.organizationId, open.departmentId);
-    await tx.userTimeEntry.delete({ where: { id: open.id } });
+    const locked = await requireOpenPunch(tx, userId, pinned?.id);
+    assertSamePunch(open, locked);
+    await tx.userTimeEntry.delete({ where: { id: locked.id } });
   });
 }
 
@@ -1113,13 +1133,15 @@ export async function resetClock(access: Access, request: { userId: string | nul
     notFound();
   }
 
+  const open = await requireOpenPunch(prisma, userId, pinned?.id);
+  await assertCanWriteUserEntry(access, userId, open.organizationId, open.departmentId);
   const startedAt = utcNow();
   const entry = await transaction(async (tx) => {
     await lockUser(tx, userId);
-    const open = await requireOpenPunch(tx, userId, pinned?.id);
-    await assertCanWriteUserEntry(access, userId, open.organizationId, open.departmentId);
+    const locked = await requireOpenPunch(tx, userId, pinned?.id);
+    assertSamePunch(open, locked);
     return tx.userTimeEntry.update({
-      where: { id: open.id },
+      where: { id: locked.id },
       data: {
         startedAt,
         occurredOn: localDate(startedAt, timeZoneOf(user)),
