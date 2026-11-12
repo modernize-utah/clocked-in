@@ -11,7 +11,7 @@ Every item has a Linear ticket in the [VolunTime Code Review](https://linear.app
 | Tier | Parent ticket | Items |
 | --- | --- | --- |
 | P0 — Critical | [BAD-123](https://linear.app/baddley/issue/BAD-123) | 8 |
-| P1 — High | [BAD-124](https://linear.app/baddley/issue/BAD-124) | 30 |
+| P1 — High | [BAD-124](https://linear.app/baddley/issue/BAD-124) | 31 |
 | P2 — Medium | [BAD-125](https://linear.app/baddley/issue/BAD-125) | 62 |
 | P3 — Low | [BAD-126](https://linear.app/baddley/issue/BAD-126) | 23 |
 | P4 — Nits | [BAD-127](https://linear.app/baddley/issue/BAD-127) | 9 |
@@ -113,6 +113,13 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
 
 ### SEC-04 — Invite codes are guessable, the invite page leaks PII, and email is never verified · Security · M · [BAD-131](https://linear.app/baddley/issue/BAD-131)
 
+> **Status: invite hijacking fixed (12 Nov 2026), on `staging`; email verification split into SEC-04b ([BAD-260](https://linear.app/baddley/issue/BAD-260)).** What shipped:
+> - Invite codes are 12 characters from an unambiguous alphabet, about 59 bits, shown as `ABCD-EFGH-JKMN`. Typed codes ignore case, spaces and dashes, and 6-digit invites already sent still work until they expire.
+> - Wrong codes are rate limited: 10 per account and 30 per IP in 15 minutes. The signup page's pre-login invite lookup shares the IP limit.
+> - Pre-login invite details (fix step 2) now need a code that can't be guessed, so they stay as a convenience for the real invitee.
+> - Not in this change: email verification on sign-up and email change, the current-password check on email change, and gating `linkGuest` on a verified email (fix steps 3–4). They need a new verification flow with web and mobile UI, now tracked as SEC-04b.
+> - Tests: `tests/invite-code.test.ts`, and a new HTTP test in `tests/http/invitations.test.mjs` for typed variants and the accept limit. The stale tenant test in `organizations.test.mjs` now passes and checks the new code format in invite links.
+
 - **Where:**
   - `src/lib/api/security.ts` 20–33 (6-digit codes valid for 7 days).
   - `src/lib/api/features/invitations.ts` 321–345.
@@ -192,6 +199,23 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
 ## P1 — High (next 2–4 weeks)
 
 ### Security and tenant isolation
+
+#### SEC-04b — Verify email ownership on sign-up and email change · M · [BAD-260](https://linear.app/baddley/issue/BAD-260)
+
+Split out of SEC-04. The app never checks that a person controls their account's email:
+
+- Sign-up and self-service email changes need no verification, and no password for the change.
+- `linkGuest` hands an account every guest volunteer sign-up made with that email, across organizations.
+- Sign-up reveals whether an email already has an account.
+- Org admins can't fix the email on an account they created once the person has signed in.
+
+**Fix:**
+
+1. Add `User.emailVerifiedAt`. Treat accounts created by accepting an invite as verified.
+2. Send a verification code on sign-up and on email change. Hold the change as `pendingEmail` until confirmed, and require the current password to start it.
+3. Run `linkGuest` only for verified emails.
+4. Return the same sign-up response either way.
+5. Build the web and mobile UI for the verification step.
 
 #### SEC-07 — Every member can read all members' emails and pay rates · S · [BAD-136](https://linear.app/baddley/issue/BAD-136)
 

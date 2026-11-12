@@ -645,7 +645,7 @@ export async function waitForLinearIssue(title, predicate) {
 
 export async function waitForCode(email) {
   const deadline = Date.now() + 8000;
-  const pattern = /Use this code to (?:reset your VolunTime password|accept the invite):\s*(\d{6})/;
+  const pattern = /Use this code to (?:reset your VolunTime password|accept the invite):\s*([A-Z0-9][A-Z0-9-]*)/;
   let last = "";
   while (Date.now() < deadline) {
     const response = await fetch(`${mailSinkUrl}/emails?to=${encodeURIComponent(email)}`);

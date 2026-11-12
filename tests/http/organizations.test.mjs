@@ -334,8 +334,17 @@ describe("organizations", suite, () => {
     });
     assertError(superAdminUsersOnTenant, 403, "forbidden", "Forbidden.");
 
+    const projectB = await createJson(ctx.admin.accessToken, `/organizations/${orgB.id}/projects`, {
+      title: label("Tenant B project"),
+      accessType: "Public",
+    });
+    const categoryB = await createJson(ctx.admin.accessToken, `/organizations/${orgB.id}/task-categories`, {
+      name: label("Tenant B category"),
+    });
     const entryB = await createJson(ctx.admin.accessToken, `/users/${ctx.admin.user.id}/time-entries`, {
       organizationId: orgB.id,
+      projectId: projectB.id,
+      taskCategoryId: categoryB.id,
       mode: "Total",
       durationMinutes: 60,
       occurredOn: "2026-04-01",
@@ -352,6 +361,8 @@ describe("organizations", suite, () => {
       tenant: slugA,
       body: {
         organizationId: orgB.id,
+        projectId: projectB.id,
+        taskCategoryId: categoryB.id,
         mode: "Total",
         durationMinutes: 30,
         occurredOn: "2026-04-02",
@@ -375,7 +386,7 @@ describe("organizations", suite, () => {
     });
     assert.equal(invited.status, 201, invited.text);
     const messages = await waitForEmails(invitee.email, 1);
-    assert.match(messages[0].text, new RegExp(`https?://${slugA}\\.[a-z0-9.-]+(?::\\d+)?/accept\\?code=\\d{6}`));
+    assert.match(messages[0].text, new RegExp(`https?://${slugA}\\.[a-z0-9.-]+(?::\\d+)?/accept\\?code=[A-Z0-9-]{14}`));
 
     const cleared = await callApi(`/organizations/${orgA.id}`, {
       method: "PATCH",

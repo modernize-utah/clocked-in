@@ -37,6 +37,20 @@ export function appUrl(path: string, slug?: string | null) {
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
+// No 0/O, 1/I/L, or U, so a code read from an email is easy to type.
+const inviteAlphabet = "ABCDEFGHJKMNPQRSTVWXYZ23456789";
+
+/** About 59 bits, shown as ABCD-EFGH-JKMN. Invites last a week, so they cannot be short like reset codes. */
+export function inviteCode() {
+  const characters = Array.from({ length: 12 }, () => inviteAlphabet[randomInt(0, inviteAlphabet.length)]);
+  return [0, 4, 8].map((start) => characters.slice(start, start + 4).join("")).join("-");
+}
+
+/** Typed codes may differ in case, spacing, and dashes. Older 6-digit invites still match. */
+export function normalizeInviteCode(code: string) {
+  return code.trim().toUpperCase().replace(/[\s-]/g, "");
+}
+
 export function hashCode(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }

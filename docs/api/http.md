@@ -257,7 +257,7 @@ Organization invites require an organization admin. Department invites require t
 
 `GET` lists invitations for that target. `DELETE /organizations/{id}/invitations/{invitationId}` and the department equivalent revoke a pending invite and return it. An accepted invite cannot be revoked.
 
-`POST /invitations/accept` requires auth. Body `{ "code": "" }`. The signed-in user's email must match the invite. Signup does not accept invites. Accepting a department invite creates an organization `MEMBER` membership when the user has none, and does not change an organization role they already have. Response:
+`POST /invitations/accept` requires auth. Body `{ "code": "" }`. Invite codes are 12 characters in three groups, such as `ABCD-EFGH-JKMN`. Case, spaces, and dashes are ignored, and 6-digit codes from older invites still work until they expire. Ten wrong codes from one account, or 30 from one client IP, in 15 minutes return 429 `rate_limited`; the signup page's invite lookup shares the IP limit. The signed-in user's email must match the invite. Signup does not accept invites. Accepting a department invite creates an organization `MEMBER` membership when the user has none, and does not change an organization role they already have. Response:
 
 ```json
 {

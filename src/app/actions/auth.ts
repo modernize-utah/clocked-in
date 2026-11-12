@@ -48,7 +48,7 @@ export async function signUpAction(_: ActionResult | null, formData: FormData): 
   const pinned = await requirePinnedOrganizationOrApex();
   const next = safeNext(text(formData, "next"));
   const code = acceptCodeFromNext(next);
-  const invite = code ? await invitationAccount(code, pinned.organization?.id) : null;
+  const invite = code ? await invitationAccount(code, pinned.organization?.id, { ip: clientIp(await headers()) }) : null;
   if (code && !invite) {
     return { ok: false, error: "The code is not valid." };
   }
@@ -129,7 +129,7 @@ export async function acceptInviteAction(_: ActionResult | null, formData: FormD
   const code = text(formData, "code").trim();
   const access = await getAccess();
   if (!access) {
-    const invite = await invitationAccount(code, pinned.organization?.id);
+    const invite = await invitationAccount(code, pinned.organization?.id, { ip: clientIp(await headers()) });
     if (!invite) {
       return { ok: false, error: "The code is not valid." };
     }
@@ -138,7 +138,7 @@ export async function acceptInviteAction(_: ActionResult | null, formData: FormD
   }
 
   const result = await run(async () => {
-    const accepted = await acceptInvitation(access, parseAcceptInvitation({ code }));
+    const accepted = await acceptInvitation(access, parseAcceptInvitation({ code }), { ip: clientIp(await headers()) });
     writeOrganization(await cookies(), accepted.invitation.organizationId);
   });
   if (!result.ok) {
