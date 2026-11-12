@@ -156,6 +156,15 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
 
 ### SEC-06 — Privilege escalation through roles, self-approval and import · Security · M · [BAD-133](https://linear.app/baddley/issue/BAD-133)
 
+> **Status: done (12 Nov 2026), on `staging`.** What shipped:
+> - A shared rule, `assertCanGrant` in `roles.ts`: anyone but an organization admin can grant only permissions they hold, and no wider scope than their own.
+> - It applies when creating a role, and when editing one (only newly added permissions and a changed scope are checked, so renames still work).
+> - It applies to the role an access-request approval would give.
+> - It applies to each role in a people import. An importer gets the new accounts' passwords, so a row whose role the importer couldn't grant becomes a row error.
+> - Nobody can review their own access request, and granting group-manager rights through a request needs an organization admin.
+> - Deferred: removing temporary passwords from import responses (fix step 4). Admins use them to hand out accounts, so this needs the email-a-link flow first.
+> - Test in `tests/http/voluntime-feedback.test.mjs` covering all three routes. Also fixed the stale reserved-username test in that file.
+
 - **Where:**
   - `src/lib/api/features/roles.ts` 157–200: a `manage_roles` holder can add `manage_organization` to their own role.
   - `src/lib/api/features/access-requests.ts` 103–104 and 217–221: anyone can request ADMIN, and someone holding `approve_access_requests` can approve their own request.

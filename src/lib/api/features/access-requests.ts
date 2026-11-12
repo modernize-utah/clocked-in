@@ -2,10 +2,12 @@ import { randomUUID } from "node:crypto";
 import { Access } from "@/lib/api/access";
 import { guard, transaction } from "@/lib/api/db";
 import { parseGuid } from "@/lib/api/guid";
-import { conflict, forbidden, notFound, validation } from "@/lib/api/errors";
+import { ApiError, conflict, forbidden, notFound, validation } from "@/lib/api/errors";
 import { Body, has, ids, list, normalizeEmail, optionalUuid, page, requireString } from "@/lib/api/json";
 import { sendEmail } from "@/lib/api/mail";
 import { resolveRole, roleId } from "@/lib/api/features/memberships";
+import { assertCanGrant, effectivePermissions } from "@/lib/api/features/roles";
+import { isRoleScope } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 
 function asStringArray(value: unknown) {
@@ -200,6 +202,9 @@ export async function decideAccessRequest(
   if (row.status !== "pending") {
     conflict("This request has already been reviewed.");
   }
+  if (row.userId && row.userId === access.actorUserId) {
+    throw new ApiError(403, "forbidden", "You cannot review your own access request.");
+  }
   if (status === "approved") {
     await approve(access, row);
   }
@@ -238,8 +243,18 @@ async function approve(
     return;
   }
   const userId = row.userId;
+  if (row.requestedRoleId) {
+    const role = await prisma.role.findUniqueOrThrow({ where: { id: row.requestedRoleId }, include: { permissions: true } });
+    await assertCanGrant(access, row.organizationId, {
+      permissions: effectivePermissions(role),
+      scope: isRoleScope(role.scope) ? role.scope : null,
+    });
+  }
   // Requests stored before this check could name another organization's departments.
   const departmentIds = await departmentsIn(row.organizationId, asStringArray(row.requestedDepartmentIds));
+  if (departmentIds.length > 0 && !(await access.isOrgAdmin(row.organizationId))) {
+    throw new ApiError(403, "forbidden", "Only an organization admin can make someone a group manager.");
+  }
   const adminRole = await roleId("ADMIN");
   await transaction(async (tx) => {
     if (row.requestedRoleId) {
@@ -256,7 +271,6 @@ async function approve(
       });
     }
   });
-  void access;
 }
 
 async function notifyAdmins(organizationId: string, organizationName: string, requesterEmail: string) {

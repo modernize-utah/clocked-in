@@ -3,7 +3,9 @@ import { Prisma } from "@/generated/prisma/client";
 import { Access } from "@/lib/api/access";
 import { lockOrganization, transaction } from "@/lib/api/db";
 import { ApiError, validation } from "@/lib/api/errors";
+import { assertCanGrant, effectivePermissions } from "@/lib/api/features/roles";
 import { linkGuest } from "@/lib/api/features/volunteer-needs";
+import { isRoleScope } from "@/lib/permissions";
 import {
   type AccessType,
   assertTimezone,
@@ -218,10 +220,22 @@ export async function importPeople(access: Access, organizationId: string, rows:
   }
 
   const roleRows = await prisma.role.findMany({
-    where: { code: { in: ["MEMBER", "VOLUNTEER", "ADMIN"] } },
-    select: { id: true, code: true },
+    where: { code: { in: ["MEMBER", "VOLUNTEER", "ADMIN"] }, organizationId: null },
+    include: { permissions: true },
   });
   const roleIds = new Map(roleRows.map((role) => [role.code, role.id]));
+  // An importer receives each new account's password, so they may only create roles they could grant.
+  const importableRoles = new Set<string>();
+  for (const role of roleRows) {
+    const allowed = await assertCanGrant(access, organizationId, {
+      permissions: effectivePermissions(role),
+      scope: isRoleScope(role.scope) ? role.scope : null,
+    }).then(
+      () => true,
+      () => false,
+    );
+    if (allowed) importableRoles.add(role.code);
+  }
   const seenEmails = new Set<string>();
   const seenUsernames = new Set<string>();
   const result = await importRows(rows, async (row) => {
@@ -272,6 +286,9 @@ export async function importPeople(access: Access, organizationId: string, rows:
       const memberRoleId = roleIds.get("MEMBER");
       if (!roleId || !memberRoleId) {
         validation("role must be MEMBER, VOLUNTEER, or ADMIN.");
+      }
+      if (!importableRoles.has(role)) {
+        validation(`You cannot import people with the ${role} role.`);
       }
 
       const departmentName = text(row, "primaryDepartment");
