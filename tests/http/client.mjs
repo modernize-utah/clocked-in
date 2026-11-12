@@ -30,7 +30,7 @@ export function missingId() {
   return randomUUID();
 }
 
-export async function callApi(path, { method = "GET", token, apiKey, tenant, body, query } = {}) {
+export async function callApi(path, { method = "GET", token, apiKey, tenant, body, query, headers: extraHeaders } = {}) {
   const url = new URL(path, apiBaseUrl);
   if (query) {
     for (const [key, value] of Object.entries(query)) {
@@ -53,6 +53,7 @@ export async function callApi(path, { method = "GET", token, apiKey, tenant, bod
   if (tenant) {
     headers["x-voluntime-tenant"] = tenant;
   }
+  Object.assign(headers, extraHeaders);
 
   const response = await fetch(url, {
     method,

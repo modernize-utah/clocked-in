@@ -1,6 +1,6 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import {
   confirmPasswordReset,
@@ -20,6 +20,7 @@ import {
   inviteEmailMismatch,
   parseAcceptInvitation,
 } from "@/lib/api/features/invitations";
+import { clientIp } from "@/lib/api/rate-limit";
 import { run, safeNext, text } from "@/lib/server/action";
 import { clearSessionCookies, currentRefreshToken, getAccess, setSessionCookies } from "@/lib/server/session";
 import { writeOrganization } from "@/lib/server/session-cookies";
@@ -29,7 +30,9 @@ import type { ActionResult } from "@/lib/types";
 export async function logInAction(_: ActionResult | null, formData: FormData): Promise<ActionResult> {
   const result = await run(async () => {
     const pinned = await requirePinnedOrganizationOrApex();
-    const session = await logIn(parseLogIn({ username: text(formData, "username"), password: text(formData, "password") }));
+    const session = await logIn(parseLogIn({ username: text(formData, "username"), password: text(formData, "password") }), {
+      ip: clientIp(await headers()),
+    });
     await setSessionCookies(session);
     if (pinned.pinned && pinned.organization) {
       writeOrganization(await cookies(), pinned.organization.id);
@@ -67,6 +70,7 @@ export async function signUpAction(_: ActionResult | null, formData: FormData): 
       {
         invitationEmail: invite?.email,
         tenantSlug: pinned.slug,
+        ip: clientIp(await headers()),
       },
     );
     await setSessionCookies(session);
@@ -100,20 +104,21 @@ export async function logOutStayOnAcceptAction(code: string) {
 
 export async function requestResetAction(_: ActionResult | null, formData: FormData): Promise<ActionResult> {
   return run(
-    async () => requestPasswordReset(text(formData, "email"), { tenantSlug: await getTenantSlug() }),
+    async () => requestPasswordReset(text(formData, "email"), { tenantSlug: await getTenantSlug(), ip: clientIp(await headers()) }),
     "If that email has an account, a code is on its way.",
   );
 }
 
 export async function confirmResetAction(_: ActionResult | null, formData: FormData): Promise<ActionResult> {
   return run(
-    () =>
+    async () =>
       confirmPasswordReset(
         parseConfirmPasswordReset({
           email: text(formData, "email"),
           code: text(formData, "code"),
           password: text(formData, "password"),
         }),
+        { ip: clientIp(await headers()) },
       ),
     "Password updated. You can sign in now.",
   );

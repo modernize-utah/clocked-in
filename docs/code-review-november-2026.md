@@ -87,6 +87,17 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
 
 ### SEC-03 — Brute-forceable 6-digit reset codes and no rate limiting · Security · M · [BAD-130](https://linear.app/baddley/issue/BAD-130)
 
+> **Status: done (12 Nov 2026), on `staging`.** What shipped:
+> - A reset code stops working after 5 wrong guesses. A new `PasswordResetCode.failedAttempts` column counts them across the person's active codes.
+> - A database-backed fixed-window limiter (`src/lib/api/rate-limit.ts`, new `RateLimit` table with hashed keys) returns 429 `rate_limited`. Limits:
+>   - Login: 10 failures per username and 50 per IP in 15 minutes.
+>   - Reset confirm: 30 failures per IP in 15 minutes.
+>   - Reset request and sign-up: 20 per IP per hour.
+> - The IP is the Vercel-set `x-forwarded-for`. Loopback and private addresses are skipped, so local runs aren't limited.
+> - Migration `20261112210000_auth_rate_limits` was applied to staging, together with the two 5 Nov migrations staging was still missing. **Production is also missing `20261105180000_paid_rates` and `20261105181000_paid_in_kind_zero`**, which `main` already needs, so run `db:deploy` for production before the next release.
+> - Deferred: making the reset request `POST` (the mobile app uses `GET`), 32-byte link tokens, and identical sign-up responses for taken emails. The last needs the email verification from SEC-04.
+> - Tests in `tests/http/auth.test.mjs`: five wrong guesses retire a code, ten wrong passwords lock a username, and the per-IP limit on reset confirmations.
+
 - **Where:**
   - `src/lib/api/features/auth.ts` 269–278 (no counter of failed attempts) and 143–154 (login).
   - `src/lib/api/security.ts` 20–22 (`numericCode`).

@@ -98,10 +98,26 @@ describe("auth / log in", suite, () => {
     });
     const missing = await callApi("/auth/login", {
       method: "POST",
-      body: { username: "nobody123", password: person.password },
+      body: { username: identity("nobody").username, password: person.password },
     });
     assertError(password, 401, "unauthorized", "The username or password is incorrect.");
     assertError(missing, 401, "unauthorized", "The username or password is incorrect.");
+  });
+
+  test("ten wrong passwords lock the username for a while", async () => {
+    const person = await signUp("lockout");
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const wrong = await callApi("/auth/login", {
+        method: "POST",
+        body: { username: person.username, password: "wrong-password" },
+      });
+      assertError(wrong, 401, "unauthorized", "The username or password is incorrect.");
+    }
+    const locked = await callApi("/auth/login", {
+      method: "POST",
+      body: { username: person.username, password: person.password },
+    });
+    assertError(locked, 429, "rate_limited", "Too many attempts. Wait a few minutes and try again.");
   });
 });
 
@@ -197,6 +213,39 @@ describe("auth / forgot password", suite, () => {
     assertError(oldPassword, 401, "unauthorized", "The username or password is incorrect.");
     const session = await logIn(person.username, "new-password-1");
     assertUser(session.user, person);
+  });
+
+  test("a reset code stops working after five wrong guesses", async () => {
+    const person = await signUp("resetguess");
+    await callApi("/auth/user/forgot-password", { query: { email: person.email } });
+    const code = await waitForCode(person.email);
+    const wrong = code === "000000" ? "111111" : "000000";
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const guess = await callApi("/auth/user/forgot-password", {
+        method: "POST",
+        body: { email: person.email, code: wrong, password: "new-password-1" },
+      });
+      assertError(guess, 400, "validation_error", "The code is not valid.");
+    }
+    const late = await callApi("/auth/user/forgot-password", {
+      method: "POST",
+      body: { email: person.email, code, password: "new-password-1" },
+    });
+    assertError(late, 400, "validation_error", "The code is not valid.");
+  });
+
+  test("reset confirmations from one address are rate limited", async () => {
+    const ip = `198.18.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 254) + 1}`;
+    const attempt = () =>
+      callApi("/auth/user/forgot-password", {
+        method: "POST",
+        headers: { "x-forwarded-for": ip },
+        body: { email: identity("nobody").email, code: "000000", password: "new-password-1" },
+      });
+    for (let count = 0; count < 30; count += 1) {
+      assertError(await attempt(), 400, "validation_error", "The code is not valid.");
+    }
+    assertError(await attempt(), 429, "rate_limited", "Too many attempts. Wait a few minutes and try again.");
   });
 
   test("a tenant's reset email goes only to its members and cannot link the code elsewhere", async () => {

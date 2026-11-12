@@ -96,7 +96,15 @@ Both return:
 
 `GET /auth/user/forgot-password?email=` stores a code, emails it with Resend, and always returns `{ "ok": true }` when `email` is present. Another request for the same user within 60 seconds does not send a second mail. Codes expire in 15 minutes. On a tenant host, the organization's PasswordReset template and address are used only when the person is an active member of that organization; otherwise the request gets the platform email. `RESEND_API_KEY`, `EMAIL_FROM`, and optional `RESEND_API_URL` configure mail. Mail failures return 502 `email_failed`: `Email is not configured.` when the key or sender is missing, and `The email could not be sent.` when Resend rejects the request or cannot be reached.
 
-`POST /auth/user/forgot-password` body `{ "email": "", "code": "", "password": "" }` sets the password, consumes the code, clears `mustChangePassword`, revokes refresh tokens, and returns `{ "ok": true }`.
+`POST /auth/user/forgot-password` body `{ "email": "", "code": "", "password": "" }` sets the password, consumes the code, clears `mustChangePassword`, revokes refresh tokens, and returns `{ "ok": true }`. Each wrong code counts against the person's active codes, and a code stops working after five wrong guesses.
+
+Rate limits return 429 `rate_limited` (`Too many attempts. Wait a few minutes and try again.`):
+
+- Login: 10 failed attempts per username, and 50 per client IP, in 15 minutes. A correct password is refused too while the limit holds.
+- Reset confirm: 30 failed attempts per client IP in 15 minutes.
+- Reset request and sign-up: 20 requests per client IP per hour.
+
+The client IP is the first `x-forwarded-for` value, which Vercel sets. Loopback and private addresses are not limited by IP.
 
 ## User
 

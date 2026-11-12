@@ -359,15 +359,24 @@ model Invitation {
 }
 
 model PasswordResetCode {
-  id        String    @id(map: "PK_PasswordResetCode") @default(uuid()) @db.Uuid
-  userId    String    @db.Uuid
-  codeHash  String    @unique(map: "IX_PasswordResetCode_codeHash")
-  expiresAt DateTime  @db.Timestamptz(6)
-  usedAt    DateTime? @db.Timestamptz(6)
-  createdAt DateTime  @default(now()) @db.Timestamptz(6)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_PasswordResetCode_User_userId")
+  id             String    @id(map: "PK_PasswordResetCode") @default(uuid()) @db.Uuid
+  userId         String    @db.Uuid
+  codeHash       String    @unique(map: "IX_PasswordResetCode_codeHash")
+  expiresAt      DateTime  @db.Timestamptz(6)
+  usedAt         DateTime? @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(6)
+  /// Wrong guesses while this code was active. The code stops working after five.
+  failedAttempts Int       @default(0)
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_PasswordResetCode_User_userId")
 
   @@index([userId], map: "IX_PasswordResetCode_userId")
+}
+
+/// Fixed-window counters for auth rate limits. key is a hash, so no email or IP is stored.
+model RateLimit {
+  key         String   @id(map: "PK_RateLimit")
+  windowStart DateTime @db.Timestamptz(6)
+  count       Int
 }
 
 model CollectiveTimeEntryTag {
@@ -618,24 +627,24 @@ model Guest {
 }
 
 model AccessRequest {
-  id                      String          @id(map: "PK_AccessRequest") @default(uuid()) @db.Uuid
-  organizationId          String          @db.Uuid
-  userId                  String?         @db.Uuid
-  guestId                 String?         @db.Uuid
-  requestedRoleId         String?         @db.Uuid
-  requestedDepartmentIds  Json            @default("[]")
-  message                 String?
-  status                  String          @default("pending")
-  reviewedByUserId        String?         @db.Uuid
-  reviewedAt              DateTime?       @db.Timestamptz(6)
-  volunteerNeedId         String?         @db.Uuid
-  createdAt               DateTime        @default(now()) @db.Timestamptz(6)
-  organization            Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_AccessRequest_Organization_organizationId")
-  user                    User?           @relation("AccessRequestUser", fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_AccessRequest_User_userId")
-  guest                   Guest?          @relation(fields: [guestId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "FK_AccessRequest_Guest_guestId")
-  requestedRole           Role?           @relation(fields: [requestedRoleId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "FK_AccessRequest_Role_requestedRoleId")
-  reviewedBy              User?           @relation("AccessRequestReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "FK_AccessRequest_User_reviewedByUserId")
-  volunteerNeed           VolunteerNeed?  @relation(fields: [volunteerNeedId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "FK_AccessRequest_VolunteerNeed_volunteerNeedId")
+  id                     String         @id(map: "PK_AccessRequest") @default(uuid()) @db.Uuid
+  organizationId         String         @db.Uuid
+  userId                 String?        @db.Uuid
+  guestId                String?        @db.Uuid
+  requestedRoleId        String?        @db.Uuid
+  requestedDepartmentIds Json           @default("[]")
+  message                String?
+  status                 String         @default("pending")
+  reviewedByUserId       String?        @db.Uuid
+  reviewedAt             DateTime?      @db.Timestamptz(6)
+  volunteerNeedId        String?        @db.Uuid
+  createdAt              DateTime       @default(now()) @db.Timestamptz(6)
+  organization           Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_AccessRequest_Organization_organizationId")
+  user                   User?          @relation("AccessRequestUser", fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_AccessRequest_User_userId")
+  guest                  Guest?         @relation(fields: [guestId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "FK_AccessRequest_Guest_guestId")
+  requestedRole          Role?          @relation(fields: [requestedRoleId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "FK_AccessRequest_Role_requestedRoleId")
+  reviewedBy             User?          @relation("AccessRequestReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "FK_AccessRequest_User_reviewedByUserId")
+  volunteerNeed          VolunteerNeed? @relation(fields: [volunteerNeedId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "FK_AccessRequest_VolunteerNeed_volunteerNeedId")
 
   @@index([organizationId], map: "IX_AccessRequest_organizationId")
   @@index([userId], map: "IX_AccessRequest_userId")
