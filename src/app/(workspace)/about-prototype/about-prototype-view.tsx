@@ -36,7 +36,6 @@ export function AboutPrototypeView() {
   const group = copy.department.toLowerCase();
   const groups = copy.departments.toLowerCase();
   const project = copy.project.toLowerCase();
-  const projects = copy.projects.toLowerCase();
   const category = copy.taskCategory.toLowerCase();
   const categories = copy.taskCategories.toLowerCase();
 

@@ -17,6 +17,7 @@
     "env:print": "node scripts/with-env.mjs -- node scripts/print-env.mjs",
     "pipeToVercel": "node scripts/pipeToVercel.mjs",
     "lint": "eslint",
+    "typecheck": "next typegen && tsc --noEmit && tsc --noEmit -p tests/tsconfig.json",
     "test": "npm run test:unit && npm run test:import && npm run test:http",
     "test:unit": "node --import tsx --test tests/*.test.ts",
     "test:http": "node --test --test-concurrency=1 tests/http/*.test.mjs",

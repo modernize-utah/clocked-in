@@ -73,7 +73,6 @@ export function PersonProfileDialog({
             <DialogHeader className="shrink-0 pr-8">
               <div className="flex items-center gap-3">
                 {avatarSrc ? (
-                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={avatarSrc} alt="" className="size-12 shrink-0 rounded-full object-cover" />
                 ) : (
                   <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium">

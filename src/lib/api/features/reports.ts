@@ -1,7 +1,7 @@
 import { Prisma } from "@/generated/prisma/client";
 import { Access } from "@/lib/api/access";
 import { forbidden } from "@/lib/api/errors";
-import { asDateOnly, cents, hoursFromMinutes, inKindFromMinutes, queryDate, queryUuids } from "@/lib/api/json";
+import { cents, hoursFromMinutes, inKindFromMinutes, queryDate, queryUuids } from "@/lib/api/json";
 import { labels } from "@/lib/labels";
 import { readPreferences } from "@/lib/api/features/organizations";
 import { prisma } from "@/lib/prisma";

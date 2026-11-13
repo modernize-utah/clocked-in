@@ -58,7 +58,7 @@ function TimerCard() {
   const [resetting, setResetting] = useState(false);
   const running = Boolean(punch);
   const canStart = placement.punchReady;
-  const longerThanADay = Boolean(punch?.startedAt && Date.now() - new Date(punch.startedAt).getTime() >= 24 * 60 * 60 * 1000);
+  const longerThanADay = elapsed >= 24 * 60 * 60 * 1000;
 
   return (
     <Card className="gap-0 py-0">

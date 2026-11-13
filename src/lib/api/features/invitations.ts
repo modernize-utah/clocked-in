@@ -1,7 +1,7 @@
 import { Prisma } from "@/generated/prisma/client";
 import { Access } from "@/lib/api/access";
 import { guard, lockUser, transaction } from "@/lib/api/db";
-import { ApiError, conflict, forbidden, notFound, validation } from "@/lib/api/errors";
+import { ApiError, conflict, notFound, validation } from "@/lib/api/errors";
 import { Body, has, list, normalizeEmail, normalizeRole, normalizeUsername, page, Page, personName, requireString, RoleCode } from "@/lib/api/json";
 import { usernameFromName } from "@/lib/import/username";
 import { sendEmail } from "@/lib/api/mail";

@@ -83,7 +83,6 @@ function OrgBrand({
   return (
     <>
       {markUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
         <img src={markUrl} alt="" width={32} height={32} className="size-8 shrink-0 rounded-md object-contain" />
       ) : (
         <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
@@ -92,7 +91,6 @@ function OrgBrand({
       )}
       {wordmarkUrl ? (
         <>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={wordmarkUrl}
             alt=""
@@ -123,7 +121,6 @@ function OrgLogo({
   }
 
   return (
-    // eslint-disable-next-line @next/next/no-img-element
     <img src={src} alt="" width={20} height={20} className="size-5 shrink-0 object-contain" />
   );
 }

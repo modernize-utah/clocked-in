@@ -970,7 +970,8 @@ function punchUserId(access: Access, userId: string | null) {
 }
 
 export async function clockIn(access: Access, request: { placement: EntryPlacement; hourlyRateId: string | null; userId: string | null }) {
-  const pinned = await access.pinnedOrganization();
+  // Throws 404 for an unknown tenant host.
+  await access.pinnedOrganization();
   const userId = punchUserId(access, request.userId);
   const user = await prisma.user.findUnique({ where: { id: userId }, include: accountInclude });
   if (!user) {

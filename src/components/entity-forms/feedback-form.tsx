@@ -278,7 +278,6 @@ function FeedbackForm({
                 >
                   <span className="flex min-w-0 items-center gap-2">
                     {item.previewUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={item.previewUrl}
                         alt=""

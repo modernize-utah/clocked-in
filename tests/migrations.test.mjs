@@ -33,6 +33,20 @@ async function applicationData(client) {
   return snapshot;
 }
 
+function sameRow(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+/** Rows each table gained after migrations ran, so adoption can be compared with a fresh deploy. */
+function addedRows(after, before) {
+  return Object.fromEntries(
+    Object.entries(after).map(([table, rows]) => [
+      table,
+      rows.filter((row) => !(before[table] ?? []).some((old) => sameRow(old, row))),
+    ]),
+  );
+}
+
 test("migration creation refuses staging and production targets", () => {
   for (const appEnv of ["staging", "production"]) {
     const result = spawnSync(process.execPath, ["scripts/migrate-dev.mjs", "--name", "must_not_run"], {
@@ -117,7 +131,15 @@ test(
       });
       assert.equal(adoption.status, 0, `${adoption.stdout}\n${adoption.stderr}`);
       prisma(urls[1], "migrate", "deploy");
-      assert.deepEqual(await applicationData(adopted), before);
+      const deployed = await applicationData(adopted);
+      for (const [table, rows] of Object.entries(before)) {
+        assert.deepEqual(rows.filter((row) => !deployed[table]?.some((kept) => sameRow(kept, row))), [], `${table} lost rows`);
+      }
+      assert.deepEqual(
+        addedRows(deployed, before),
+        addedRows(await applicationData(fresh), await applicationData(reference)),
+        "adoption added different rows than a fresh deploy",
+      );
       assert.deepEqual(await schemaSnapshot(adopted), await schemaSnapshot(fresh));
       assert.equal(
         (await adopted.query(`SELECT count(*)::int AS total FROM ef."__EFMigrationsHistory"`)).rows[0].total,

@@ -348,7 +348,6 @@ function FeedbackEditor({ feedback, canUpdateStatus }: { feedback: Feedback; can
                       rel="noreferrer"
                       className="group relative block overflow-hidden rounded-lg bg-muted/30 ring-1 ring-foreground/10 transition hover:ring-foreground/25"
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={url}
                         alt={`Screenshot ${index + 1}`}

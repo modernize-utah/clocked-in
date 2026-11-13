@@ -101,7 +101,6 @@ export function AvatarField({
           onClick={browse}
         >
           {shown ? (
-            // eslint-disable-next-line @next/next/no-img-element
             <img src={shown} alt="" className="size-full object-cover" />
           ) : (
             <span className="flex size-full items-center justify-center bg-muted text-xs text-muted-foreground">None</span>

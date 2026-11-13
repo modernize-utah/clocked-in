@@ -165,12 +165,14 @@ test("syncFeedbackInCache updates item and active/inactive list caches immediate
     description: "Initial description",
     screenshotUrls: [],
     status: "Pending",
+    active: true,
+    completed: false,
     ticketUrl: null,
     linearIssueId: null,
     linearIssueIdentifier: null,
     createdAt: "2026-10-30T00:00:00.000Z",
     updatedAt: "2026-10-30T00:00:00.000Z",
-    user: { id: "user-1", username: "ada", email: "ada@example.com", firstName: "Ada", lastName: "Lovelace", displayName: "Ada Lovelace" },
+    user: { id: "user-1", username: "ada", email: "ada@example.com", displayName: "Ada Lovelace" },
     organization: null,
     actions: [],
   };
@@ -182,6 +184,8 @@ test("syncFeedbackInCache updates item and active/inactive list caches immediate
     ...baseItem,
     title: "Updated title",
     status: "Resolved",
+    active: false,
+    completed: true,
     actions: [
       {
         id: "act-1",
@@ -190,6 +194,7 @@ test("syncFeedbackInCache updates item and active/inactive list caches immediate
         updatedStatus: "Resolved",
         description: "Fixed",
         takenByUserId: "user-1",
+        ticketUrl: null,
         updatedAt: "2026-10-30T01:00:00.000Z",
         takenBy: baseItem.user,
       },

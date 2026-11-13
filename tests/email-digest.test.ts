@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { shouldSendEmailImmediate, type EmailSettings } from "../src/lib/email/templates";
+import { shouldSendEmailImmediate, type OrganizationEmailSettings } from "../src/lib/email/templates";
 
 process.env.DATABASE_URL ??= "postgresql://unused:unused@127.0.0.1:5432/unused";
 
@@ -11,7 +11,7 @@ function loadDigest() {
 const settings = {
   LoggedTime: "weekly",
   UnclassifiedEntry: "weekly",
-} as EmailSettings;
+} as OrganizationEmailSettings;
 
 test("weekly does not send immediately", () => {
   assert.equal(shouldSendEmailImmediate(settings, "LoggedTime"), false);

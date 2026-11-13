@@ -351,6 +351,13 @@ Each P0 item lists its tests. In addition, add:
 
 #### CI-01 — Lint and typecheck in CI, and typecheck the tests · S · [BAD-147](https://linear.app/baddley/issue/BAD-147)
 
+> **Status: done (12 Nov 2026), on `staging`.** What shipped:
+> - CI now runs `npm run lint` and a new `npm run typecheck`. The typecheck runs `next typegen`, then `tsc` on the app and on a new `tests/tsconfig.json`.
+> - Fixed the lint error (`Date.now()` during render in `own-view.tsx`), five unused-variable warnings, and the three stale test type errors.
+> - Turned `@next/next/no-img-element` off and removed its 11 inline disables (part of BP-08). Turned alt-text off for react-pdf images.
+> - Fixed the migration test, which had failed on every push since 5 Nov. It required migrations to add no data, which `paid_rates` and the new `RateLimit` table both broke. It now checks that adoption keeps every existing row and adds the same rows as a fresh deploy.
+> - Lint fails CI on errors only. Three warnings remain in `placement-fields.tsx` until A11Y-07, then switch to `--max-warnings=0`.
+
 1. Add `"typecheck": "tsc --noEmit"`, plus a `tests/tsconfig.json` that includes `tests/**`.
 2. Fix the 3 stale test type errors: `tests/email-digest.test.ts:3`, and `tests/linear-issues.test.ts:173` and `:186`.
 3. Fix the one ESLint error, `react-hooks/purity` at `src/app/(workspace)/log/own/own-view.tsx:61` (`Date.now()` called during render).

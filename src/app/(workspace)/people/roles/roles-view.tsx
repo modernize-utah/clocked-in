@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { useActionMutation } from "@/hooks/use-action-mutation";
 import { useOrganization, useWorkspace } from "@/hooks/use-workspace";
-import { permissionGroups, type Permission } from "@/lib/permissions";
+import { permissionGroups } from "@/lib/permissions";
 import { keys } from "@/lib/queries";
 import { useQuery } from "@tanstack/react-query";
 import { fetchJson } from "@/lib/fetch-json";

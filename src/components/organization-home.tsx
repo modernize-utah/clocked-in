@@ -39,12 +39,10 @@ export function OrganizationHome() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex min-w-0 items-center gap-4">
           {markUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
             <img src={markUrl} alt="" width={56} height={56} className="size-14 shrink-0 rounded-xl object-contain" />
           ) : null}
           <div className="min-w-0">
             {wordmarkUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
               <img src={wordmarkUrl} alt="" className="mb-2 h-8 max-w-56 object-contain object-left" />
             ) : null}
             <h1 className="truncate text-3xl font-semibold tracking-tight">{organization.name}</h1>

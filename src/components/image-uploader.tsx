@@ -175,11 +175,9 @@ export function ImageUploader({
           <>
             {shape === "square" ? (
               <span aria-hidden className="pointer-events-none flex size-20 items-center justify-center rounded-xl bg-background shadow-sm ring-1 ring-black/10">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={shown} alt="" className="size-14 rounded-md object-cover" />
               </span>
             ) : (
-              // eslint-disable-next-line @next/next/no-img-element
               <img src={shown} alt="" className="pointer-events-none max-h-24 max-w-[92%] object-contain" />
             )}
             <span
