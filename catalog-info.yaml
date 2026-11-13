@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: clocked-in
+  description: Next.js app with Tailwind CSS, shadcn/ui, and Prisma.
+  annotations:
+    github.com/project-slug: modernize-utah/clocked-in
+    backstage.io/techdocs-ref: dir:.
+  links:
+    - title: Production
+      url: https://voluntime.app
+    - title: Staging
+      url: https://staging.voluntime.app
+spec:
+  type: website
+  lifecycle: production
+  owner: modernize-utah
