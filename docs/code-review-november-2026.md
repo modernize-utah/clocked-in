@@ -358,6 +358,13 @@ Neither `next.config.ts` nor `vercel.json` sets CSP, `frame-ancestors` or `X-Fra
 
 #### SEC-14 — Persisted query cache holds personal data and isn't scoped to a user · S · [BAD-143](https://linear.app/baddley/issue/BAD-143)
 
+> **Status: done (12 Nov 2026), on `staging`.** What shipped:
+> - `UserQueryCache`, mounted in `WorkspaceShell`, persists lookups under `clocked-in.lookups.<userId>`.
+> - Signing in as someone else clears the in-memory cache and deletes every other user's entry, including the old shared key.
+> - Sign-out, the accept page's "log out" and any 401 from `fetchJson` clear all persisted lookups.
+> - Feedback queries are no longer persisted.
+> - Checked in a local browser: the per-user key is written, and after sign-out only an empty cache remains.
+
 `src/lib/lookup-persistence.ts` 43–53 persists lookups and every `["feedback", …]` query, including submitter emails, to IndexedDB for 24 h under a fixed key. It is cleared only on explicit sign-out.
 
 **Fix:** key the cache by user ID, clear it on 401 and on user switch, and stop persisting feedback.

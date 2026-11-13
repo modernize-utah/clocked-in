@@ -16,6 +16,8 @@ export async function fetchJson<T>(path: string, signal?: AbortSignal): Promise<
   const text = await response.text();
   const body = text ? JSON.parse(text) : null;
   if (response.status === 401 && typeof window !== "undefined") {
+    const { clearPersistedLookups } = await import("@/lib/lookup-persistence");
+    await clearPersistedLookups();
     // The helper runs outside React, so a full navigation is the only way off an expired session.
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.href = `/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;

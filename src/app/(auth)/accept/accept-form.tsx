@@ -6,7 +6,7 @@ import { acceptInviteAction, logOutStayOnAcceptAction } from "@/app/actions/auth
 import { Field, FormMessage } from "@/components/field";
 import { SubmitButton } from "@/components/submit-button";
 import { Input } from "@/components/ui/input";
-import { lookupPersister } from "@/lib/lookup-persistence";
+import { clearPersistedLookups } from "@/lib/lookup-persistence";
 
 export function AcceptForm() {
   const codeFromUrl = useSearchParams().get("code") ?? "";
@@ -18,11 +18,7 @@ export function AcceptForm() {
   function logOut() {
     const code = codeRef.current?.value ?? codeFromUrl;
     startLogout(async () => {
-      try {
-        await lookupPersister.removeClient();
-      } catch {
-        // Ignore a missing or unreadable persisted cache.
-      }
+      await clearPersistedLookups();
       await logOutStayOnAcceptAction(code);
     });
   }
