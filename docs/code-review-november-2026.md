@@ -301,6 +301,13 @@ Split out of SEC-04. The app never checks that a person controls their account's
 
 #### SEC-10 — Fine-grained permissions are checked only in the UI · M–L · [BAD-139](https://linear.app/baddley/issue/BAD-139)
 
+> **Status: done for the gaps that were looser than the UI (12 Nov 2026), on `staging`.** What shipped:
+> - Reports: a caller without `view_reports` gets only their own hours, so volunteer dashboards still work.
+> - `time-entries.csv` and `summary.csv` now require `export_reports`, as `view.csv` already did.
+> - Creating a project requires `create_projects`, scoped to the department for Department projects. Previously any member could.
+> - Lists, members and API keys already require an organization admin, which is stricter than `manage_lists`, `manage_members` and `manage_api_keys`. Letting non-admin holders of those permissions in is part of DUP-02's shared gates.
+> - Tests: a new role-permissions test in `tests/http/voluntime-feedback.test.mjs`. The project tests now give their member a role with `create_projects`, because default Staff never had it in the UI.
+
 - **Where:**
   - `reports.ts` 343–352 and 405–407 ignore `view_reports` and `export_reports`, although `viewCsv` at 585 checks them.
   - `projects.ts` 266–268 ignores `create_projects`.

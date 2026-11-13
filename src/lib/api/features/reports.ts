@@ -316,7 +316,10 @@ async function collectiveRollup(organizationId: string, filter: Filter) {
 }
 
 async function forCaller(access: Access, organizationId: string, filter: Filter) {
-  const visibility = await access.visibility(organizationId);
+  // Without view_reports a caller still sees their own hours, which the dashboard needs.
+  const visibility = (await access.can(organizationId, "view_reports"))
+    ? await access.visibility(organizationId)
+    : ({ kind: "self" } as const);
   if (visibility.kind === "all") {
     return filter;
   }
@@ -403,7 +406,7 @@ function csvResponse(lines: string[]) {
 }
 
 export async function csv(access: Access, organizationId: string, params: URLSearchParams) {
-  const organization = await access.requireOrganization(organizationId, false);
+  const organization = await access.requirePermission(organizationId, "export_reports");
   const filter = await forCaller(access, organizationId, parseFilter(params));
   const copy = labels(readPreferences(organization.preferences));
   const header = [
@@ -483,6 +486,7 @@ export async function csv(access: Access, organizationId: string, params: URLSea
 }
 
 export async function summaryCsv(access: Access, organizationId: string, params: URLSearchParams) {
+  await access.requirePermission(organizationId, "export_reports");
   const data = await report(access, organizationId, params);
   const organization = await access.requireOrganization(organizationId, false);
   const copy = labels(readPreferences(organization.preferences));

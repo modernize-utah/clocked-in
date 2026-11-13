@@ -104,6 +104,37 @@ describe("voluntime feedback", suite, () => {
     assert.equal(decided.json.status, "approved");
   });
 
+  test("reports, exports, and new projects follow the role's permissions", async () => {
+    const loggerRole = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/roles`, {
+      name: "Logger only",
+      scope: "organization",
+      permissions: ["log_own_time"],
+    });
+    const logger = await signUp("vtflogger");
+    await joinOrg(ctx.admin.accessToken, ctx.org.id, logger, { role: loggerRole.code });
+
+    const own = await callApi(`/organizations/${ctx.org.id}/report`, { token: logger.accessToken });
+    assert.equal(own.status, 200, own.text);
+    const others = await callApi(`/organizations/${ctx.org.id}/report`, {
+      token: logger.accessToken,
+      query: { userId: ctx.admin.user.id },
+    });
+    assertError(others, 403, "forbidden", "Forbidden.");
+    for (const path of ["time-entries.csv", "summary.csv"]) {
+      const exported = await callApi(`/organizations/${ctx.org.id}/${path}`, { token: logger.accessToken });
+      assertError(exported, 403, "forbidden", "Forbidden.");
+    }
+    const project = await callApi(`/organizations/${ctx.org.id}/projects`, {
+      method: "POST",
+      token: logger.accessToken,
+      body: { title: label("Not allowed"), accessType: "Public" },
+    });
+    assertError(project, 403, "forbidden", "Forbidden.");
+
+    const adminExport = await callApi(`/organizations/${ctx.org.id}/time-entries.csv`, { token: ctx.admin.accessToken });
+    assert.equal(adminExport.status, 200, adminExport.text);
+  });
+
   test("roles, access requests, and imports cannot grant more than the granter holds", async () => {
     const keeperRole = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/roles`, {
       name: "Role keeper",

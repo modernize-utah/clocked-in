@@ -265,6 +265,11 @@ export async function listProjects(access: Access, organizationId: string, param
 
 export async function createProject(access: Access, organizationId: string, request: CreateProjectRequest) {
   await access.requireOrganization(organizationId, access.isApiKey);
+  await access.requirePermission(
+    organizationId,
+    "create_projects",
+    request.accessType === "Department" ? request.departmentId : null,
+  );
   await assertAccessWrite(access, organizationId, request.accessType, request.departmentId);
   assertDates(request.accessType, request.departmentId, request.startDate, request.endDate);
   const editorIds = await editors(organizationId, access.actorUserId, request.editorIds);

@@ -25,9 +25,14 @@ describe("projects", suite, () => {
     ctx.department = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/departments`, {
       name: label("Project department"),
     });
+    const projectLead = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/roles`, {
+      name: "Project lead",
+      scope: "organization",
+      permissions: ["log_own_time", "view_reports", "export_reports", "create_projects"],
+    });
     await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/invitations`, {
       email: ctx.member.email,
-      role: "MEMBER",
+      role: projectLead.code,
     });
     await acceptInvite(ctx.member.accessToken, ctx.member.email);
     ctx.title = label("Public project");
