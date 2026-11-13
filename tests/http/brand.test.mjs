@@ -46,6 +46,12 @@ describe("organization brand", suite, () => {
       body: { markUrl: `orgs/${ctx.org.id}/mark.webp` },
     });
     assert.equal(own.status, 200, own.text);
+    const reset = await callApi(`/organizations/${ctx.org.id}`, {
+      method: "PATCH",
+      token: ctx.admin.accessToken,
+      body: { markUrl: null },
+    });
+    assert.equal(reset.status, 200, reset.text);
   });
 
   test("rejects a missing image, a bad kind, and a non-admin", async () => {
