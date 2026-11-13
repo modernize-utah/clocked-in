@@ -76,6 +76,7 @@ export function orgMembershipJson(
     primaryDepartmentId: string | null;
     orgUserTitle: string | null;
     orgUserDescription: string | null;
+    notes: string | null;
     role: RoleRow;
     user: MemberUser;
   },
@@ -100,6 +101,7 @@ export function orgMembershipJson(
     managedDepartmentIds: [...assignment.managedDepartmentIds].sort(),
     orgUserTitle: membership.orgUserTitle,
     orgUserDescription: membership.orgUserDescription,
+    notes: membership.notes,
     user: memberUserJson(membership.user),
   };
 }
@@ -122,6 +124,7 @@ export function departmentMembershipJson(
     departmentIds: [membership.departmentId],
     orgUserTitle: null,
     orgUserDescription: null,
+    notes: null,
     user: memberUserJson(membership.user),
   };
 }
@@ -307,7 +310,9 @@ async function memberVisibility(access: Access, organizationId: string) {
   return { pay, contact: pay || (await access.can(organizationId, "invite_members")) };
 }
 
-function redactMember<T extends { userId: string; rateType: string | null; professionalBillingRate: number | null; user: { email: string | null } }>(
+function redactMember<
+  T extends { userId: string; rateType: string | null; professionalBillingRate: number | null; notes: string | null; user: { email: string | null } },
+>(
   member: T,
   visibility: { pay: boolean; contact: boolean },
   selfId: string,
@@ -317,6 +322,7 @@ function redactMember<T extends { userId: string; rateType: string | null; profe
     ...member,
     rateType: visibility.pay ? member.rateType : null,
     professionalBillingRate: visibility.pay ? member.professionalBillingRate : null,
+    notes: visibility.pay ? member.notes : null,
     user: { ...member.user, email: visibility.contact ? member.user.email : null },
   };
 }
@@ -435,7 +441,6 @@ export async function createOrgMembership(access: Access, organizationId: string
             timezone: request.timezone,
             phone: request.phone,
             zipCode: request.zipCode,
-            notes: request.notes,
             avatarUrl: request.avatarUrl,
             description: request.description,
           },
@@ -461,6 +466,7 @@ export async function createOrgMembership(access: Access, organizationId: string
         primaryDepartmentId: request.departmentIds[0] ?? null,
         orgUserTitle: request.orgUserTitle,
         orgUserDescription: request.orgUserDescription,
+        notes: request.notes,
       },
       include: membershipInclude,
     });
@@ -589,7 +595,7 @@ export async function updateOrgMembership(
     const nextEmail = request.email.set && request.email.value !== account.email ? request.email.value : null;
     const emailChanged = nextEmail !== null;
     const profileChanged = (
-      ["firstName", "lastName", "displayName", "timezone", "phone", "zipCode", "notes", "avatarUrl", "description"] as const
+      ["firstName", "lastName", "displayName", "timezone", "phone", "zipCode", "avatarUrl", "description"] as const
     ).some((field) => {
       const change: Optional<string | null> = request[field];
       return change.set && change.value !== (account.profile?.[field] ?? null);
@@ -615,7 +621,6 @@ export async function updateOrgMembership(
           timezone: request.timezone.set ? request.timezone.value : undefined,
           phone: request.phone.set ? request.phone.value : undefined,
           zipCode: request.zipCode.set ? request.zipCode.value : undefined,
-          notes: request.notes.set ? request.notes.value : undefined,
           avatarUrl: request.avatarUrl.set ? request.avatarUrl.value : undefined,
           description: request.description.set ? request.description.value : undefined,
         },
@@ -632,6 +637,7 @@ export async function updateOrgMembership(
         primaryDepartmentId,
         orgUserTitle: request.orgUserTitle.set ? request.orgUserTitle.value : undefined,
         orgUserDescription: request.orgUserDescription.set ? request.orgUserDescription.value : undefined,
+        notes: request.notes.set ? request.notes.value : undefined,
       },
       include: membershipInclude,
     });

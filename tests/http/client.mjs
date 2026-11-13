@@ -327,6 +327,7 @@ export function assertMembership(membership, { organizationId, departmentId, rol
     ...(departmentId === null ? ["managedDepartmentIds"] : []),
     "orgUserTitle",
     "orgUserDescription",
+    "notes",
     "user",
   ]);
   assertUuid(membership.id);

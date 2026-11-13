@@ -421,6 +421,34 @@ describe("memberships", suite, () => {
     assert.equal(seen.rateType, "Volunteer");
   });
 
+  test("organization notes stay on the membership, not the person's profile", async () => {
+    const person = identity("memnotes");
+    const created = await createJson(ctx.second.accessToken, `/organizations/${ctx.org.id}/memberships`, {
+      email: person.email,
+      username: person.username,
+      password: person.password,
+      firstName: "Note",
+      lastName: "Taker",
+      role: "VOLUNTEER",
+      notes: "Prefers mornings",
+    });
+    assert.equal(created.notes, "Prefers mornings");
+    const patched = await callApi(`/organizations/${ctx.org.id}/memberships/${created.id}`, {
+      method: "PATCH",
+      token: ctx.second.accessToken,
+      body: { notes: "Prefers evenings" },
+    });
+    assert.equal(patched.status, 200, patched.text);
+    assert.equal(patched.json.notes, "Prefers evenings");
+    const profile = await callApi(`/users/${created.userId}`, { token: ctx.second.accessToken });
+    assert.equal(profile.json.profile.notes, null);
+
+    const peer = await signUp("memnotespeer");
+    await joinOrg(ctx.second.accessToken, ctx.org.id, peer, { role: "VOLUNTEER" });
+    const asPeer = await callApi(`/organizations/${ctx.org.id}/memberships?limit=100`, { token: peer.accessToken });
+    assert.equal(asPeer.json.items.find((item) => item.id === created.id).notes, null);
+  });
+
   test("batch delete removes the selected memberships", async () => {
     const path = `/organizations/${ctx.org.id}/memberships`;
     const firstPerson = identity("batchone");

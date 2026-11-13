@@ -220,7 +220,7 @@ Volunteer need `{ "id", "organizationId", "createdByUserId", "publicToken", "nam
 }
 ```
 
-Organization memberships leave `departmentId` null. Department memberships set both ids, and their `rateType`, `professionalBillingRate`, `isActive`, `primaryDepartmentId`, `orgUserTitle`, and `orgUserDescription` are null. `orgUserTitle` is that person's title in the organization (up to 100 characters). `orgUserDescription` is Markdown about that person in the organization (up to 8000 characters). `departmentIds` lists every department the person belongs to. A person may belong to more than one department.
+Organization memberships leave `departmentId` null. Department memberships set both ids, and their `rateType`, `professionalBillingRate`, `isActive`, `primaryDepartmentId`, `orgUserTitle`, and `orgUserDescription` are null. `orgUserTitle` is that person's title in the organization (up to 100 characters). `orgUserDescription` is Markdown about that person in the organization (up to 8000 characters). `notes` is the organization's private note about the person (up to 2000 characters). It is null unless the caller has `manage_members`. It is separate from the person's own profile `notes`, which only the person can change. Membership create, membership patch, and people import all write it. `departmentIds` lists every department the person belongs to. A person may belong to more than one department.
 
 Only active organization memberships grant access. An inactive member cannot read or write the organization, and their department roles in it stop counting. Their time entries are kept.
 

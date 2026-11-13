@@ -269,6 +269,14 @@ Split out of SEC-04. The app never checks that a person controls their account's
 
 #### SEC-08 — A global `UserProfile` is edited per org, so private notes leak between orgs · M · [BAD-137](https://linear.app/baddley/issue/BAD-137)
 
+> **Status: done (12 Nov 2026), on `staging`.** What shipped:
+> - New `OrganizationMembership.notes` (migration `20261113030000_membership_notes`, applied to staging and production). Member create, member patch and people import write `notes` there, and member lists show it only to `manage_members` holders.
+> - Profile `notes` are now written only by the person. Admins of the person's organizations can still read them, as the existing privacy tests intend (for example an allergy).
+> - SEC-01 already stops admins editing the rest of a shared person's profile. Phone and ZIP stay global contact details.
+> - Existing profile notes were not moved, because there's no record of who wrote them.
+> - The mobile edit sheet now loads and saves the organization note, and no longer wipes the person's phone on every save.
+> - Test: `tests/http/memberships.test.mjs`.
+
 - **Where:** writes in `memberships.ts` 409–423 and 548–572; reads in `users.ts` 117–137.
 - **Problem:** Org admins edit `notes`, `phone`, `zipCode`, `description` and `avatarUrl` on the global profile. Org A's admin can overwrite them, and can read org B's private notes about a shared person.
 - **Fix:** move org-specific notes, phone overrides and description onto `OrganizationMembership`. Only the user edits their global profile.

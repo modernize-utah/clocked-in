@@ -313,7 +313,6 @@ export async function importPeople(access: Access, organizationId: string, rows:
               timezone,
               phone,
               zipCode,
-              notes,
               memberNumber,
             },
           },
@@ -329,6 +328,7 @@ export async function importPeople(access: Access, organizationId: string, rows:
           rateType: organization.defaultRateType,
           isActive: true,
           primaryDepartmentId: department?.id ?? null,
+          notes,
         },
       });
       if (department) {

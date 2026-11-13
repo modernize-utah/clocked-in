@@ -154,6 +154,8 @@ export type Membership = {
   departmentIds?: string[];
   primaryDepartmentId?: string | null;
   orgUserTitle?: string | null;
+  /** The organization's private notes. Null unless the caller has manage_members. */
+  notes?: string | null;
   user: {
     id: string;
     username: string;

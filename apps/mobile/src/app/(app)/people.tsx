@@ -557,7 +557,7 @@ function MemberEditor({
   const [last, setLast] = useState(member?.user.lastName ?? "");
   const [display, setDisplay] = useState(member?.user.displayName ?? "");
   const [phone, setPhone] = useState("");
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(member?.notes ?? "");
   const [title, setTitle] = useState(member?.orgUserTitle ?? "");
   return (
     <Sheet onClose={onClose} open={Boolean(member)} title="Edit person">
@@ -587,8 +587,8 @@ function MemberEditor({
           <Field label="Last name" onChangeText={setLast} value={last} />
           <Field label="Display name" onChangeText={setDisplay} value={display} />
           <Field label="Title" onChangeText={setTitle} value={title} />
-          <Field label="Phone" onChangeText={setPhone} value={phone} />
-          <Field label="Notes" onChangeText={setNotes} value={notes} />
+          <Field label="Phone" onChangeText={setPhone} placeholder="Leave blank to keep" value={phone} />
+          <Field label="Organization notes" onChangeText={setNotes} value={notes} />
         </>
       )}
       <ErrorText error={error} />
@@ -598,7 +598,7 @@ function MemberEditor({
           onSave(
             tab === "membership"
               ? { role, departmentIds: groups }
-              : { firstName: first, lastName: last, displayName: display, orgUserTitle: title, phone, notes },
+              : { firstName: first, lastName: last, displayName: display, orgUserTitle: title, ...(phone.trim() ? { phone } : {}), notes: notes || null },
           )
         }
         pending={pending}
