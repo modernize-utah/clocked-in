@@ -1,4 +1,4 @@
-export type ReviewMember = { email: string; firstName: string | null; lastName: string | null };
+export type ReviewMember = { email: string | null; firstName: string | null; lastName: string | null };
 export type ReviewAction = "import" | "skip" | "merge";
 export type ReviewMatch = "Existing email" | "Near match" | "New";
 

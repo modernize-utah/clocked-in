@@ -211,8 +211,8 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
 >   - Deleted `scripts/diag-add-person.mjs`.
 >   - Stopped tracking `docs/base/2026 Volunteer Hours.xlsx` and added it to `.gitignore`. A copy is at `~/code/clocked-in-private/`, because pulling this change removes the file from a checkout. The seed reads `CASWJ_WORKBOOK_PATH` or the old path.
 >   - The `dworkman` seed account now gets a random temporary password, printed once, instead of the hard-coded `dworkman_temp`.
-> - Still open, for the owner:
->   1. Make the repository private.
+> - Still open, for the owner (the repository stays public; it is an MIT open-source project):
+>   1. ~~Make the repository private.~~ Not wanted.
 >   2. Decide whether to rewrite history (for example with `git filter-repo`) to purge the workbook and PDFs.
 >   3. Decide whether the client PDFs and brief belong in the repo.
 >   4. Confirm the Azure SQL server `clocked-in.database.windows.net` is decommissioned.
@@ -255,6 +255,13 @@ Split out of SEC-04. The app never checks that a person controls their account's
 5. Build the web and mobile UI for the verification step.
 
 #### SEC-07 — Every member can read all members' emails and pay rates · S · [BAD-136](https://linear.app/baddley/issue/BAD-136)
+
+> **Status: done (12 Nov 2026), on `staging`.** What shipped:
+> - Both member lists (organization and department) null out other members' `user.email` unless the caller has `manage_members` or `invite_members`, which covers admins and group managers.
+> - They null out `rateType` and `professionalBillingRate` unless the caller has `manage_members`.
+> - Your own row always shows everything.
+> - Web and mobile types now allow a null email, and the mobile list falls back to the username.
+> - Test: `tests/http/memberships.test.mjs`.
 
 `listOrgMemberships` (`src/lib/api/features/memberships.ts` 304–322) only calls `requireOrganization(id, false)` but returns `user.email`, `rateType` and `professionalBillingRate`.
 

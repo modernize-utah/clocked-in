@@ -157,7 +157,8 @@ export type Membership = {
   user: {
     id: string;
     username: string;
-    email: string;
+    /** Null unless the caller may manage people. */
+    email: string | null;
     firstName: string | null;
     lastName: string | null;
     displayName: string | null;

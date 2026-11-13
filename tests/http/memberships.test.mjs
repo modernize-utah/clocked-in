@@ -70,7 +70,8 @@ describe("memberships", suite, () => {
       role: "ADMIN",
       userId: ctx.admin.user.id,
     });
-    assert.equal(admin.rateType, "Volunteer");
+    assert.equal(admin.rateType, null);
+    assert.equal(admin.user.email, null);
     assert.equal(admin.professionalBillingRate, null);
     assert.equal(admin.isActive, true);
     assert.equal(admin.primaryDepartmentId, null);
@@ -398,6 +399,26 @@ describe("memberships", suite, () => {
     const me = await callApi("/users/me", { token: victim.accessToken });
     assert.equal(me.json.email, victim.email);
     assert.equal(me.json.profile.firstName, victim.firstName);
+  });
+
+  test("members see names but not other members' emails or pay", async () => {
+    const volunteer = await signUp("memvisible");
+    await joinOrg(ctx.second.accessToken, ctx.org.id, volunteer, { role: "VOLUNTEER" });
+    const path = `/organizations/${ctx.org.id}/memberships?limit=100`;
+    const asVolunteer = await callApi(path, { token: volunteer.accessToken });
+    assert.equal(asVolunteer.status, 200, asVolunteer.text);
+    const others = asVolunteer.json.items.filter((item) => item.userId !== volunteer.user.id);
+    assert.ok(others.length > 0);
+    assert.ok(others.every((item) => item.user.email === null && item.rateType === null && item.professionalBillingRate === null));
+    assert.ok(others.every((item) => item.user.username && "firstName" in item.user));
+    const self = asVolunteer.json.items.find((item) => item.userId === volunteer.user.id);
+    assert.equal(self.user.email, volunteer.email);
+    assert.equal(self.rateType, "Volunteer");
+
+    const asAdmin = await callApi(path, { token: ctx.second.accessToken });
+    const seen = asAdmin.json.items.find((item) => item.userId === volunteer.user.id);
+    assert.equal(seen.user.email, volunteer.email);
+    assert.equal(seen.rateType, "Volunteer");
   });
 
   test("batch delete removes the selected memberships", async () => {

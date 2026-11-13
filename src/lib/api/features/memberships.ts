@@ -55,7 +55,7 @@ function memberUserJson(user: MemberUser) {
   return {
     id: user.id,
     username: user.username,
-    email: user.email,
+    email: user.email as string | null,
     firstName: user.profile?.firstName ?? null,
     lastName: user.profile?.lastName ?? null,
     displayName: user.profile?.displayName ?? null,
@@ -91,7 +91,7 @@ export function orgMembershipJson(
     departmentId: null,
     role: roleJson(membership.role),
     joinedAt: membership.joinedAt.toISOString(),
-    rateType: membership.rateType,
+    rateType: membership.rateType as string | null,
     professionalBillingRate:
       membership.professionalBillingRate === null ? null : Number(membership.professionalBillingRate),
     isActive: membership.isActive,
@@ -301,9 +301,30 @@ export async function listRoles(params: URLSearchParams) {
   return list(roles.map(roleJson), paging);
 }
 
+/** What a caller may see about other members: email needs people-management rights, pay needs manage_members. */
+async function memberVisibility(access: Access, organizationId: string) {
+  const pay = await access.can(organizationId, "manage_members");
+  return { pay, contact: pay || (await access.can(organizationId, "invite_members")) };
+}
+
+function redactMember<T extends { userId: string; rateType: string | null; professionalBillingRate: number | null; user: { email: string | null } }>(
+  member: T,
+  visibility: { pay: boolean; contact: boolean },
+  selfId: string,
+): T {
+  if (member.userId === selfId) return member;
+  return {
+    ...member,
+    rateType: visibility.pay ? member.rateType : null,
+    professionalBillingRate: visibility.pay ? member.professionalBillingRate : null,
+    user: { ...member.user, email: visibility.contact ? member.user.email : null },
+  };
+}
+
 export async function listOrgMemberships(access: Access, organizationId: string, params: URLSearchParams) {
   const paging = page(params);
   await access.requireOrganization(organizationId, false);
+  const visibility = await memberVisibility(access, organizationId);
   const memberships = await prisma.organizationMembership.findMany({
     where: { organizationId },
     include: membershipInclude,
@@ -316,7 +337,13 @@ export async function listOrgMemberships(access: Access, organizationId: string,
     memberships.map((item) => item.userId),
   );
   return list(
-    memberships.map((item) => orgMembershipJson(item, departmentIds.get(item.userId) ?? { departmentIds: [], managedDepartmentIds: [] })),
+    memberships.map((item) =>
+      redactMember(
+        orgMembershipJson(item, departmentIds.get(item.userId) ?? { departmentIds: [], managedDepartmentIds: [] }),
+        visibility,
+        access.actorUserId,
+      ),
+    ),
     paging,
   );
 }
@@ -669,6 +696,7 @@ export async function deleteOrgMemberships(access: Access, organizationId: strin
 export async function listDepartmentMemberships(access: Access, departmentId: string, params: URLSearchParams) {
   const paging = page(params);
   const department = await access.requireDepartment(departmentId);
+  const visibility = await memberVisibility(access, department.organizationId);
   const memberships = await prisma.departmentMembership.findMany({
     where: { departmentId },
     include: membershipInclude,
@@ -677,7 +705,9 @@ export async function listDepartmentMemberships(access: Access, departmentId: st
     take: paging.limit,
   });
   return list(
-    memberships.map((membership) => departmentMembershipJson(membership, department.organizationId)),
+    memberships.map((membership) =>
+      redactMember(departmentMembershipJson(membership, department.organizationId), visibility, access.actorUserId),
+    ),
     paging,
   );
 }

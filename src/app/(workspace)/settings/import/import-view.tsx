@@ -391,7 +391,7 @@ function PeopleReview({
   onAction,
 }: {
   rows: Record<string, string>[];
-  members: { user: { email: string; firstName: string | null; lastName: string | null } }[];
+  members: { user: { email: string | null; firstName: string | null; lastName: string | null } }[];
   actions: Record<string, ReviewAction>;
   onAction: (key: string, action: ReviewAction) => void;
 }) {

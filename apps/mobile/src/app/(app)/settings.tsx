@@ -283,7 +283,7 @@ export default function SettingsScreen() {
                   key={member.id}
                   onPress={() => setNotifyIds((current) => (on ? current.filter((id) => id !== member.userId) : [...current, member.userId]))}
                   right={<Text>{on ? "✓" : ""}</Text>}
-                  title={member.user.displayName || member.user.email}
+                  title={member.user.displayName || member.user.email || member.user.username}
                 />
               );
             })}

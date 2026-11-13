@@ -338,7 +338,7 @@ export function PeopleView() {
                     </TableCell>
                     <TableCell className="whitespace-normal">
                       <InlineEmail
-                        email={member.user.email}
+                        email={member.user.email ?? ""}
                         name={formatPersonName(member.user)}
                         pending={emailSavingId === member.id}
                         onSave={(email) => saveMemberEmail(member.id, email)}
@@ -427,7 +427,7 @@ export function PeopleView() {
                         />
                       </div>
                       <InlineEmail
-                        email={member.user.email}
+                        email={member.user.email ?? ""}
                         name={formatPersonName(member.user)}
                         pending={emailSavingId === member.id}
                         onSave={(email) => saveMemberEmail(member.id, email)}

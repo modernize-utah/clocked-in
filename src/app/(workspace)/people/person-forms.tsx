@@ -120,7 +120,7 @@ export function EditPersonForm({
     })),
   );
   const [profile, setProfile] = useState({
-    email: member.user.email,
+    email: member.user.email ?? "",
     firstName: member.user.firstName ?? "",
     lastName: member.user.lastName ?? "",
     displayName: member.user.displayName ?? "",
