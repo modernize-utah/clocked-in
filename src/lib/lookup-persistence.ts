@@ -1,8 +1,11 @@
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
+import type { Persister } from "@tanstack/react-query-persist-client";
 import type { Query } from "@tanstack/react-query";
 import { logOutAction } from "@/app/actions/auth";
+import { getQueryClient } from "@/lib/query-client";
 
 const storeName = "state";
+const keyPrefix = "clocked-in.lookups";
 
 function database() {
   return new Promise<IDBDatabase>((resolve, reject) => {
@@ -40,23 +43,58 @@ const lookupStorage = {
   },
 };
 
-export const lookupPersister = createAsyncStoragePersister({
-  storage: typeof indexedDB === "undefined" ? undefined : lookupStorage,
-  key: "clocked-in.lookups",
-});
+function storageKey(userId: string) {
+  return `${keyPrefix}.${userId}`;
+}
 
-export function persistedLookupQuery(query: Query) {
-  return (
-    query.state.status === "success" &&
-    (query.queryKey[2] === "lookups" || query.queryKey[0] === "feedback")
+const persisters = new Map<string, Persister>();
+
+/** One persisted cache per signed-in user, so a shared browser never restores another person's lookups. */
+export function lookupPersisterFor(userId: string) {
+  let persister = persisters.get(userId);
+  if (!persister) {
+    persister = createAsyncStoragePersister({
+      storage: typeof indexedDB === "undefined" ? undefined : lookupStorage,
+      key: storageKey(userId),
+    });
+    persisters.set(userId, persister);
+  }
+  return persister;
+}
+
+async function removeLookupsExcept(keep: string | null) {
+  if (typeof indexedDB === "undefined") return;
+  const db = await database();
+  const store = db.transaction(storeName, "readwrite").objectStore(storeName);
+  const keys = await requestResult(store.getAllKeys());
+  await Promise.all(
+    keys
+      .filter((key) => typeof key === "string" && key.startsWith(keyPrefix) && key !== keep)
+      .map((key) => requestResult(store.delete(key))),
   );
 }
 
-export async function signOut() {
+export function forgetOtherUsersLookups(userId: string) {
+  return removeLookupsExcept(storageKey(userId)).catch(() => {
+    // Ignore a missing or unreadable persisted cache.
+  });
+}
+
+/** Drops every user's persisted lookups and the in-memory cache. */
+export async function clearPersistedLookups() {
+  getQueryClient().clear();
   try {
-    await lookupPersister.removeClient();
+    await removeLookupsExcept(null);
   } catch {
     // Ignore a missing or unreadable persisted cache.
   }
+}
+
+export function persistedLookupQuery(query: Query) {
+  return query.state.status === "success" && query.queryKey[2] === "lookups";
+}
+
+export async function signOut() {
+  await clearPersistedLookups();
   await logOutAction();
 }

@@ -332,11 +332,25 @@ The `owned` check (`time-entries.ts` 578–602) and delete (963–966) grant acc
 
 #### SEC-12 — Feedback can be sent into any org · S · [BAD-141](https://linear.app/baddley/issue/BAD-141)
 
+> **Status: done (12 Nov 2026), on `staging`.** What shipped:
+> - Off a tenant host, sending feedback to an organization now needs an active membership there (`requireOrganization(organizationId, false)`), so outsiders can't trigger its notification emails or learn its name.
+> - Feedback to VolunTime itself (no organization) is unchanged.
+> - Test: `tests/http/feedback.test.mjs`.
+
 `feedback.ts` 352–365: off a tenant host, `organizationId` is only checked for existence. This sends that org's notification emails and returns its name for any UUID.
 
 **Fix:** `requireOrganization(organizationId, false)`.
 
 #### SEC-13 — No security headers · S · [BAD-142](https://linear.app/baddley/issue/BAD-142)
+
+> **Status: done (12 Nov 2026), on `staging`; the full CSP is still report-only.** What shipped:
+> - `next.config.ts` `headers()` adds these on every response: `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, a `Permissions-Policy` that turns off camera, microphone, geolocation, payment and USB, and HSTS (two years, with subdomains).
+> - The enforced CSP is limited to `frame-ancestors 'none'; object-src 'none'; base-uri 'self'`, which blocks clickjacking.
+> - The full policy is sent as `Content-Security-Policy-Report-Only`. It allows Turnstile, the Vercel toolbar and https images in markdown.
+> - Scripts keep `'unsafe-inline'`, because partial prerendering rules out per-request nonces.
+> - A local browser check of login, dashboard, profile and feedback logged no violations.
+> - Follow-up: browse staging, then promote the report-only policy to enforced.
+> - Test: `tests/http/security-headers.test.mjs`.
 
 Neither `next.config.ts` nor `vercel.json` sets CSP, `frame-ancestors` or `X-Frame-Options`, HSTS, `Referrer-Policy`, `X-Content-Type-Options` or `Permissions-Policy`, so admin pages can be framed for clickjacking.
 
