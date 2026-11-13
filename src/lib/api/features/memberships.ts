@@ -32,6 +32,8 @@ import { sendEmail } from "@/lib/api/mail";
 import { appUrl, hashPassword } from "@/lib/api/security";
 import { allowsVolunteerAdds, insertConnection, normalizeRelationship } from "@/lib/api/features/connections";
 import type { MemberRelationship } from "@/lib/member-connection";
+import { assertOwnAvatarUrl } from "@/lib/api/features/users";
+import { isVercelBlobUrl } from "@/lib/brand";
 import { prisma } from "@/lib/prisma";
 
 type RoleRow = { id: string; code: string; name: string };
@@ -426,6 +428,9 @@ export async function createOrgMembership(access: Access, organizationId: string
     if (!request.password || !request.username) {
       validation("username and password are required for a new person.");
     }
+    if (request.avatarUrl && isVercelBlobUrl(request.avatarUrl)) {
+      validation("avatarUrl must be an image uploaded for this person.");
+    }
 
     const user = await tx.user.create({
       data: {
@@ -602,6 +607,9 @@ export async function updateOrgMembership(
     });
     if (emailChanged || profileChanged) {
       assertOrganizationOwnsAccount(account, emailChanged);
+    }
+    if (request.avatarUrl.set && request.avatarUrl.value) {
+      assertOwnAvatarUrl(membership.userId, request.avatarUrl.value);
     }
 
     if (nextEmail) {

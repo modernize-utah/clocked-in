@@ -20,6 +20,22 @@ describe("avatar", suite, () => {
     ctx.user = await signUp("avataruser");
   });
 
+  test("a person cannot point their avatar at someone else's file", async () => {
+    const other = await signUp("avatarother");
+    const response = await callApi("/users/me", {
+      method: "PATCH",
+      token: ctx.user.accessToken,
+      body: { avatarUrl: `https://abc123.private.blob.vercel-storage.com/avatars/${other.user.id}/a.webp` },
+    });
+    assertError(response, 400, "validation_error", "avatarUrl must be an image uploaded for this person.");
+    const orgFile = await callApi("/users/me", {
+      method: "PATCH",
+      token: ctx.user.accessToken,
+      body: { avatarUrl: "orgs/11111111-1111-4111-8111-111111111111/mark.webp" },
+    });
+    assertError(orgFile, 400, "validation_error", "avatarUrl must be an image uploaded for this person.");
+  });
+
   test("rejects a missing image and an anonymous caller", async () => {
     const missing = await callForm("/users/me/avatar", { token: ctx.user.accessToken, form: new FormData() });
     assertError(missing, 400, "validation_error", "Choose an image to upload.");

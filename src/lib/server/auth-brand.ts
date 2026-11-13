@@ -14,6 +14,7 @@ export async function getAuthBrand() {
     }
 
     return {
+      id: org.id,
       name: org.name,
       markUrl: org.markUrl,
       wordmarkUrl: org.wordmarkUrl,
@@ -38,6 +39,7 @@ export async function getAuthBrand() {
   }
 
   return {
+    id: organization.id,
     name: organization.name,
     markUrl: organization.markUrl,
     wordmarkUrl: organization.wordmarkUrl,

@@ -1,7 +1,7 @@
 import { ApiError } from "@/lib/api/errors";
 import { emptyNotFound, withGuids } from "@/lib/api/guid";
 import { getUser } from "@/lib/api/features/users";
-import { isVercelBlobUrl } from "@/lib/brand";
+import { isOwnedAvatarBlob, isVercelBlobUrl } from "@/lib/brand";
 import { readAvatarAsset } from "@/lib/server/avatar-assets";
 import { getAccess } from "@/lib/server/session";
 import { safeHttpUrl } from "@/lib/url";
@@ -31,6 +31,10 @@ export const GET = withGuids<{ userId: string }>(async (_request, { userId }) =>
   if (!isVercelBlobUrl(storedUrl)) {
     const external = safeHttpUrl(storedUrl);
     return external ? Response.redirect(external, 302) : emptyNotFound();
+  }
+
+  if (!isOwnedAvatarBlob(userId, storedUrl)) {
+    return emptyNotFound();
   }
 
   const result = await readAvatarAsset(storedUrl);

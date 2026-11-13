@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { BlobAccessError, BlobError, BlobNotFoundError, del, get, put } from "@vercel/blob";
 import sharp from "sharp";
 import { fail, validation } from "@/lib/api/errors";
-import { isVercelBlobUrl } from "@/lib/brand";
+import { isOwnedAvatarBlob } from "@/lib/brand";
 
 const maxUploadBytes = 4 * 1024 * 1024;
 const outputSize = 512;
@@ -36,17 +36,7 @@ function isMissingBlob(error: unknown) {
   return error instanceof BlobError && /\b(401|403)\b/.test(error.message);
 }
 
-export function isOwnedAvatarBlob(userId: string, storedUrl: string) {
-  if (!isVercelBlobUrl(storedUrl)) {
-    return false;
-  }
-
-  try {
-    return new URL(storedUrl).pathname.includes(`/avatars/${userId}/`);
-  } catch {
-    return false;
-  }
-}
+export { isOwnedAvatarBlob };
 
 export async function uploadAvatar(userId: string, file: File) {
   if (!(file instanceof File) || file.size === 0) {

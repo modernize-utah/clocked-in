@@ -2,7 +2,7 @@ import "server-only";
 import { BlobAccessError, BlobError, BlobNotFoundError, del, get, put } from "@vercel/blob";
 import sharp from "sharp";
 import { fail, validation } from "@/lib/api/errors";
-import { brandField, isVercelBlobUrl, type BrandKind } from "@/lib/brand";
+import { brandField, isOwnedBrandBlob, type BrandKind } from "@/lib/brand";
 
 const maxUploadBytes = 4 * 1024 * 1024;
 const allowedTypes = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
@@ -105,8 +105,8 @@ export async function readBrandAsset(storedUrl: string) {
   }
 }
 
-export async function deleteBrandAsset(storedUrl: string | null) {
-  if (!storedUrl || !isVercelBlobUrl(storedUrl)) {
+export async function deleteBrandAsset(organizationId: string, storedUrl: string | null) {
+  if (!storedUrl || !isOwnedBrandBlob(organizationId, storedUrl)) {
     return;
   }
 

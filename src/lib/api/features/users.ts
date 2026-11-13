@@ -18,7 +18,15 @@ import {
   requireString,
 } from "@/lib/api/json";
 import { hashPassword, verifyPassword } from "@/lib/api/security";
+import { isOwnedAvatarBlob, isVercelBlobUrl } from "@/lib/brand";
 import { prisma } from "@/lib/prisma";
+
+/** A stored Blob avatar must be one uploaded for this person, so another person's file is never served as theirs. */
+export function assertOwnAvatarUrl(userId: string, avatarUrl: string) {
+  if (isVercelBlobUrl(avatarUrl) && !isOwnedAvatarBlob(userId, avatarUrl)) {
+    validation("avatarUrl must be an image uploaded for this person.");
+  }
+}
 
 export function userJson(user: Account, includePrivate = true) {
   return {
@@ -138,6 +146,9 @@ export async function getUser(access: Access, userId: string) {
 
 export async function updateUser(access: Access, userId: string, request: UpdateUserRequest, fromMe: boolean) {
   const caller = access.requireHuman();
+  if (request.avatarUrl.set && request.avatarUrl.value) {
+    assertOwnAvatarUrl(userId, request.avatarUrl.value);
+  }
   const user = await prisma.user.findUnique({ where: { id: userId }, include: accountInclude });
   if (!user || !user.profile) {
     notFound();

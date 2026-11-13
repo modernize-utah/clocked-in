@@ -27,6 +27,27 @@ describe("organization brand", suite, () => {
     });
   });
 
+  test("an organization cannot point its brand at another organization's file", async () => {
+    const other = await createJson(ctx.admin.accessToken, "/organizations", { name: label("Other brand org") });
+    for (const markUrl of [
+      `orgs/${other.id}/mark.webp`,
+      `https://abc123.private.blob.vercel-storage.com/orgs/${other.id}/mark.webp`,
+    ]) {
+      const response = await callApi(`/organizations/${ctx.org.id}`, {
+        method: "PATCH",
+        token: ctx.admin.accessToken,
+        body: { markUrl },
+      });
+      assertError(response, 400, "validation_error", "markUrl must be an image uploaded for this organization.");
+    }
+    const own = await callApi(`/organizations/${ctx.org.id}`, {
+      method: "PATCH",
+      token: ctx.admin.accessToken,
+      body: { markUrl: `orgs/${ctx.org.id}/mark.webp` },
+    });
+    assert.equal(own.status, 200, own.text);
+  });
+
   test("rejects a missing image, a bad kind, and a non-admin", async () => {
     const empty = new FormData();
     empty.set("kind", "mark");

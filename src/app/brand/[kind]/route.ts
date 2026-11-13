@@ -1,6 +1,6 @@
 import { emptyNotFound } from "@/lib/api/guid";
 import { respond } from "@/lib/api/respond";
-import { isBrandKind, isVercelBlobUrl } from "@/lib/brand";
+import { isBrandKind, isOwnedBrandBlob, isVercelBlobUrl } from "@/lib/brand";
 import { getAuthBrand } from "@/lib/server/auth-brand";
 import { encodePng, readBrandAsset, storedBrandUrl } from "@/lib/server/brand-assets";
 import { getCurrentOrganization } from "@/lib/server/dal";
@@ -23,6 +23,10 @@ export async function GET(request: Request, context: { params: Promise<{ kind: s
 
     if (storedUrl.startsWith("/") || (/^https?:\/\//i.test(storedUrl) && !isVercelBlobUrl(storedUrl))) {
       return Response.redirect(storedUrl, 302);
+    }
+
+    if (!isOwnedBrandBlob(organization.id, storedUrl)) {
+      return emptyNotFound();
     }
 
     const result = await readBrandAsset(storedUrl);

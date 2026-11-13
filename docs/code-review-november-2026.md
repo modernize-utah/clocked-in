@@ -283,6 +283,13 @@ Split out of SEC-04. The app never checks that a person controls their account's
 
 #### SEC-09 — Cross-org Blob delete and read through `orgs/…` paths · S · [BAD-138](https://linear.app/baddley/issue/BAD-138)
 
+> **Status: done (12 Nov 2026), on `staging`.** What shipped:
+> - New `isOwnedBrandBlob` and `isOwnedAvatarBlob` in `src/lib/brand.ts`: a Blob path must sit under `orgs/<thisOrgId>/` or `avatars/<userId>/`.
+> - Organization updates reject brand URLs pointing at another organization's Blob file.
+> - Profile and membership updates reject an avatar URL that isn't that person's. A new member's avatar can't be a Blob file at all.
+> - Brand deletes, brand reads and avatar reads only touch owned paths.
+> - Tests: `tests/blob-ownership.test.ts`, plus new cases in `tests/http/brand.test.mjs` and `avatar.test.mjs`.
+
 - **Where:**
   - `src/lib/brand.ts` 132–139 (`isVercelBlobUrl` accepts any `orgs/` prefix).
   - `src/lib/api/features/organizations.ts` 176–187 (brand URLs accept any string).

@@ -138,6 +138,29 @@ export function isVercelBlobUrl(url: string) {
   }
 }
 
+/** The store path of a Blob URL or stored Blob path, without a leading slash. */
+function blobPathname(storedUrl: string) {
+  if (!isVercelBlobUrl(storedUrl)) {
+    return null;
+  }
+
+  try {
+    return new URL(storedUrl).pathname.replace(/^\/+/, "");
+  } catch {
+    return storedUrl;
+  }
+}
+
+/** Brand files live under orgs/<organizationId>/. Another organization's path must never be read or deleted. */
+export function isOwnedBrandBlob(organizationId: string, storedUrl: string) {
+  return blobPathname(storedUrl)?.startsWith(`orgs/${organizationId}/`) ?? false;
+}
+
+/** Avatars live under avatars/<userId>/. */
+export function isOwnedAvatarBlob(userId: string, storedUrl: string) {
+  return blobPathname(storedUrl)?.startsWith(`avatars/${userId}/`) ?? false;
+}
+
 export function brandAssetSrc(kind: BrandKind, storedUrl: string | null) {
   if (!storedUrl) {
     return null;

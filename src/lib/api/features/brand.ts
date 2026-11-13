@@ -1,7 +1,7 @@
 import { Access } from "@/lib/api/access";
 import { validation } from "@/lib/api/errors";
 import { parseUpdateOrganization, updateOrganization } from "@/lib/api/features/organizations";
-import { brandField, isBrandKind, isVercelBlobUrl, type BrandKind } from "@/lib/brand";
+import { brandField, isBrandKind, type BrandKind } from "@/lib/brand";
 import { deleteBrandAsset, putBrandAsset, resizeBrandImage, storedBrandUrl } from "@/lib/server/brand-assets";
 
 export function requireBrandKind(kind: string): BrandKind {
@@ -27,8 +27,8 @@ export async function uploadOrganizationBrand(access: Access, organizationId: st
     organizationId,
     parseUpdateOrganization({ [brandField(asset)]: blob.url }),
   );
-  if (previous && isVercelBlobUrl(previous) && previous !== blob.url) {
-    await deleteBrandAsset(previous);
+  if (previous && previous !== blob.url) {
+    await deleteBrandAsset(organizationId, previous);
   }
 
   return updated;
@@ -39,6 +39,6 @@ export async function removeOrganizationBrand(access: Access, organizationId: st
   const organization = await access.requireOrganizationAdmin(organizationId);
   const previous = storedBrandUrl(organization, asset);
   const updated = await updateOrganization(access, organizationId, parseUpdateOrganization({ [brandField(asset)]: null }));
-  await deleteBrandAsset(previous);
+  await deleteBrandAsset(organizationId, previous);
   return updated;
 }

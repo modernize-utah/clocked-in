@@ -33,6 +33,7 @@ import {
 } from "@/lib/email/templates";
 import { defaultEntityLabels, type EntityLabels } from "@/lib/labels";
 import { isValidTenantSlug, reservedTenantSlugs } from "@/lib/portal";
+import { isOwnedBrandBlob, isVercelBlobUrl } from "@/lib/brand";
 import { prisma } from "@/lib/prisma";
 
 export type OrganizationPreferences = {
@@ -385,6 +386,15 @@ export async function getOrganization(access: Access, organizationId: string) {
 
 export async function updateOrganization(access: Access, organizationId: string, request: UpdateOrganizationRequest) {
   await access.requireOrganizationAdmin(organizationId);
+  for (const [key, change] of [
+    ["markUrl", request.markUrl],
+    ["wordmarkUrl", request.wordmarkUrl],
+    ["wordmarkOnLightUrl", request.wordmarkOnLightUrl],
+  ] as const) {
+    if (change.set && change.value && isVercelBlobUrl(change.value) && !isOwnedBrandBlob(organizationId, change.value)) {
+      validation(`${key} must be an image uploaded for this organization.`);
+    }
+  }
   if (request.slug.set && access.tenantSlug) {
     forbidden();
   }
