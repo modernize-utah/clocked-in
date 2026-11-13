@@ -148,6 +148,16 @@ describe("feedback", suite, () => {
     assert.deepEqual(saved.json.preferences.feedbackNotifyUserIds, [ctx.notify.user.id]);
   });
 
+  test("only members can send feedback to an organization", async () => {
+    const stranger = await signUp("fbstranger");
+    const refused = await callApi("/feedback", {
+      method: "POST",
+      token: stranger.accessToken,
+      body: feedbackBody({ organizationId: ctx.org.id, title: label("Not a member") }),
+    });
+    assertError(refused, 403, "forbidden", "Forbidden.");
+  });
+
   test("members can create feedback and SuperAdmins can list it", async () => {
     const body = feedbackBody({ organizationId: ctx.org.id, title: label("Clock out") });
     const created = await createJson(ctx.member.accessToken, "/feedback", body);

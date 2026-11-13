@@ -358,10 +358,8 @@ export async function createFeedback(access: Access, request: CreateFeedbackRequ
     }
     await access.requireOrganization(pinned.id, false);
   } else if (organizationId) {
-    const organization = await prisma.organization.findUnique({ where: { id: organizationId } });
-    if (!organization) {
-      notFound();
-    }
+    // Feedback for an organization emails its notify list, so only its members may send it.
+    await access.requireOrganization(organizationId, false);
   }
 
   const caller = access.requireHuman();
