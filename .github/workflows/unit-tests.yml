@@ -46,3 +46,72 @@ jobs:
       - run: npm run test:import
 
       - run: npm run test:migrations
+
+  http:
+    name: HTTP contract tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: clocked_in
+          POSTGRES_PASSWORD: clocked_in
+          POSTGRES_DB: clocked_in
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      APP_ENV: local
+      DATABASE_PROVIDER: postgresql
+      DATABASE_URL: postgresql://clocked_in:clocked_in@127.0.0.1:5432/clocked_in?schema=public
+      # One connection, like a busy production instance, so a query that waits on its own transaction fails here.
+      DATABASE_POOL_MAX: "1"
+      JWT_SIGNING_KEY: ci-only-clocked-in-jwt-signing-key-0123456789
+      JWT_ISSUER: clocked-in
+      JWT_AUDIENCE: clocked-in
+      API_KEY_PEPPER: ci-only-api-key-pepper-0123456789
+      RESEND_API_KEY: ci
+      EMAIL_FROM: VolunTime CI <noreply@voluntime.app>
+      RESEND_API_URL: http://127.0.0.1:5399/emails
+      LINEAR_API_URL: http://127.0.0.1:5400
+      LINEAR_API_KEY: ci
+      LINEAR_TEAM_KEY: VolunTime
+      LINEAR_WEBHOOK_SECRET: ci-only-linear-webhook-secret
+      CRON_SECRET: ci-only-cron-secret
+      APP_URL: http://localhost:3025
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx prisma migrate deploy --config prisma7.config.ts
+
+      - name: Start mail and Linear sinks and the app
+        run: |
+          node tests/http/mail-sink.mjs > mail-sink.log 2>&1 &
+          node tests/http/linear-sink.mjs > linear-sink.log 2>&1 &
+          # next dev, because the tests use the x-voluntime-tenant header, which only works outside production builds.
+          npx next dev --port 3025 > next.log 2>&1 &
+          for attempt in $(seq 1 90); do
+            curl -sf http://127.0.0.1:3025/health && exit 0
+            sleep 2
+          done
+          cat next.log
+          exit 1
+
+      - run: npm run test:http
+
+      - name: Server log
+        if: failure()
+        run: tail -n 300 next.log
