@@ -587,9 +587,16 @@ async function owned(access: Access, entryId: string, write: boolean) {
     return entry;
   }
 
+  // Your own hours stay readable after you leave. Changing them, or reaching entries you logged
+  // for someone else, needs a current membership.
+  if (entry.userId === access.actorUserId && (!write || (await access.isActiveMember(entry.organizationId)))) {
+    return entry;
+  }
+
   if (
-    entry.userId === access.actorUserId ||
-    entry.enteredByUserId === access.actorUserId ||
+    (entry.enteredByUserId === access.actorUserId &&
+      (await access.isActiveMember(entry.organizationId)) &&
+      (await access.can(entry.organizationId, "log_member_time", entry.departmentId))) ||
     access.isSuperAdmin ||
     (await access.isOrgAdmin(entry.organizationId)) ||
     (entry.departmentId !== null && (await access.isDepartmentAdmin(entry.departmentId))) ||

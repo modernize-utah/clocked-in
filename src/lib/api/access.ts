@@ -286,6 +286,14 @@ export class Access {
     return this.can(organizationId, "manage_organization");
   }
 
+  async isActiveMember(organizationId: string) {
+    if (this.apiKey) {
+      return this.apiKey.organizationId === organizationId;
+    }
+
+    return (await this.organizationMemberships()).get(organizationId)?.isActive === true;
+  }
+
   async isOrgVolunteer(organizationId: string) {
     if (this.apiKey) {
       return false;

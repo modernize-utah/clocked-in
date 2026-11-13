@@ -319,6 +319,13 @@ Split out of SEC-04. The app never checks that a person controls their account's
 
 #### SEC-11 — Removed or demoted users keep access to time entries · S · [BAD-140](https://linear.app/baddley/issue/BAD-140)
 
+> **Status: done (12 Nov 2026), on `staging`.** What shipped:
+> - People can still read their own entries after leaving, but changing or deleting them needs an active membership.
+> - Entries someone logged for another person no longer grant lasting access: they also need an active membership and `log_member_time` (department-scoped).
+> - Admin, department-admin and connection access are unchanged.
+> - New `Access.isActiveMember`.
+> - Test: `tests/http/time.test.mjs`.
+
 The `owned` check (`time-entries.ts` 578–602) and delete (963–966) grant access through `entry.userId === actor || entry.enteredByUserId === actor` without checking that the membership is active.
 
 **Fix:** require an active membership plus the relevant permission, and stop treating `enteredByUserId` as a permanent grant.

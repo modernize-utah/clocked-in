@@ -13,6 +13,7 @@ import {
   label,
   missingId,
   remove,
+  joinOrg,
   signUp,
   suite,
 } from "./client.mjs";
@@ -222,6 +223,34 @@ describe("time entries", suite, () => {
       body: { projectId: null, taskCategoryId: null },
     });
     assertError(cleared, 400, "validation_error", "Choose a project and a task category.");
+  });
+
+  test("a deactivated member can read but not change their own entries", async () => {
+    const leaver = await signUp("timeleaver");
+    const membership = await joinOrg(ctx.admin.accessToken, ctx.org.id, leaver, { role: "VOLUNTEER" });
+    const entry = await createJson(leaver.accessToken, "/time/duration", {
+      organizationId: ctx.org.id,
+      projectId: ctx.project.id,
+      taskCategoryId: ctx.category.id,
+      durationMinutes: 30,
+      occurredOn: "2026-10-22",
+    });
+    const deactivated = await callApi(`/organizations/${ctx.org.id}/memberships/${membership.id}`, {
+      method: "PATCH",
+      token: ctx.admin.accessToken,
+      body: { isActive: false },
+    });
+    assert.equal(deactivated.status, 200, deactivated.text);
+    const read = await callApi(`/time-entries/${entry.id}`, { token: leaver.accessToken });
+    assert.equal(read.status, 200, read.text);
+    const edited = await callApi(`/time-entries/${entry.id}`, {
+      method: "PATCH",
+      token: leaver.accessToken,
+      body: { description: "after leaving" },
+    });
+    assertError(edited, 403, "forbidden", "Forbidden.");
+    const deleted = await callApi(`/time-entries/${entry.id}`, { method: "DELETE", token: leaver.accessToken });
+    assertError(deleted, 403, "forbidden", "Forbidden.");
   });
 
   test("admins can enter time for a member and members cannot enter it for someone else", async () => {
