@@ -318,6 +318,13 @@ These come before the P2 refactors, so the refactors have a safety net.
 
 #### TEST-01 — Run the HTTP contract suite on every pull request · M · [BAD-144](https://linear.app/baddley/issue/BAD-144)
 
+> **Status: done (12 Nov 2026), on `staging`.** What shipped:
+> - A new "HTTP contract tests" job in `.github/workflows/unit-tests.yml`, on every push to `staging`/`main` and on pull requests. It runs a fresh Postgres, `prisma migrate deploy`, the mail and Linear sinks, `next dev` on 3025, then `npm run test:http`.
+> - It uses `next dev` because the tests rely on the `x-voluntime-tenant` header, which only works outside production builds.
+> - It uses `DATABASE_POOL_MAX=1`, so it also guards DATA-01.
+> - Fixed the last two stale tests: the MCP tool list now includes `cancel_clock` and `reset_clock`, and the time test now checks that hand-entered hours need a project and task category.
+> - Not done: moving `openapi.test.mjs` into the unit suite, and making the job a required check (a GitHub branch-protection setting).
+
 `.github/workflows/unit-tests.yml` runs only unit, import and migration tests. Add a job that:
 
 1. Uses the existing Postgres service and runs `db:deploy`.

@@ -192,41 +192,36 @@ describe("time entries", suite, () => {
     assertError(unauthenticated, 401, "unauthorized", "Authentication is required.");
   });
 
-  test("duration and total can omit project and task category", async () => {
+  test("duration and total need a project and task category, and keep them", async () => {
+    for (const [path, durationMinutes] of [
+      ["/time/duration", 45],
+      ["/time/total", 30],
+    ]) {
+      const refused = await callApi(path, {
+        method: "POST",
+        token: ctx.member.accessToken,
+        body: { organizationId: ctx.org.id, durationMinutes, occurredOn: "2026-10-20" },
+      });
+      assertError(refused, 400, "validation_error", "Choose a project and a task category.");
+    }
     const duration = await createJson(ctx.member.accessToken, "/time/duration", {
       organizationId: ctx.org.id,
+      projectId: ctx.project.id,
+      taskCategoryId: ctx.category.id,
       durationMinutes: 45,
       occurredOn: "2026-10-20",
-      description: "Unclassified duration",
+      description: "Classified duration",
     });
     assert.equal(duration.mode, "Duration");
-    assert.equal(duration.projectId, null);
-    assert.equal(duration.taskCategoryId, null);
+    assert.equal(duration.projectId, ctx.project.id);
+    assert.equal(duration.taskCategoryId, ctx.category.id);
     assert.equal(duration.durationMinutes, 45);
-    const total = await createJson(ctx.member.accessToken, "/time/total", {
-      organizationId: ctx.org.id,
-      durationMinutes: 30,
-      occurredOn: "2026-10-21",
-    });
-    assert.equal(total.mode, "Total");
-    assert.equal(total.projectId, null);
-    assert.equal(total.taskCategoryId, null);
-    const classified = await callApi(`/time-entries/${duration.id}`, {
-      method: "PATCH",
-      token: ctx.member.accessToken,
-      body: { projectId: ctx.project.id, taskCategoryId: ctx.category.id },
-    });
-    assert.equal(classified.status, 200);
-    assert.equal(classified.json.projectId, ctx.project.id);
-    assert.equal(classified.json.taskCategoryId, ctx.category.id);
     const cleared = await callApi(`/time-entries/${duration.id}`, {
       method: "PATCH",
       token: ctx.member.accessToken,
       body: { projectId: null, taskCategoryId: null },
     });
-    assert.equal(cleared.status, 200);
-    assert.equal(cleared.json.projectId, null);
-    assert.equal(cleared.json.taskCategoryId, null);
+    assertError(cleared, 400, "validation_error", "Choose a project and a task category.");
   });
 
   test("admins can enter time for a member and members cannot enter it for someone else", async () => {

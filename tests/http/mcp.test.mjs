@@ -4,6 +4,7 @@ import { apiBaseUrl } from "./fixture.mjs";
 import { assertError, callApi, createJson, label, signUp, suite } from "./client.mjs";
 
 const toolNames = [
+  "cancel_clock",
   "clock_in",
   "clock_out",
   "create_collective_entry",
@@ -51,6 +52,7 @@ const toolNames = [
   "list_themes",
   "list_time_entries",
   "list_volunteer_needs",
+  "reset_clock",
   "revoke_invitation",
   "update_collective_entry",
   "update_connection",
