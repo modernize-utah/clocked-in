@@ -13,14 +13,16 @@ export function AuthCard({
   children: React.ReactNode;
 }) {
   return (
-    <Card className="relative gap-6 overflow-hidden py-6 shadow-sm [--card-spacing:--spacing(6)]">
+    <Card className="relative gap-6 overflow-hidden pt-8 pb-0 shadow-sm [--card-spacing:--spacing(6)]">
       <div className="brand-rule absolute inset-x-0 top-0" />
-      <CardHeader>
+      <CardHeader className="gap-2">
         <CardTitle className="text-2xl font-semibold tracking-tight">{title}</CardTitle>
-        {description ? <CardDescription>{description}</CardDescription> : null}
+        {description ? <CardDescription className="leading-relaxed">{description}</CardDescription> : null}
       </CardHeader>
-      <CardContent>{children}</CardContent>
-      {footer ? <CardFooter className="justify-center gap-1 text-sm text-muted-foreground">{footer}</CardFooter> : null}
+      <CardContent className="pb-2">{children}</CardContent>
+      {footer ? (
+        <CardFooter className="justify-center gap-1.5 py-4 text-sm text-muted-foreground">{footer}</CardFooter>
+      ) : null}
     </Card>
   );
 }

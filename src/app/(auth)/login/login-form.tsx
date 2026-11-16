@@ -13,7 +13,7 @@ export function LoginForm() {
   const [result, action] = useActionState(logInAction, null);
 
   return (
-    <form action={action} className="flex flex-col gap-4">
+    <form action={action} className="mt-1 flex flex-col gap-5">
       <input type="hidden" name="next" value={next} />
       <Field label="Username" htmlFor="username">
         <Input id="username" name="username" autoComplete="username" required className="h-10" />
@@ -30,7 +30,7 @@ export function LoginForm() {
         <Input id="password" name="password" type="password" autoComplete="current-password" required className="h-10" />
       </Field>
       <FormMessage result={result} />
-      <SubmitButton className="h-10 w-full">Sign in</SubmitButton>
+      <SubmitButton className="mt-1 h-10 w-full">Sign in</SubmitButton>
     </form>
   );
 }

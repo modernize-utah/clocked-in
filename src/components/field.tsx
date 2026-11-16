@@ -19,8 +19,8 @@ export function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div className={cn("flex min-w-0 flex-col gap-1.5", className)}>
-      <div className="flex h-5 items-center justify-between gap-1">
+    <div className={cn("flex min-w-0 flex-col gap-2", className)}>
+      <div className="flex min-h-5 items-center justify-between gap-2">
         <Label htmlFor={htmlFor} className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
           {label}
         </Label>

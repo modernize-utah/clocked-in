@@ -33,7 +33,7 @@ const voluntime: Palette = {
   primary: "#001836",
   primaryForeground: "#FFFFFF",
   highlight: "#D4AC59",
-  accent: "#FF5E9F",
+  accent: "#2A6F97",
   success: "#4EBFAE",
   surface: "#FFFFFF",
   surfaceForeground: "#001836",
