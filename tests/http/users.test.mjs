@@ -26,8 +26,8 @@ describe("users", suite, () => {
     ctx.owner = await signUp("users");
     ctx.other = await signUp("usersb");
     ctx.stranger = await signUp("usersc");
-    ctx.org = await createJson(ctx.owner.accessToken, "/organizations", { name: label("Users org") });
-    const invited = await createJson(ctx.owner.accessToken, `/organizations/${ctx.org.id}/invitations`, {
+    ctx.org = await createJson(ctx.owner.accessToken, "/tenants", { name: label("Users org") });
+    const invited = await createJson(ctx.owner.accessToken, `/tenants/${ctx.org.id}/invitations`, {
       email: ctx.other.email,
       role: "MEMBER",
     });
@@ -198,10 +198,10 @@ describe("users / workspace", suite, () => {
     const owner = await signUp("wsowner");
     const member = await signUp("wsmember");
     const volunteer = identity("wsvol");
-    const first = await createJson(owner.accessToken, "/organizations", { name: label("Workspace A") });
-    const second = await createJson(owner.accessToken, "/organizations", { name: label("Workspace B") });
+    const first = await createJson(owner.accessToken, "/tenants", { name: label("Workspace A") });
+    const second = await createJson(owner.accessToken, "/tenants", { name: label("Workspace B") });
     const slug = `ws${Date.now().toString(36)}`;
-    const launched = await callApi(`/organizations/${first.id}`, {
+    const launched = await callApi(`/tenants/${first.id}`, {
       method: "PATCH",
       token: owner.accessToken,
       body: { slug },
@@ -209,7 +209,7 @@ describe("users / workspace", suite, () => {
     assert.equal(launched.status, 200);
 
     await joinOrg(owner.accessToken, first.id, member, { role: "MEMBER" });
-    await createJson(owner.accessToken, `/organizations/${first.id}/memberships`, {
+    await createJson(owner.accessToken, `/tenants/${first.id}/memberships`, {
       email: volunteer.email,
       username: volunteer.username,
       password: volunteer.password,
@@ -220,42 +220,42 @@ describe("users / workspace", suite, () => {
 
     const ownerWorkspace = await callApi("/users/me/workspace", {
       token: owner.accessToken,
-      query: { organizationId: second.id },
+      query: { tenantId: second.id },
       tenant: slug,
     });
     assert.equal(ownerWorkspace.status, 200);
-    assert.equal(ownerWorkspace.json.organization.id, second.id);
+    assert.equal(ownerWorkspace.json.tenant.id, second.id);
     assert.equal(
-      ownerWorkspace.json.organizations.some((item) => item.id === first.id),
+      ownerWorkspace.json.tenants.some((item) => item.id === first.id),
       true,
     );
     assert.equal(
-      ownerWorkspace.json.organizations.some((item) => item.id === second.id),
+      ownerWorkspace.json.tenants.some((item) => item.id === second.id),
       true,
     );
     assert.equal(ownerWorkspace.json.role, "ADMIN");
     assert.equal(ownerWorkspace.json.isAdmin, true);
     assert.equal(ownerWorkspace.json.canSelectRate, true);
     assert.equal(ownerWorkspace.json.isCoordinator, false);
-    assert.equal(ownerWorkspace.json.groupDepartments, "all");
-    assert.equal(ownerWorkspace.json.permissions.includes("manage_organization"), true);
+    assert.equal(ownerWorkspace.json.groupOrganizations, "all");
+    assert.equal(ownerWorkspace.json.permissions.includes("manage_tenant"), true);
     assert.equal(ownerWorkspace.json.viewer.id, owner.user.id);
     assert.equal(ownerWorkspace.json.viewer.username, owner.user.username);
 
     const fallback = await callApi("/users/me/workspace", {
       token: owner.accessToken,
-      query: { organizationId: missingId() },
+      query: { tenantId: missingId() },
     });
     assert.equal(fallback.status, 200);
-    assert.equal(fallback.json.organization.id, fallback.json.organizations[0].id);
+    assert.equal(fallback.json.tenant.id, fallback.json.tenants[0].id);
 
     const memberWorkspace = await callApi("/users/me/workspace", { token: member.accessToken });
     assert.equal(memberWorkspace.status, 200);
-    assert.equal(memberWorkspace.json.organization.id, first.id);
+    assert.equal(memberWorkspace.json.tenant.id, first.id);
     assert.equal(memberWorkspace.json.role, "MEMBER");
     assert.equal(memberWorkspace.json.isAdmin, false);
     assert.equal(memberWorkspace.json.canSelectRate, true);
-    assert.equal(memberWorkspace.json.permissions.includes("manage_organization"), false);
+    assert.equal(memberWorkspace.json.permissions.includes("manage_tenant"), false);
     assert.equal(memberWorkspace.json.permissions.includes("log_own_time"), true);
 
     const temporary = await logIn(volunteer.username, volunteer.password, { mustChangePassword: true });
@@ -274,20 +274,20 @@ describe("users / workspace", suite, () => {
     assert.equal(volunteerWorkspace.json.isAdmin, false);
     assert.equal(volunteerWorkspace.json.canSelectRate, false);
     assert.equal(volunteerWorkspace.json.permissions.includes("log_own_time"), true);
-    assert.equal(volunteerWorkspace.json.permissions.includes("manage_organization"), false);
-    assert.deepEqual(volunteerWorkspace.json.groupDepartments, []);
+    assert.equal(volunteerWorkspace.json.permissions.includes("manage_tenant"), false);
+    assert.deepEqual(volunteerWorkspace.json.groupOrganizations, []);
 
     const lonely = await signUp("wslonely");
     const empty = await callApi("/users/me/workspace", { token: lonely.accessToken });
     assert.equal(empty.status, 200);
-    assert.equal(empty.json.organization, null);
-    assert.deepEqual(empty.json.organizations, []);
+    assert.equal(empty.json.tenant, null);
+    assert.deepEqual(empty.json.tenants, []);
     assert.equal(empty.json.role, null);
     assert.deepEqual(empty.json.permissions, []);
     assert.equal(empty.json.isAdmin, false);
     assert.equal(empty.json.isCoordinator, false);
     assert.equal(empty.json.canSelectRate, false);
-    assert.deepEqual(empty.json.groupDepartments, []);
+    assert.deepEqual(empty.json.groupOrganizations, []);
 
     const unauthenticated = await callApi("/users/me/workspace");
     assertError(unauthenticated, 401, "unauthorized", "Authentication is required.");

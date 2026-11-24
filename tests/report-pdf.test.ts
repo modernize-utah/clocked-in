@@ -18,17 +18,17 @@ import { reportPdfFilename } from "../src/lib/report-pdf/filename.ts";
 import { shouldStartNewPage } from "../src/lib/report-pdf/layout.ts";
 
 const names = {
-  department: new Map([["dept-1", "Visual Arts Society"]]),
+  organization: new Map([["dept-1", "Visual Arts Society"]]),
   project: new Map([["proj-1", "Nutcracker"]]),
   category: new Map([["cat-1", "Rehearsal"]]),
   person: new Map([["user-1", "Jane Smith"]]),
 };
 
 const copy = {
-  department: "Group",
+  organization: "Group",
   project: "Project",
   taskCategory: "Task category",
-  departments: "Groups",
+  organizations: "Groups",
 };
 
 function valueCard(over: Partial<ValueReportCard> & Pick<ValueReportCard, "id" | "title" | "accessor" | "column">): ValueReportCard {
@@ -52,7 +52,7 @@ function chartCard(): ChartReportCard {
     kind: "chart",
     title: "Hours by group",
     description: "",
-    accessor: "user.byDepartment",
+    accessor: "user.byOrganization",
     column: 1,
     row: 2,
     columns: 12,
@@ -72,10 +72,10 @@ test("designer layout autosave omits filters", () => {
 });
 
 test("filtersQuery and filtersFromSearch round-trip", () => {
-  const filters = { from: "2026-01-01", to: "2026-12-31", departmentId: ["11111111-1111-4111-8111-111111111101"] };
+  const filters = { from: "2026-01-01", to: "2026-12-31", organizationId: ["11111111-1111-4111-8111-111111111101"] };
   const query = filtersQuery(filters);
   assert.equal(query.includes("from=2026-01-01"), true);
-  assert.equal(query.includes("departmentId=11111111-1111-4111-8111-111111111101"), true);
+  assert.equal(query.includes("organizationId=11111111-1111-4111-8111-111111111101"), true);
   assert.deepEqual(filtersFromSearch(new URLSearchParams(query)), filters);
   assert.equal(filtersEqual(filters, filtersFromSearch(new URLSearchParams(query))), true);
   assert.equal(filtersEqual(filters, { ...filters, to: "2026-06-30" }), false);
@@ -96,17 +96,17 @@ test("multi-id filters join with commas and compare without order", () => {
 test("normalizeFilters accepts a legacy string id or a list", () => {
   const a = "11111111-1111-4111-8111-111111111101";
   const b = "11111111-1111-4111-8111-111111111102";
-  assert.deepEqual(normalizeFilters({ departmentId: a }), { departmentId: [a] });
-  assert.deepEqual(normalizeFilters({ departmentId: [a, b, a] }), { departmentId: [a, b] });
-  assert.deepEqual(normalizeFilters({ departmentId: [] }), {});
-  assert.throws(() => normalizeFilters({ departmentId: 3 }), /departmentId must be an id or a list of ids/);
-  assert.throws(() => normalizeFilters({ departmentId: ["nope"] }), /departmentId must be an id/);
+  assert.deepEqual(normalizeFilters({ organizationId: a }), { organizationId: [a] });
+  assert.deepEqual(normalizeFilters({ organizationId: [a, b, a] }), { organizationId: [a, b] });
+  assert.deepEqual(normalizeFilters({ organizationId: [] }), {});
+  assert.throws(() => normalizeFilters({ organizationId: 3 }), /organizationId must be an id or a list of ids/);
+  assert.throws(() => normalizeFilters({ organizationId: ["nope"] }), /organizationId must be an id/);
 });
 
 test("reportFilterSummary names the active filters", () => {
   assert.equal(reportFilterSummary({}, names, copy), "All time · All groups");
   assert.equal(
-    reportFilterSummary({ from: "2026-01-01", to: "2026-12-31", departmentId: ["dept-1"] }, names, copy),
+    reportFilterSummary({ from: "2026-01-01", to: "2026-12-31", organizationId: ["dept-1"] }, names, copy),
     "Thu, Jan 1, 2026 – Thu, Dec 31, 2026 · Visual Arts Society",
   );
 });
@@ -134,7 +134,7 @@ test("reportPdfBlocks groups KPIs then lists charts", () => {
     valueCard({ id: "inkind", title: "In-kind", accessor: "user.inKind", column: 4, format: "currency", pattern: "$0,0.00" }),
     chartCard(),
   ];
-  const blocks = reportPdfBlocks(cards, { user: { hours: 12, inKind: 425.64, byDepartment: [{ id: "d1", label: "Symphony", hours: 12, inKind: 425.64, volunteers: 2, entries: 1 }] } }, clockedInTheme);
+  const blocks = reportPdfBlocks(cards, { user: { hours: 12, inKind: 425.64, byOrganization: [{ id: "d1", label: "Symphony", hours: 12, inKind: 425.64, volunteers: 2, entries: 1 }] } }, clockedInTheme);
   assert.equal(blocks[0]?.kind, "kpis");
   if (blocks[0]?.kind !== "kpis") return;
   assert.equal(blocks[0].items.length, 2);

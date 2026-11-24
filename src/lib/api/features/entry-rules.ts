@@ -8,11 +8,11 @@ import { prisma } from "@/lib/prisma";
 export async function assertCanWriteUserEntry(
   access: Access,
   userId: string,
-  organizationId: string,
-  departmentId: string | null,
+  tenantId: string,
+  organizationId: string | null,
 ) {
   if (access.isApiKey) {
-    if (!access.canWrite(organizationId)) {
+    if (!access.canWrite(tenantId)) {
       forbidden();
     }
 
@@ -22,9 +22,9 @@ export async function assertCanWriteUserEntry(
   if (
     access.actorUserId === userId ||
     access.isSuperAdmin ||
-    (await access.isOrgAdmin(organizationId)) ||
-    (departmentId !== null && (await access.isDepartmentAdmin(departmentId))) ||
-    (await volunteerConnectedTo(access, organizationId, userId))
+    (await access.isOrgAdmin(tenantId)) ||
+    (organizationId !== null && (await access.isOrganizationAdmin(organizationId))) ||
+    (await volunteerConnectedTo(access, tenantId, userId))
   ) {
     return;
   }
@@ -32,22 +32,22 @@ export async function assertCanWriteUserEntry(
   forbidden();
 }
 
-async function assertPlacement(organizationId: string, departmentId: string | null) {
-  if ((await prisma.organization.count({ where: { id: organizationId } })) === 0) {
+async function assertPlacement(tenantId: string, organizationId: string | null) {
+  if ((await prisma.tenant.count({ where: { id: tenantId } })) === 0) {
     notFound();
   }
 
-  if (departmentId !== null) {
-    const department = await prisma.department.findUnique({
-      where: { id: departmentId },
-      select: { organizationId: true },
+  if (organizationId !== null) {
+    const organization = await prisma.tenant.findUnique({
+      where: { id: organizationId },
+      select: { tenantId: true },
     });
-    if (!department) {
+    if (!organization) {
       notFound();
     }
 
-    if (department.organizationId !== organizationId) {
-      validation("departmentId does not belong to this organization.");
+    if (organization.tenantId !== tenantId) {
+      validation("organizationId does not belong to this tenant.");
     }
   }
 }
@@ -55,45 +55,45 @@ async function assertPlacement(organizationId: string, departmentId: string | nu
 export async function assertLogTarget(
   access: Access,
   userId: string,
-  organizationId: string,
-  departmentId: string | null,
+  tenantId: string,
+  organizationId: string | null,
 ) {
-  const pinned = await access.pinnedOrganization();
-  if (pinned && pinned.id !== organizationId) {
+  const pinned = await access.pinnedTenant();
+  if (pinned && pinned.id !== tenantId) {
     notFound();
   }
 
-  await assertPlacement(organizationId, departmentId);
+  await assertPlacement(tenantId, organizationId);
   if (access.isSuperAdmin) {
     return;
   }
 
-  const member = await prisma.organizationMembership.count({ where: { userId, organizationId, isActive: true } });
+  const member = await prisma.tenantMembership.count({ where: { userId, tenantId, isActive: true } });
   if (member === 0) {
     forbidden();
   }
 }
 
-export async function assertCollectiveWrite(access: Access, organizationId: string, departmentId: string | null) {
-  const pinned = await access.pinnedOrganization();
-  if (pinned && pinned.id !== organizationId) {
+export async function assertCollectiveWrite(access: Access, tenantId: string, organizationId: string | null) {
+  const pinned = await access.pinnedTenant();
+  if (pinned && pinned.id !== tenantId) {
     notFound();
   }
 
-  await assertPlacement(organizationId, departmentId);
-  if (access.isSuperAdmin || access.canWrite(organizationId)) {
+  await assertPlacement(tenantId, organizationId);
+  if (access.isSuperAdmin || access.canWrite(tenantId)) {
     return;
   }
-  if (departmentId === null) {
-    if ((await access.visibility(organizationId)).kind === "all" && await access.can(organizationId, "log_event_totals")) {
+  if (organizationId === null) {
+    if ((await access.visibility(tenantId)).kind === "all" && await access.can(tenantId, "log_event_totals")) {
       return;
     }
     forbidden();
   }
   if (
-    (await access.can(organizationId, "log_group_sessions", departmentId)) ||
-    (await access.can(organizationId, "log_event_totals", departmentId)) ||
-    (await access.isDepartmentAdmin(departmentId))
+    (await access.can(tenantId, "log_group_sessions", organizationId)) ||
+    (await access.can(tenantId, "log_event_totals", organizationId)) ||
+    (await access.isOrganizationAdmin(organizationId))
   ) {
     return;
   }
@@ -103,8 +103,8 @@ export async function assertCollectiveWrite(access: Access, organizationId: stri
 export async function assertProject(
   access: Access,
   workerId: string,
-  organizationId: string,
-  departmentId: string | null,
+  tenantId: string,
+  organizationId: string | null,
   projectId: string,
 ) {
   const project = await prisma.project.findUnique({
@@ -115,16 +115,16 @@ export async function assertProject(
     notFound();
   }
 
-  if (project.organizationId !== organizationId) {
-    validation("projectId does not belong to this organization.");
+  if (project.tenantId !== tenantId) {
+    validation("projectId does not belong to this tenant.");
   }
 
   if (!project.isActive) {
     validation("This project is not active.");
   }
 
-  if (project.accessType === "Department" && (departmentId === null || departmentId !== project.departmentId)) {
-    validation("departmentId must match this department project.");
+  if (project.accessType === "Organization" && (organizationId === null || organizationId !== project.organizationId)) {
+    validation("organizationId must match this organization project.");
   }
 
   if (
@@ -132,48 +132,48 @@ export async function assertProject(
     !access.isSuperAdmin &&
     project.ownerUserId !== workerId &&
     project.editors.every((editor) => editor.userId !== workerId) &&
-    !access.canWrite(organizationId) &&
-    !(await access.isOrgAdmin(organizationId))
+    !access.canWrite(tenantId) &&
+    !(await access.isOrgAdmin(tenantId))
   ) {
     forbidden();
   }
 }
 
-export async function assertTaskCategory(organizationId: string, taskCategoryId: string) {
+export async function assertTaskCategory(tenantId: string, taskCategoryId: string) {
   const category = await prisma.taskCategory.findUnique({
     where: { id: taskCategoryId },
-    select: { organizationId: true },
+    select: { tenantId: true },
   });
   if (!category) {
     notFound();
   }
 
-  if (category.organizationId !== organizationId) {
-    validation("taskCategoryId does not belong to this organization.");
+  if (category.tenantId !== tenantId) {
+    validation("taskCategoryId does not belong to this tenant.");
   }
 }
 
-export async function tags(organizationId: string, tagIds: string[]) {
+export async function tags(tenantId: string, tagIds: string[]) {
   const unique = [...new Set(tagIds)];
   if (unique.length === 0) {
     return [];
   }
 
-  const found = await prisma.tag.findMany({ where: { id: { in: unique }, organizationId }, select: { id: true } });
+  const found = await prisma.tag.findMany({ where: { id: { in: unique }, tenantId }, select: { id: true } });
   if (found.length !== unique.length) {
-    validation("A tag does not belong to this organization.");
+    validation("A tag does not belong to this tenant.");
   }
 
   return found.map((tag) => tag.id);
 }
 
-async function paidCatalogRate(organizationId: string, amount: Prisma.Decimal | null) {
+async function paidCatalogRate(tenantId: string, amount: Prisma.Decimal | null) {
   if (amount === null) {
     validation("Set a pay rate for this person before logging paid time.");
   }
 
   const rate = await prisma.hourlyRate.findFirst({
-    where: { organizationId, type: "Paid", isArchived: false, perHourRate: amount },
+    where: { tenantId, type: "Paid", isArchived: false, perHourRate: amount },
     orderBy: { name: "asc" },
   });
   if (!rate) {
@@ -186,26 +186,26 @@ async function paidCatalogRate(organizationId: string, amount: Prisma.Decimal | 
 export async function resolveHourlyRate(
   access: Access,
   userId: string,
-  organizationId: string,
+  tenantId: string,
   hourlyRateId: string | null | undefined,
 ) {
-  const membership = await prisma.organizationMembership.findUnique({
-    where: { userId_organizationId: { userId, organizationId } },
+  const membership = await prisma.tenantMembership.findUnique({
+    where: { userId_tenantId: { userId, tenantId } },
     select: { rateType: true, professionalBillingRate: true },
   });
   const paidMember = membership?.rateType === "Paid";
   const lockToDefault =
-    !paidMember && !access.isApiKey && !access.isSuperAdmin && (await access.isOrgVolunteer(organizationId));
+    !paidMember && !access.isApiKey && !access.isSuperAdmin && (await access.isOrgVolunteer(tenantId));
   if (paidMember && !hourlyRateId) {
-    return paidCatalogRate(organizationId, membership.professionalBillingRate);
+    return paidCatalogRate(tenantId, membership.professionalBillingRate);
   }
 
   if (lockToDefault || !hourlyRateId) {
-    const volunteer = await defaultVolunteerRate(organizationId);
+    const volunteer = await defaultVolunteerRate(tenantId);
     return { ...volunteer, type: "Volunteer" as const };
   }
 
-  const rate = await prisma.hourlyRate.findFirst({ where: { id: hourlyRateId, organizationId } });
+  const rate = await prisma.hourlyRate.findFirst({ where: { id: hourlyRateId, tenantId } });
   if (!rate) {
     notFound();
   }

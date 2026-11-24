@@ -20,34 +20,34 @@ describe("collective time entries", suite, () => {
   before(async () => {
     ctx.admin = await signUp("colladmin");
     ctx.member = await signUp("collmember");
-    ctx.departmentAdmin = await signUp("colldept");
-    ctx.org = await createJson(ctx.admin.accessToken, "/organizations", { name: label("Collective org") });
-    ctx.department = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/departments`, {
-      name: label("Collective department"),
+    ctx.tenantAdmin = await signUp("colldept");
+    ctx.org = await createJson(ctx.admin.accessToken, "/tenants", { name: label("Collective org") });
+    ctx.tenant = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/tenants`, {
+      name: label("Collective organization"),
     });
-    ctx.tag = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/tags`, { name: label("Collective tag") });
-    ctx.category = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/task-categories`, {
+    ctx.tag = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/tags`, { name: label("Collective tag") });
+    ctx.category = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/task-categories`, {
       name: label("Collective category"),
     });
-    ctx.project = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/projects`, {
+    ctx.project = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/projects`, {
       title: label("Collective project"),
       accessType: "Public",
     });
-    await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/invitations`, {
+    await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/invitations`, {
       email: ctx.member.email,
       role: "MEMBER",
     });
     await acceptInvite(ctx.member.accessToken, ctx.member.email);
-    await createJson(ctx.admin.accessToken, `/departments/${ctx.department.id}/invitations`, {
-      email: ctx.departmentAdmin.email,
+    await createJson(ctx.admin.accessToken, `/tenants/${ctx.tenant.id}/invitations`, {
+      email: ctx.tenantAdmin.email,
       role: "ADMIN",
     });
-    await acceptInvite(ctx.departmentAdmin.accessToken, ctx.departmentAdmin.email);
+    await acceptInvite(ctx.tenantAdmin.accessToken, ctx.tenantAdmin.email);
   });
 
-  test("an organization admin records group time", async () => {
+  test("an tenant admin records group time", async () => {
     const created = await createJson(ctx.admin.accessToken, "/collective-time-entries", {
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       startedAt: "2026-10-01T15:00:00.000Z",
@@ -59,7 +59,7 @@ describe("collective time entries", suite, () => {
     ctx.entry = created;
     assertCollective(created, {
       recordedByUserId: ctx.admin.user.id,
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       participantCount: 3,
@@ -71,7 +71,7 @@ describe("collective time entries", suite, () => {
       method: "POST",
       token: ctx.admin.accessToken,
       body: {
-        organizationId: ctx.org.id,
+        tenantId: ctx.org.id,
         projectId: ctx.project.id,
         taskCategoryId: ctx.category.id,
         startedAt: "2026-10-01T17:00:00.000Z",
@@ -83,7 +83,7 @@ describe("collective time entries", suite, () => {
       method: "POST",
       token: ctx.admin.accessToken,
       body: {
-        organizationId: ctx.org.id,
+        tenantId: ctx.org.id,
         projectId: ctx.project.id,
         taskCategoryId: ctx.category.id,
         startedAt: "2026-10-01T15:00:00.000Z",
@@ -98,7 +98,7 @@ describe("collective time entries", suite, () => {
   test("members can read collective time and cannot record it", async () => {
     const listed = await callApi("/collective-time-entries", {
       token: ctx.member.accessToken,
-      query: { organizationId: ctx.org.id },
+      query: { tenantId: ctx.org.id },
     });
     assertList(listed.json);
     assert.ok(listed.json.items.some((item) => item.id === ctx.entry.id));
@@ -109,7 +109,7 @@ describe("collective time entries", suite, () => {
       method: "POST",
       token: ctx.member.accessToken,
       body: {
-        organizationId: ctx.org.id,
+        tenantId: ctx.org.id,
         projectId: ctx.project.id,
         taskCategoryId: ctx.category.id,
         startedAt: "2026-10-02T15:00:00.000Z",
@@ -124,12 +124,12 @@ describe("collective time entries", suite, () => {
     assertError(unauthenticated, 401, "unauthorized", "Authentication is required.");
   });
 
-  test("a department admin records time only for that department", async () => {
-    const organization = await callApi("/collective-time-entries", {
+  test("a organization admin records time only for that organization", async () => {
+    const tenant = await callApi("/collective-time-entries", {
       method: "POST",
-      token: ctx.departmentAdmin.accessToken,
+      token: ctx.tenantAdmin.accessToken,
       body: {
-        organizationId: ctx.org.id,
+        tenantId: ctx.org.id,
         projectId: ctx.project.id,
         taskCategoryId: ctx.category.id,
         startedAt: "2026-10-03T15:00:00.000Z",
@@ -137,28 +137,28 @@ describe("collective time entries", suite, () => {
         participantCount: 2,
       },
     });
-    assertError(organization, 403, "forbidden", "Forbidden.");
-    const created = await createJson(ctx.departmentAdmin.accessToken, "/collective-time-entries", {
-      organizationId: ctx.org.id,
-      departmentId: ctx.department.id,
+    assertError(tenant, 403, "forbidden", "Forbidden.");
+    const created = await createJson(ctx.tenantAdmin.accessToken, "/collective-time-entries", {
+      tenantId: ctx.org.id,
+      organizationId: ctx.tenant.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       startedAt: "2026-10-03T15:00:00.000Z",
       endedAt: "2026-10-03T16:00:00.000Z",
       participantCount: 2,
     });
-    assert.equal(created.departmentId, ctx.department.id);
-    assert.equal(created.recordedByUserId, ctx.departmentAdmin.user.id);
+    assert.equal(created.organizationId, ctx.tenant.id);
+    assert.equal(created.recordedByUserId, ctx.tenantAdmin.user.id);
     assert.equal(created.inKindValue, 70.94);
   });
 
-  test("patch and delete keep the organization and the writer", async () => {
+  test("patch and delete keep the tenant and the writer", async () => {
     const moved = await callApi(`/collective-time-entries/${ctx.entry.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
-      body: { organizationId: missingId() },
+      body: { tenantId: missingId() },
     });
-    assertError(moved, 400, "validation_error", "organizationId cannot change.");
+    assertError(moved, 400, "validation_error", "tenantId cannot change.");
     const updated = await callApi(`/collective-time-entries/${ctx.entry.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,

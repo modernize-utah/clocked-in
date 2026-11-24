@@ -43,7 +43,7 @@ const groupRules: [string, string][] = [
   ["/hourly-rates", "Hourly rates"],
   ["/task-categories", "Task categories"],
   ["/imports", "Imports"],
-  ["/departments", "Departments"],
+  ["/tenants", "Organizations"],
   ["/projects", "Projects"],
   ["/time-entries.csv", "Reports"],
   ["/access-requests", "Access requests"],
@@ -59,7 +59,7 @@ const groupRules: [string, string][] = [
   ["/roles", "Roles"],
   ["/time/", "Time"],
   ["/health", "Health"],
-  ["/organizations", "Organizations"],
+  ["/tenants", "Tenants"],
 ];
 
 export type ApiParameter = {
@@ -230,6 +230,6 @@ function buildGroups(): ApiGroup[] {
 
 export const apiGroups = buildGroups();
 
-export const defaultOperationId = apiGroups.flatMap((group) => group.operations).find((operation) => operation.id === "get /organizations/{id}")?.id
+export const defaultOperationId = apiGroups.flatMap((group) => group.operations).find((operation) => operation.id === "get /tenants/{id}")?.id
   ?? apiGroups[0]?.operations[0]?.id
   ?? "";

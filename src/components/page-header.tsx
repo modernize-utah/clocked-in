@@ -20,8 +20,8 @@ export function PageHeader({
   inline?: boolean;
 }) {
   const pathname = usePathname();
-  const { viewer, organization } = useWorkspace();
-  const title = viewTitle(pathname ?? "", viewer.name, organization?.name);
+  const { viewer, tenant } = useWorkspace();
+  const title = viewTitle(pathname ?? "", viewer.name, tenant?.name);
   const hasSupport = Boolean(description || actions);
   const showSwitcher = isReportViewerPath(pathname ?? "");
 

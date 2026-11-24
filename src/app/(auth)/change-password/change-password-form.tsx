@@ -21,11 +21,10 @@ export function ChangePasswordForm({ next }: { next: string }) {
           type="password"
           autoComplete="current-password"
           required
-          className="h-10"
         />
       </Field>
       <Field label="New password" htmlFor="password" hint="8 characters or more. Do not reuse the temporary password.">
-        <Input id="password" name="password" type="password" autoComplete="new-password" required minLength={8} className="h-10" />
+        <Input id="password" name="password" type="password" autoComplete="new-password" required minLength={8} />
       </Field>
       <Field label="Confirm new password" htmlFor="confirmPassword">
         <Input
@@ -35,12 +34,11 @@ export function ChangePasswordForm({ next }: { next: string }) {
           autoComplete="new-password"
           required
           minLength={8}
-          className="h-10"
         />
       </Field>
       <FormMessage result={result} />
-      <SubmitButton className="h-10 w-full">Save and continue</SubmitButton>
-      <Button type="button" variant="ghost" className="h-10 w-full" onClick={() => void signOut()}>
+      <SubmitButton className="w-full">Save and continue</SubmitButton>
+      <Button type="button" variant="ghost" className="w-full" onClick={() => void signOut()}>
         Sign out
       </Button>
     </form>

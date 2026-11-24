@@ -4,22 +4,22 @@ import { bodyText, EmailLayout } from "./components/layout";
 export const needSubmitted = {
   id: "need-submitted",
   subject: "Need waiting for approval: {{needName}}",
-  variables: ["organizationName", "needName", "managerName"],
+  variables: ["tenantName", "needName", "managerName"],
 };
 
 export default function NeedSubmittedEmail({
-  organizationName = "Harbor Volunteers",
+  tenantName = "Harbor Volunteers",
   needName = "Ushers",
   managerName = "Alex",
 }: {
-  organizationName?: string;
+  tenantName?: string;
   needName?: string;
   managerName?: string;
 }) {
   return (
     <EmailLayout preview={`${managerName} submitted ${needName} for approval.`} title="Need submitted">
       <Text style={bodyText}>
-        {managerName} submitted “{needName}” in {organizationName} for admin approval.
+        {managerName} submitted “{needName}” in {tenantName} for admin approval.
       </Text>
     </EmailLayout>
   );

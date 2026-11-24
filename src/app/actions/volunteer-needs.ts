@@ -19,8 +19,8 @@ import { run } from "@/lib/server/action";
 import { getAccess, requireAccess } from "@/lib/server/session";
 import { getTenantSlug } from "@/lib/server/tenant";
 
-export async function createNeedAction(organizationId: string, body: Record<string, unknown>) {
-  return run(async () => createVolunteerNeed(await requireAccess(), organizationId, parseSaveNeed(body)), "Need added.");
+export async function createNeedAction(tenantId: string, body: Record<string, unknown>) {
+  return run(async () => createVolunteerNeed(await requireAccess(), tenantId, parseSaveNeed(body)), "Need added.");
 }
 
 export async function updateNeedAction(needId: string, body: Record<string, unknown>) {

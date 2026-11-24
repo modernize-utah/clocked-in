@@ -20,27 +20,27 @@ describe("tags", suite, () => {
   before(async () => {
     ctx.admin = await signUp("tagadmin");
     ctx.member = await signUp("tagmember");
-    ctx.org = await createJson(ctx.admin.accessToken, "/organizations", { name: label("Tag org") });
-    await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/invitations`, {
+    ctx.org = await createJson(ctx.admin.accessToken, "/tenants", { name: label("Tag org") });
+    await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/invitations`, {
       email: ctx.member.email,
       role: "MEMBER",
     });
     await acceptInvite(ctx.member.accessToken, ctx.member.email);
     ctx.name = label("Tag");
-    ctx.tag = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/tags`, { name: ctx.name });
+    ctx.tag = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/tags`, { name: ctx.name });
   });
 
   test("create and list tags", async () => {
-    assertNamed(ctx.tag, { organizationId: ctx.org.id, name: ctx.name, isArchived: false });
-    const listed = await callApi(`/organizations/${ctx.org.id}/tags`, { token: ctx.member.accessToken });
+    assertNamed(ctx.tag, { tenantId: ctx.org.id, name: ctx.name, isArchived: false });
+    const listed = await callApi(`/tenants/${ctx.org.id}/tags`, { token: ctx.member.accessToken });
     assertList(listed.json);
     assert.ok(listed.json.items.some((item) => item.id === ctx.tag.id && item.name === ctx.name));
-    const unauthenticated = await callApi(`/organizations/${ctx.org.id}/tags`);
+    const unauthenticated = await callApi(`/tenants/${ctx.org.id}/tags`);
     assertError(unauthenticated, 401, "unauthorized", "Authentication is required.");
   });
 
-  test("patch requires an organization admin and keeps names unique", async () => {
-    const forbidden = await callApi(`/organizations/${ctx.org.id}/tags`, {
+  test("patch requires an tenant admin and keeps names unique", async () => {
+    const forbidden = await callApi(`/tenants/${ctx.org.id}/tags`, {
       method: "POST",
       token: ctx.member.accessToken,
       body: { name: label("Nope") },
@@ -54,7 +54,7 @@ describe("tags", suite, () => {
     });
     assert.equal(updated.status, 200);
     assert.equal(updated.json.name, renamed);
-    const duplicate = await callApi(`/organizations/${ctx.org.id}/tags`, {
+    const duplicate = await callApi(`/tenants/${ctx.org.id}/tags`, {
       method: "POST",
       token: ctx.admin.accessToken,
       body: { name: `  ${renamed.toLowerCase()}  ` },
@@ -69,7 +69,7 @@ describe("tags", suite, () => {
   });
 
   test("delete removes an unused tag", async () => {
-    const tag = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/tags`, {
+    const tag = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/tags`, {
       name: label("Temporary tag"),
     });
     const forbidden = await callApi(`/tags/${tag.id}`, { method: "DELETE", token: ctx.member.accessToken });

@@ -2,24 +2,24 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { PageSkeleton } from "@/components/skeletons";
-import { requirePinnedOrganizationOrApex } from "@/lib/server/tenant";
-import { NewOrganizationView } from "./new-organization-view";
+import { requirePinnedTenantOrApex } from "@/lib/server/tenant";
+import { NewTenantView } from "./new-tenant-view";
 
-export const metadata: Metadata = { title: "New organization" };
+export const metadata: Metadata = { title: "New tenant" };
 
-export default function NewOrganizationPage() {
+export default function NewTenantPage() {
   return (
     <Suspense fallback={<PageSkeleton />}>
-      <NewOrganizationContent />
+      <NewTenantContent />
     </Suspense>
   );
 }
 
-async function NewOrganizationContent() {
-  const pinned = await requirePinnedOrganizationOrApex();
+async function NewTenantContent() {
+  const pinned = await requirePinnedTenantOrApex();
   if (pinned.pinned) {
     redirect("/dashboard");
   }
 
-  return <NewOrganizationView />;
+  return <NewTenantView />;
 }

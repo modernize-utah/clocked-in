@@ -1,8 +1,8 @@
 import { Access, accessForSubject } from "@/lib/api/access";
 import { unauthorized } from "@/lib/api/errors";
-import { listOrganizations } from "@/lib/api/features/organizations";
+import { listTenants } from "@/lib/api/features/tenants";
 import { isCoordinator } from "@/lib/roles";
-import type { GroupDepartments } from "@/lib/types";
+import type { GroupOrganizations } from "@/lib/types";
 
 function viewerFor(access: Access) {
   const caller = access.caller;
@@ -27,37 +27,37 @@ function viewerFor(access: Access) {
 }
 
 /** Apex workspace for a signed-in person. Tenant host headers do not pin this payload. */
-export async function getUserWorkspace(access: Access, requestedOrganizationId: string | null) {
+export async function getUserWorkspace(access: Access, requestedTenantId: string | null) {
   access.requireHuman();
   const apex = access.tenantSlug ? await accessForSubject(access.caller.id, null) : access;
   if (!apex) {
     unauthorized("This token is not valid for this server.");
   }
 
-  const organizations = (await listOrganizations(apex, new URLSearchParams({ limit: "100" }))).items;
-  const requested = requestedOrganizationId?.trim() || null;
-  const organization =
-    (requested ? organizations.find((item) => item.id === requested) : undefined) ?? organizations[0] ?? null;
+  const tenants = (await listTenants(apex, new URLSearchParams({ limit: "100" }))).items;
+  const requested = requestedTenantId?.trim() || null;
+  const tenant =
+    (requested ? tenants.find((item) => item.id === requested) : undefined) ?? tenants[0] ?? null;
   const viewer = viewerFor(apex);
-  const role = organization ? await apex.organizationRole(organization.id) : null;
-  const permissions = organization ? [...(await apex.permissionsFor(organization.id))] : [];
-  const isAdmin = organization ? viewer.isSuperAdmin || (await apex.can(organization.id, "manage_organization")) : false;
-  const canSelectRate = organization ? role === "ADMIN" || role === "MEMBER" || isAdmin : false;
-  const groupDepartments: GroupDepartments = !organization
+  const role = tenant ? await apex.tenantRole(tenant.id) : null;
+  const permissions = tenant ? [...(await apex.permissionsFor(tenant.id))] : [];
+  const isAdmin = tenant ? viewer.isSuperAdmin || (await apex.can(tenant.id, "manage_tenant")) : false;
+  const canSelectRate = tenant ? role === "ADMIN" || role === "MEMBER" || isAdmin : false;
+  const groupOrganizations: GroupOrganizations = !tenant
     ? []
     : isAdmin
       ? "all"
-      : await apex.adminDepartmentIds(organization.id);
+      : await apex.adminOrganizationIds(tenant.id);
 
   return {
     viewer,
-    organizations,
-    organization,
+    tenants,
+    tenant,
     isAdmin,
-    isCoordinator: isCoordinator(groupDepartments),
+    isCoordinator: isCoordinator(groupOrganizations),
     canSelectRate,
     role,
     permissions,
-    groupDepartments,
+    groupOrganizations,
   };
 }

@@ -9,10 +9,10 @@ import { PageLoader } from "@/components/skeletons";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { brandCss } from "@/lib/brand";
 import { orgMarkIcon } from "@/lib/favicon";
-import type { Organization } from "@/lib/types";
+import type { Tenant } from "@/lib/types";
 
 export function AppShell({
-  organization,
+  tenant,
   isAdmin,
   isCoordinator = false,
   isSuperAdmin,
@@ -20,7 +20,7 @@ export function AppShell({
   sidebarOpen,
   children,
 }: {
-  organization: Organization | null;
+  tenant: Tenant | null;
   isAdmin: boolean;
   isCoordinator?: boolean;
   isSuperAdmin: boolean;
@@ -28,8 +28,8 @@ export function AppShell({
   sidebarOpen: boolean;
   children: React.ReactNode;
 }) {
-  const css = brandCss(organization?.theme ?? null);
-  const icon = organization ? (orgMarkIcon(organization.markUrl)?.url ?? null) : null;
+  const css = brandCss(tenant?.theme ?? null);
+  const icon = tenant ? (orgMarkIcon(tenant.markUrl)?.url ?? null) : null;
   return (
     <SidebarProvider defaultOpen={sidebarOpen} className="h-svh overflow-hidden">
       {css ? <style>{css}</style> : null}

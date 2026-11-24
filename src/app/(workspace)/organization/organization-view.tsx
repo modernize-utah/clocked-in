@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { updateOrganizationDetailsAction } from "@/app/actions/organizations";
+import { updateTenantDetailsAction } from "@/app/actions/tenants";
 import { Field, FormMessage } from "@/components/field";
 import { MarkdownEditor } from "@/components/markdown-editor";
 import { MarkdownView } from "@/components/markdown-view";
@@ -9,7 +9,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useLabels } from "@/hooks/use-labels";
-import { useOrganization, useWorkspace } from "@/hooks/use-workspace";
+import { useTenant, useWorkspace } from "@/hooks/use-workspace";
 import { websiteHref } from "@/lib/url";
 import { EditorLayout } from "./editor-layout";
 
@@ -18,31 +18,33 @@ type SaveStatus = {
   pending: boolean;
 };
 
-export function OrganizationView() {
-  const organization = useOrganization();
+export function TenantView() {
+  const tenant = useTenant();
   const { isAdmin } = useWorkspace();
   const copy = useLabels();
   const [status, setStatus] = useState<SaveStatus>({ result: null, pending: false });
+  const externalGroups = tenant.preferences.portalDirectorySync === true;
+  const canEdit = isAdmin && !externalGroups;
 
   return (
     <EditorLayout
       footer={
-        isAdmin ? (
+        canEdit ? (
           <div
             role="group"
-            aria-label={`${copy.organization} actions`}
+            aria-label={`${copy.tenant} actions`}
             className="flex flex-col gap-3 rounded-xl bg-card px-4 py-3 ring-1 ring-foreground/10 sm:flex-row sm:items-center"
           >
             <SaveBar result={status.result}>
-              <SubmitButton form="organization-form" pending={status.pending} className="h-9 w-full sm:ml-auto sm:w-auto">
-                Save {copy.organization.toLowerCase()}
+              <SubmitButton form="tenant-form" pending={status.pending} className="h-9 w-full sm:ml-auto sm:w-auto">
+                Save {copy.tenant.toLowerCase()}
               </SubmitButton>
             </SaveBar>
           </div>
         ) : null
       }
     >
-      <OrganizationFields key={organization.id} editable={isAdmin} onStatus={setStatus} />
+      <TenantFields key={tenant.id} editable={canEdit} onStatus={setStatus} />
     </EditorLayout>
   );
 }
@@ -64,11 +66,12 @@ function SaveBar({
   );
 }
 
-function OrganizationFields({ editable, onStatus }: { editable: boolean; onStatus: (status: SaveStatus) => void }) {
-  const organization = useOrganization();
+function TenantFields({ editable, onStatus }: { editable: boolean; onStatus: (status: SaveStatus) => void }) {
+  const tenant = useTenant();
   const copy = useLabels();
-  const [result, action, pending] = useActionState(updateOrganizationDetailsAction.bind(null, organization.id), null);
-  const website = organization.websiteUrl ? websiteHref(organization.websiteUrl) : null;
+  const [result, action, pending] = useActionState(updateTenantDetailsAction.bind(null, tenant.id), null);
+  const website = tenant.websiteUrl ? websiteHref(tenant.websiteUrl) : null;
+  const externalGroups = tenant.preferences.portalDirectorySync === true;
 
   useEffect(() => {
     onStatus({ result, pending });
@@ -77,11 +80,13 @@ function OrganizationFields({ editable, onStatus }: { editable: boolean; onStatu
   const fields = (
     <Card>
       <CardHeader>
-        <CardTitle>{copy.organization}</CardTitle>
+        <CardTitle>{copy.tenant}</CardTitle>
         <CardDescription>
-          {editable
-            ? "Name, website, and description shown on the home page."
-            : "Name, website, and description shown on the home page. An organization admin can change these."}
+          {externalGroups
+            ? "Tenant details are managed by an external system of record."
+            : editable
+              ? "Name, website, and description shown on the home page."
+              : "Name, website, and description shown on the home page. An tenant admin can change these."}
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
@@ -92,7 +97,7 @@ function OrganizationFields({ editable, onStatus }: { editable: boolean; onStatu
             required={editable}
             readOnly={!editable}
             maxLength={200}
-            defaultValue={organization.name}
+            defaultValue={tenant.name}
             className="h-9"
           />
         </Field>
@@ -104,7 +109,7 @@ function OrganizationFields({ editable, onStatus }: { editable: boolean; onStatu
               type="url"
               inputMode="url"
               maxLength={2000}
-              defaultValue={organization.websiteUrl ?? ""}
+              defaultValue={tenant.websiteUrl ?? ""}
               placeholder="https://"
               className="h-9"
             />
@@ -116,7 +121,7 @@ function OrganizationFields({ editable, onStatus }: { editable: boolean; onStatu
               rel="noreferrer"
               className="inline-flex h-9 items-center text-sm text-primary underline-offset-2 hover:underline"
             >
-              {organization.websiteUrl}
+              {tenant.websiteUrl}
             </a>
           ) : (
             <p id="websiteUrl" className="flex h-9 items-center text-sm text-muted-foreground">
@@ -131,10 +136,10 @@ function OrganizationFields({ editable, onStatus }: { editable: boolean; onStatu
               name="description"
               label="Description"
               maxLength={8000}
-              defaultValue={organization.description ?? ""}
+              defaultValue={tenant.description ?? ""}
             />
-          ) : organization.description?.trim() ? (
-            <MarkdownView source={organization.description} />
+          ) : tenant.description?.trim() ? (
+            <MarkdownView source={tenant.description} />
           ) : (
             <p id="description" className="text-sm text-muted-foreground">
               No description yet.
@@ -148,7 +153,7 @@ function OrganizationFields({ editable, onStatus }: { editable: boolean; onStatu
   if (!editable) return fields;
 
   return (
-    <form id="organization-form" action={action}>
+    <form id="tenant-form" action={action}>
       {fields}
     </form>
   );

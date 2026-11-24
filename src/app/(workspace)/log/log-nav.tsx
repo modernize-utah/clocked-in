@@ -8,24 +8,24 @@ import { connectionsQuery } from "@/lib/queries";
 import { canLogConnectionTime, canLogGroupTime, canLogMemberTime } from "@/lib/roles";
 
 function useLogNavItems() {
-  const { isAdmin, role, groupDepartments, organization } = useWorkspace();
+  const { isAdmin, role, groupOrganizations, tenant } = useWorkspace();
   const connections = useQuery({
-    ...connectionsQuery(organization?.id ?? ""),
-    enabled: Boolean(organization),
+    ...connectionsQuery(tenant?.id ?? ""),
+    enabled: Boolean(tenant),
   });
-  const showConnections = organization
+  const showConnections = tenant
     ? canLogConnectionTime({
         role,
         isAdmin,
-        allowVolunteersToAddVolunteers: organization.preferences.allowVolunteersToAddVolunteers,
+        allowVolunteersToAddVolunteers: tenant.preferences.allowVolunteersToAddVolunteers,
         connectionCount: connections.data?.length ?? 0,
       })
     : false;
   return [
     { href: "/log/own", label: "Log Own Time", icon: TimerIcon },
-    ...(canLogMemberTime(isAdmin, groupDepartments) ? [{ href: "/log/member", label: "Log Member Time", icon: UserRoundIcon }] : []),
+    ...(canLogMemberTime(isAdmin, groupOrganizations) ? [{ href: "/log/member", label: "Log Member Time", icon: UserRoundIcon }] : []),
     ...(showConnections ? [{ href: "/log/connections", label: "Log Connection Time", icon: Link2Icon }] : []),
-    ...(canLogGroupTime(groupDepartments) ? [{ href: "/log/group", label: "Log Group Time", icon: UsersIcon }] : []),
+    ...(canLogGroupTime(groupOrganizations) ? [{ href: "/log/group", label: "Log Group Time", icon: UsersIcon }] : []),
   ];
 }
 

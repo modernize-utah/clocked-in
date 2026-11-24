@@ -26,8 +26,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useActionMutation } from "@/hooks/use-action-mutation";
 import { useMembers } from "@/hooks/use-members";
-import { organizationWide, usePlacement, type PlacementPreference } from "@/hooks/use-placement";
-import { useOrganization, useWorkspace } from "@/hooks/use-workspace";
+import { tenantWide, usePlacement, type PlacementPreference } from "@/hooks/use-placement";
+import { useTenant, useWorkspace } from "@/hooks/use-workspace";
 import { formatDurationInput, minutesFromDurationInput, today } from "@/lib/format";
 import { keys } from "@/lib/queries";
 import type { TimeEntry } from "@/lib/types";
@@ -101,8 +101,8 @@ export function TimeEntryForm({
   people?: { excludeSelf?: boolean; activeOnly?: boolean };
   candidates?: { userId: string; label: string }[];
 }) {
-  const organization = useOrganization();
-  const { viewer, isAdmin, isCoordinator, canSelectRate, groupDepartments } = useWorkspace();
+  const tenant = useTenant();
+  const { viewer, isAdmin, isCoordinator, canSelectRate, groupOrganizations } = useWorkspace();
   const { lookups } = useLookups();
   const idPrefix = useId();
   const excludeSelf = people?.excludeSelf ?? false;
@@ -117,18 +117,18 @@ export function TimeEntryForm({
     }
 
     const scoped = isCoordinator
-      ? members.filter((member) => (member.departmentIds ?? []).some((id) => groupDepartments.includes(id)))
+      ? members.filter((member) => (member.organizationIds ?? []).some((id) => groupOrganizations.includes(id)))
       : members;
     return selectableMembers(scoped, viewer.id, { excludeSelf, activeOnly });
-  }, [activeOnly, candidates, excludeSelf, groupDepartments, isCoordinator, members, viewer.id]);
+  }, [activeOnly, candidates, excludeSelf, groupOrganizations, isCoordinator, members, viewer.id]);
   const punch = entry?.mode === "Punch";
   const [method, setMethod] = useState<"Duration" | "Total">(entry?.mode === "Total" ? "Total" : "Duration");
   const total = entry ? entry.mode === "Total" : method === "Total";
-  const canEditTimes = !entry || organization.preferences.allowTimeEntryEditing;
+  const canEditTimes = !entry || tenant.preferences.allowTimeEntryEditing;
   const placement = usePlacement(
     entry
       ? {
-          departmentId: entry.departmentId ?? organizationWide,
+          organizationId: entry.organizationId ?? tenantWide,
           projectId: entry.projectId ?? undefined,
           taskCategoryId: entry.taskCategoryId ?? undefined,
           tagIds: entry.tagIds,
@@ -155,8 +155,8 @@ export function TimeEntryForm({
     async ({ userId, next, entries }: { userId: string; next: NewEntry; entries?: DayEntry[] }) => {
       if (entries && entries.length > 1) {
         return createDayEntriesAction(batch ? userIds! : [userId], {
+          tenantId: next.tenantId,
           organizationId: next.organizationId,
-          departmentId: next.departmentId,
           projectId: next.projectId,
           taskCategoryId: next.taskCategoryId,
           description: next.description,
@@ -172,7 +172,7 @@ export function TimeEntryForm({
       return result.ok ? { ok: true as const, message: result.message } : result;
     },
     {
-      invalidate: [keys.organization(organization.id)],
+      invalidate: [keys.tenant(tenant.id)],
       onSuccess: () => {
         setNotes("");
         setExtraDates([]);
@@ -182,7 +182,7 @@ export function TimeEntryForm({
     },
   );
   const update = useActionMutation(({ id, patch }: { id: string; patch: EntryPatch }) => updateEntryAction(id, patch), {
-    invalidate: entry?.mode === "Punch" ? [keys.organization(organization.id), keys.openPunch(entry.userId)] : [keys.organization(organization.id)],
+    invalidate: entry?.mode === "Punch" ? [keys.tenant(tenant.id), keys.openPunch(entry.userId)] : [keys.tenant(tenant.id)],
     onSuccess: () => {
       setError("");
       onSaved?.();
@@ -337,7 +337,7 @@ export function TimeEntryForm({
           update.mutate({
             id: entry.id,
             patch: {
-              departmentId: base.departmentId,
+              organizationId: base.organizationId,
               projectId: base.projectId,
               taskCategoryId: base.taskCategoryId,
               description: base.description,
@@ -365,7 +365,6 @@ export function TimeEntryForm({
               {candidates ? (
                 <SelectField
                   aria-label="Person"
-                  className="h-10"
                   value={selectedPersonId}
                   onValueChange={setPersonId}
                   options={candidates.map((candidate) => ({ value: candidate.userId, label: candidate.label }))}
@@ -375,7 +374,6 @@ export function TimeEntryForm({
                 <PersonSelect
                   value={selectedPersonId}
                   onValueChange={setPersonId}
-                  className="h-10"
                   excludeSelf={excludeSelf}
                   activeOnly={activeOnly}
                   placeholder={excludeSelf ? "Select a member" : undefined}
@@ -444,7 +442,6 @@ export function TimeEntryForm({
                 onChange={(event) => setOccurredOn(event.target.value)}
                 required
                 disabled={!canEditTimes}
-                className="h-10"
               />
             </Field>
             <Field label="Hours" htmlFor={`${idPrefix}-hours`} hint="HH:MM" error={error || null} className="sm:col-start-3">
@@ -462,7 +459,7 @@ export function TimeEntryForm({
                 }}
                 required
                 disabled={!canEditTimes}
-                className="h-10 px-2 text-center font-mono tabular-nums"
+                className="px-2 text-center font-mono tabular-nums"
               />
             </Field>
           </>
@@ -496,7 +493,6 @@ export function TimeEntryForm({
                 onChange={(event) => setOccurredOn(event.target.value)}
                 required
                 disabled={!canEditTimes}
-                className="h-10"
               />
             </Field>
             <Field label="Start" htmlFor={`${idPrefix}-start`}>
@@ -507,7 +503,6 @@ export function TimeEntryForm({
                 onChange={(event) => setStart(event.target.value)}
                 required={!entry || Boolean(entry.startedAt) || punch}
                 disabled={!canEditTimes}
-                className="h-10"
               />
             </Field>
             <Field
@@ -529,7 +524,7 @@ export function TimeEntryForm({
                   if (minutes !== null) setHours(formatDurationInput(minutes));
                 }}
                 disabled={!canEditTimes}
-                className="h-10 px-2 text-center font-mono tabular-nums"
+                className="px-2 text-center font-mono tabular-nums"
               />
             </Field>
           </>
@@ -549,7 +544,7 @@ export function TimeEntryForm({
                     setExtraDates((current) => current.map((item, itemIndex) => (itemIndex === index ? event.target.value : item)))
                   }
                   required
-                  className="h-10 sm:max-w-56"
+                  className="sm:max-w-56"
                 />
                 <Button
                   type="button"
@@ -613,8 +608,8 @@ export function TimeEntryDialog({
   userId?: string;
   userIds?: string[];
 }) {
-  const organization = useOrganization();
-  const canEditTimes = organization.preferences.allowTimeEntryEditing;
+  const tenant = useTenant();
+  const canEditTimes = tenant.preferences.allowTimeEntryEditing;
   return (
     <EntityFormDialog
       open={open}

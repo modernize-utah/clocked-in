@@ -23,19 +23,26 @@ import {
 import { clientIp } from "@/lib/api/rate-limit";
 import { run, safeNext, text } from "@/lib/server/action";
 import { clearSessionCookies, currentRefreshToken, getAccess, setSessionCookies } from "@/lib/server/session";
-import { writeOrganization } from "@/lib/server/session-cookies";
-import { getTenantSlug, requirePinnedOrganizationOrApex } from "@/lib/server/tenant";
+import { writeTenant } from "@/lib/server/session-cookies";
+import { getTenantSlug, requirePinnedTenantOrApex } from "@/lib/server/tenant";
 import type { ActionResult } from "@/lib/types";
 
 export async function logInAction(_: ActionResult | null, formData: FormData): Promise<ActionResult> {
   const result = await run(async () => {
-    const pinned = await requirePinnedOrganizationOrApex();
+    const pinned = await requirePinnedTenantOrApex();
+    if (pinned.pinned && pinned.tenant) {
+      const { readPreferences } = await import("@/lib/api/features/tenants");
+      const { validation } = await import("@/lib/api/errors");
+      if (readPreferences(pinned.tenant.preferences).portalOrigin) {
+        validation("This tenant uses an external sign-in provider.");
+      }
+    }
     const session = await logIn(parseLogIn({ username: text(formData, "username"), password: text(formData, "password") }), {
       ip: clientIp(await headers()),
     });
     await setSessionCookies(session);
-    if (pinned.pinned && pinned.organization) {
-      writeOrganization(await cookies(), pinned.organization.id);
+    if (pinned.pinned && pinned.tenant) {
+      writeTenant(await cookies(), pinned.tenant.id);
     }
     return { mustChangePassword: session.user.mustChangePassword };
   });
@@ -45,10 +52,10 @@ export async function logInAction(_: ActionResult | null, formData: FormData): P
 }
 
 export async function signUpAction(_: ActionResult | null, formData: FormData): Promise<ActionResult> {
-  const pinned = await requirePinnedOrganizationOrApex();
+  const pinned = await requirePinnedTenantOrApex();
   const next = safeNext(text(formData, "next"));
   const code = acceptCodeFromNext(next);
-  const invite = code ? await invitationAccount(code, pinned.organization?.id, { ip: clientIp(await headers()) }) : null;
+  const invite = code ? await invitationAccount(code, pinned.tenant?.id, { ip: clientIp(await headers()) }) : null;
   if (code && !invite) {
     return { ok: false, error: "The code is not valid." };
   }
@@ -74,8 +81,8 @@ export async function signUpAction(_: ActionResult | null, formData: FormData): 
       },
     );
     await setSessionCookies(session);
-    if (pinned.pinned && pinned.organization) {
-      writeOrganization(await cookies(), pinned.organization.id);
+    if (pinned.pinned && pinned.tenant) {
+      writeTenant(await cookies(), pinned.tenant.id);
     }
   });
   if (!result.ok) return result;
@@ -125,11 +132,11 @@ export async function confirmResetAction(_: ActionResult | null, formData: FormD
 }
 
 export async function acceptInviteAction(_: ActionResult | null, formData: FormData): Promise<ActionResult> {
-  const pinned = await requirePinnedOrganizationOrApex();
+  const pinned = await requirePinnedTenantOrApex();
   const code = text(formData, "code").trim();
   const access = await getAccess();
   if (!access) {
-    const invite = await invitationAccount(code, pinned.organization?.id, { ip: clientIp(await headers()) });
+    const invite = await invitationAccount(code, pinned.tenant?.id, { ip: clientIp(await headers()) });
     if (!invite) {
       return { ok: false, error: "The code is not valid." };
     }
@@ -139,7 +146,7 @@ export async function acceptInviteAction(_: ActionResult | null, formData: FormD
 
   const result = await run(async () => {
     const accepted = await acceptInvitation(access, parseAcceptInvitation({ code }), { ip: clientIp(await headers()) });
-    writeOrganization(await cookies(), accepted.invitation.organizationId);
+    writeTenant(await cookies(), accepted.invitation.tenantId);
   });
   if (!result.ok) {
     return result.error === inviteEmailMismatch ? { ok: false, error: result.error, reason: "email_mismatch" } : result;

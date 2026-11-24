@@ -31,8 +31,8 @@ function collectiveJson(entry: CollectiveRow) {
   return {
     id: entry.id,
     recordedByUserId: entry.recordedByUserId,
+    tenantId: entry.tenantId,
     organizationId: entry.organizationId,
-    departmentId: entry.departmentId,
     projectId: entry.projectId,
     taskCategoryId: entry.taskCategoryId,
     hourlyRateId: entry.hourlyRateId,
@@ -58,8 +58,8 @@ function assertSpan(startedAt: Date, endedAt: Date, participantCount: number) {
 }
 
 export type CreateCollectiveRequest = {
-  organizationId: string;
-  departmentId: string | null;
+  tenantId: string;
+  organizationId: string | null;
   projectId: string;
   taskCategoryId: string;
   startedAt: Date;
@@ -71,8 +71,8 @@ export type CreateCollectiveRequest = {
 };
 
 export function parseCreateCollective(body: Body): CreateCollectiveRequest {
-  const organizationId = requireUuid(body, "organizationId");
-  const departmentId = optionalUuid(body, "departmentId");
+  const tenantId = requireUuid(body, "tenantId");
+  const organizationId = optionalUuid(body, "organizationId");
   const projectId = requireUuid(body, "projectId");
   const taskCategoryId = requireUuid(body, "taskCategoryId");
   const startedAt = requireInstant(body, "startedAt");
@@ -82,8 +82,8 @@ export function parseCreateCollective(body: Body): CreateCollectiveRequest {
   assertSpan(startedAt, endedAt, participantCount);
   const tagIds = ids(body, "tagIds", true);
   return {
+    tenantId,
     organizationId,
-    departmentId,
     projectId,
     taskCategoryId,
     startedAt,
@@ -96,8 +96,8 @@ export function parseCreateCollective(body: Body): CreateCollectiveRequest {
 }
 
 export type UpdateCollectiveRequest = {
-  organizationId: Optional<string>;
-  departmentId: Optional<string | null>;
+  tenantId: Optional<string>;
+  organizationId: Optional<string | null>;
   projectId: Optional<string>;
   taskCategoryId: Optional<string>;
   hourlyRateId: Optional<string | null>;
@@ -110,8 +110,8 @@ export type UpdateCollectiveRequest = {
 
 export function parseUpdateCollective(body: Body): UpdateCollectiveRequest {
   return {
-    organizationId: optional(body, "organizationId", requireUuid),
-    departmentId: optional(body, "departmentId", optionalUuid),
+    tenantId: optional(body, "tenantId", requireUuid),
+    organizationId: optional(body, "organizationId", optionalUuid),
     projectId: optional(body, "projectId", requireUuid),
     taskCategoryId: optional(body, "taskCategoryId", requireUuid),
     hourlyRateId: optional(body, "hourlyRateId", optionalUuid),
@@ -134,33 +134,33 @@ async function load(entryId: string) {
 
 export async function listCollective(access: Access, params: URLSearchParams) {
   const paging = page(params);
-  const pinned = await access.pinnedOrganization();
-  const organizationId = queryUuid(params, "organizationId") ?? pinned?.id;
-  const departmentId = queryUuid(params, "departmentId");
-  if (organizationId !== undefined) {
-    await access.requireOrganization(organizationId, false);
+  const pinned = await access.pinnedTenant();
+  const tenantId = queryUuid(params, "tenantId") ?? pinned?.id;
+  const organizationId = queryUuid(params, "organizationId");
+  if (tenantId !== undefined) {
+    await access.requireTenant(tenantId, false);
   }
 
-  if (departmentId !== undefined) {
-    const department = await access.requireDepartment(departmentId);
-    if (organizationId !== undefined && department.organizationId !== organizationId) {
-      validation("departmentId does not belong to this organization.");
+  if (organizationId !== undefined) {
+    const organization = await access.requireOrganization(organizationId);
+    if (tenantId !== undefined && organization.tenantId !== tenantId) {
+      validation("organizationId does not belong to this tenant.");
     }
   }
 
   const where: Prisma.CollectiveTimeEntryWhereInput = {};
-  if (organizationId !== undefined) {
-    where.organizationId = organizationId;
+  if (tenantId !== undefined) {
+    where.tenantId = tenantId;
   } else if (!access.isSuperAdmin) {
-    where.organizationId = { in: await access.activeOrganizationIds() };
+    where.tenantId = { in: await access.activeTenantIds() };
   }
 
-  if (departmentId !== undefined) {
-    where.departmentId = departmentId;
-  } else if (organizationId !== undefined) {
-    const visibility = await access.visibility(organizationId);
-    if (visibility.kind === "departments") {
-      where.departmentId = { in: visibility.departmentIds };
+  if (organizationId !== undefined) {
+    where.organizationId = organizationId;
+  } else if (tenantId !== undefined) {
+    const visibility = await access.visibility(tenantId);
+    if (visibility.kind === "organizations") {
+      where.organizationId = { in: visibility.organizationIds };
     } else if (visibility.kind === "self") {
       where.recordedByUserId = access.actorUserId;
     }
@@ -178,18 +178,18 @@ export async function listCollective(access: Access, params: URLSearchParams) {
 
 export async function createCollective(access: Access, request: CreateCollectiveRequest) {
   const callerId = access.actorUserId;
-  await assertCollectiveWrite(access, request.organizationId, request.departmentId);
-  await assertProject(access, callerId, request.organizationId, request.departmentId, request.projectId);
-  await assertTaskCategory(request.organizationId, request.taskCategoryId);
-  const tagIds = await tags(request.organizationId, request.tagIds);
-  const resolved = await resolveHourlyRate(access, callerId, request.organizationId, request.hourlyRateId);
+  await assertCollectiveWrite(access, request.tenantId, request.organizationId);
+  await assertProject(access, callerId, request.tenantId, request.organizationId, request.projectId);
+  await assertTaskCategory(request.tenantId, request.taskCategoryId);
+  const tagIds = await tags(request.tenantId, request.tagIds);
+  const resolved = await resolveHourlyRate(access, callerId, request.tenantId, request.hourlyRateId);
   const hourlyRate = resolved.rate;
   const entry = await guard(
     prisma.collectiveTimeEntry.create({
       data: {
         recordedByUserId: callerId,
+        tenantId: request.tenantId,
         organizationId: request.organizationId,
-        departmentId: request.departmentId,
         projectId: request.projectId,
         taskCategoryId: request.taskCategoryId,
         hourlyRateId: resolved.id,
@@ -209,35 +209,35 @@ export async function createCollective(access: Access, request: CreateCollective
 
 export async function getCollective(access: Access, entryId: string) {
   const entry = await load(entryId);
-  await access.requireOrganization(entry.organizationId, false);
+  await access.requireTenant(entry.tenantId, false);
   return collectiveJson(entry);
 }
 
 export async function updateCollective(access: Access, entryId: string, request: UpdateCollectiveRequest) {
   const existing = await load(entryId);
-  if (request.organizationId.set && request.organizationId.value !== existing.organizationId) {
-    validation("organizationId cannot change.");
+  if (request.tenantId.set && request.tenantId.value !== existing.tenantId) {
+    validation("tenantId cannot change.");
   }
 
-  const departmentId = or(request.departmentId, existing.departmentId);
+  const organizationId = or(request.organizationId, existing.organizationId);
   const projectId = or(request.projectId, existing.projectId);
   const taskCategoryId = or(request.taskCategoryId, existing.taskCategoryId);
   const startedAt = or(request.startedAt, existing.startedAt);
   const endedAt = or(request.endedAt, existing.endedAt);
   const participantCount = or(request.participantCount, existing.participantCount);
   assertSpan(startedAt, endedAt, participantCount);
-  await assertCollectiveWrite(access, existing.organizationId, departmentId);
-  await assertProject(access, access.actorUserId, existing.organizationId, departmentId, projectId);
-  await assertTaskCategory(existing.organizationId, taskCategoryId);
-  const tagIds = request.tagIds.set ? await tags(existing.organizationId, request.tagIds.value) : null;
+  await assertCollectiveWrite(access, existing.tenantId, organizationId);
+  await assertProject(access, access.actorUserId, existing.tenantId, organizationId, projectId);
+  await assertTaskCategory(existing.tenantId, taskCategoryId);
+  const tagIds = request.tagIds.set ? await tags(existing.tenantId, request.tagIds.value) : null;
   const resolved = request.hourlyRateId.set
-    ? await resolveHourlyRate(access, access.actorUserId, existing.organizationId, request.hourlyRateId.value)
+    ? await resolveHourlyRate(access, access.actorUserId, existing.tenantId, request.hourlyRateId.value)
     : { id: existing.hourlyRateId, rate: Number(existing.hourlyRate) };
   const updated = await guard(
     prisma.collectiveTimeEntry.update({
       where: { id: entryId },
       data: {
-        departmentId,
+        organizationId,
         projectId,
         taskCategoryId,
         hourlyRateId: resolved.id,
@@ -257,6 +257,6 @@ export async function updateCollective(access: Access, entryId: string, request:
 
 export async function deleteCollective(access: Access, entryId: string) {
   const entry = await load(entryId);
-  await assertCollectiveWrite(access, entry.organizationId, entry.departmentId);
+  await assertCollectiveWrite(access, entry.tenantId, entry.organizationId);
   await guard(prisma.collectiveTimeEntry.delete({ where: { id: entryId } }));
 }

@@ -7,7 +7,7 @@ const knownScopes = ["org:read", "org:write", "org:admin"] as const;
 
 export type ApiKeyPrincipal = {
   id: string;
-  organizationId: string;
+  tenantId: string;
   createdByUserId: string;
   scopes: string[];
   isAdmin: boolean;
@@ -100,14 +100,14 @@ export function formatScopes(scopes: string[]) {
 }
 
 export function principalFromScopes(
-  key: { id: string; organizationId: string; createdByUserId: string },
+  key: { id: string; tenantId: string; createdByUserId: string },
   scopes: string[],
 ): ApiKeyPrincipal {
   const isAdmin = scopes.includes("org:admin");
   const canWrite = isAdmin || scopes.includes("org:write");
   return {
     id: key.id,
-    organizationId: key.organizationId,
+    tenantId: key.tenantId,
     createdByUserId: key.createdByUserId,
     scopes,
     isAdmin,

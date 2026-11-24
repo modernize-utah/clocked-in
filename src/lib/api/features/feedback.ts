@@ -40,7 +40,7 @@ import {
 import { sendEmail } from "@/lib/api/mail";
 import type { EmailContext, EmailTemplateFor } from "@/lib/email/templates";
 import { appUrl } from "@/lib/api/security";
-import { readPreferences } from "@/lib/api/features/organizations";
+import { readPreferences } from "@/lib/api/features/tenants";
 import { prisma } from "@/lib/prisma";
 
 const personSelect = {
@@ -52,7 +52,7 @@ const personSelect = {
 
 const feedbackInclude = {
   user: { select: personSelect },
-  organization: { select: { id: true, name: true, preferences: true } },
+  tenant: { select: { id: true, name: true, preferences: true } },
 } as const;
 
 const detailInclude = {
@@ -109,7 +109,7 @@ function feedbackJson(feedback: FeedbackRow, includeActions: boolean) {
   return {
     id: feedback.id,
     userId: feedback.userId,
-    organizationId: feedback.organizationId,
+    tenantId: feedback.tenantId,
     type: feedback.type,
     priority: feedback.priority,
     area: feedback.area,
@@ -125,7 +125,7 @@ function feedbackJson(feedback: FeedbackRow, includeActions: boolean) {
     createdAt: feedback.createdAt.toISOString(),
     updatedAt: feedback.updatedAt.toISOString(),
     user: personJson(feedback.user),
-    organization: feedback.organization ? { id: feedback.organization.id, name: feedback.organization.name } : null,
+    tenant: feedback.tenant ? { id: feedback.tenant.id, name: feedback.tenant.name } : null,
     actions: includeActions
       ? (feedback.actions ?? []).map((action) => ({
           id: action.id,
@@ -149,7 +149,7 @@ export type CreateFeedbackRequest = {
   title: string;
   description: string;
   screenshotUrls: string[];
-  organizationId: string | null;
+  tenantId: string | null;
 };
 
 export function parseCreateFeedback(body: Body): CreateFeedbackRequest {
@@ -160,7 +160,7 @@ export function parseCreateFeedback(body: Body): CreateFeedbackRequest {
     title: feedbackTitle(requireString(body, "title")),
     description: requiredLongText(body, "description", 4000),
     screenshotUrls: screenshotUrls(body),
-    organizationId: optionalUuid(body, "organizationId"),
+    tenantId: optionalUuid(body, "tenantId"),
   };
 }
 
@@ -204,10 +204,10 @@ function requireSuperAdmin(access: Access) {
 
 async function requireFeedbackEditor(
   access: Access,
-  feedback: { userId: string; organizationId: string | null },
+  feedback: { userId: string; tenantId: string | null },
 ) {
-  const pinned = await access.pinnedOrganization();
-  if (pinned && feedback.organizationId !== pinned.id) {
+  const pinned = await access.pinnedTenant();
+  if (pinned && feedback.tenantId !== pinned.id) {
     notFound();
   }
 
@@ -220,7 +220,7 @@ async function requireFeedbackEditor(
     return;
   }
 
-  if (feedback.organizationId && (await access.isOrgAdmin(feedback.organizationId))) {
+  if (feedback.tenantId && (await access.isOrgAdmin(feedback.tenantId))) {
     return;
   }
 
@@ -251,12 +251,12 @@ function outcome(status: FeedbackStatus) {
 
 async function trySend(
   to: string,
-  organizationId: string | null,
+  tenantId: string | null,
   kind: EmailTemplateFor,
   context: EmailContext,
 ) {
   try {
-    await sendEmail({ to, organizationId, for: kind, context });
+    await sendEmail({ to, tenantId, for: kind, context });
   } catch {
     // Keep the saved feedback even if a notify email fails.
   }
@@ -273,7 +273,7 @@ async function tryOpenLinearIssue(feedback: FeedbackRow) {
     screenshotUrls: urls(feedback.screenshotUrls),
     submitterName: displayName(feedback.user),
     submitterUsername: feedback.user.username,
-    organizationName: feedback.organization?.name ?? null,
+    tenantName: feedback.tenant?.name ?? null,
     adminUrl: appUrl(`/feedback/${feedback.id}`),
   });
   if (!issue) {
@@ -302,7 +302,7 @@ async function tryOpenLinearIssue(feedback: FeedbackRow) {
 
 async function notifyCreated(feedback: FeedbackRow) {
   const sent = new Set<string>();
-  await trySend(feedback.user.email, feedback.organizationId, "FeedbackReceived", {
+  await trySend(feedback.user.email, feedback.tenantId, "FeedbackReceived", {
     user: { firstName: firstName(feedback.user) },
     feedback: { title: feedback.title, typeLabel: typeLabel(feedback.type) },
   });
@@ -323,43 +323,43 @@ async function notifyCreated(feedback: FeedbackRow) {
   for (const admin of superAdmins) {
     if (!sent.has(admin.email.toLowerCase())) {
       sent.add(admin.email.toLowerCase());
-      await trySend(admin.email, feedback.organizationId, "FeedbackNotify", notify);
+      await trySend(admin.email, feedback.tenantId, "FeedbackNotify", notify);
     }
   }
 
-  if (!feedback.organizationId || !feedback.organization) {
+  if (!feedback.tenantId || !feedback.tenant) {
     return;
   }
 
-  const notifyIds = readPreferences(feedback.organization.preferences).feedbackNotifyUserIds;
+  const notifyIds = readPreferences(feedback.tenant.preferences).feedbackNotifyUserIds;
   if (notifyIds.length === 0) {
     return;
   }
 
-  const recipients = await prisma.organizationMembership.findMany({
-    where: { organizationId: feedback.organizationId, isActive: true, userId: { in: notifyIds } },
+  const recipients = await prisma.tenantMembership.findMany({
+    where: { tenantId: feedback.tenantId, isActive: true, userId: { in: notifyIds } },
     select: { user: { select: { email: true } } },
   });
   for (const membership of recipients) {
     const email = membership.user.email;
     if (!sent.has(email.toLowerCase())) {
       sent.add(email.toLowerCase());
-      await trySend(email, feedback.organizationId, "FeedbackNotify", notify);
+      await trySend(email, feedback.tenantId, "FeedbackNotify", notify);
     }
   }
 }
 
 export async function createFeedback(access: Access, request: CreateFeedbackRequest) {
-  const pinned = await access.pinnedOrganization();
-  const organizationId = request.organizationId ?? pinned?.id ?? null;
+  const pinned = await access.pinnedTenant();
+  const tenantId = request.tenantId ?? pinned?.id ?? null;
   if (pinned) {
-    if (organizationId !== pinned.id) {
+    if (tenantId !== pinned.id) {
       notFound();
     }
-    await access.requireOrganization(pinned.id, false);
-  } else if (organizationId) {
-    // Feedback for an organization emails its notify list, so only its members may send it.
-    await access.requireOrganization(organizationId, false);
+    await access.requireTenant(pinned.id, false);
+  } else if (tenantId) {
+    // Feedback for an tenant emails its notify list, so only its members may send it.
+    await access.requireTenant(tenantId, false);
   }
 
   const caller = access.requireHuman();
@@ -368,7 +368,7 @@ export async function createFeedback(access: Access, request: CreateFeedbackRequ
     prisma.feedback.create({
       data: {
         userId: caller.id,
-        organizationId,
+        tenantId,
         type: request.type,
         priority: request.priority,
         area: request.area,
@@ -490,7 +490,7 @@ export async function updateFeedback(access: Access, feedbackId: string, request
   }
 
   if (!isCompletedFeedback(previous) && isCompletedFeedback(request.status)) {
-    await trySend(updated.user.email, updated.organizationId, "FeedbackCompleted", {
+    await trySend(updated.user.email, updated.tenantId, "FeedbackCompleted", {
       user: { firstName: firstName(updated.user) },
       feedback: {
         title: updated.title,
@@ -527,7 +527,7 @@ export async function syncFeedbackLinearIssue(access: Access, feedbackId: string
     screenshotUrls: urls(existing.screenshotUrls),
     submitterName: displayName(existing.user),
     submitterUsername: existing.user.username,
-    organizationName: existing.organization?.name ?? null,
+    tenantName: existing.tenant?.name ?? null,
     adminUrl: appUrl(`/feedback/${existing.id}`),
   });
   if (!issue) {
@@ -835,7 +835,7 @@ export async function handleLinearWebhook(rawBody: string, signatureHeader: stri
       screenshotUrls: urls(updated.screenshotUrls),
       submitterName: displayName(updated.user),
       submitterUsername: updated.user.username,
-      organizationName: updated.organization?.name ?? null,
+      tenantName: updated.tenant?.name ?? null,
       adminUrl: appUrl(`/feedback/${updated.id}`),
       linearIssueIdentifier: updated.linearIssueIdentifier,
       ticketUrl: updated.ticketUrl,
@@ -843,7 +843,7 @@ export async function handleLinearWebhook(rawBody: string, signatureHeader: stri
   }
 
   if (statusChanged && !isCompletedFeedback(previous) && isCompletedFeedback(nextStatus)) {
-    await trySend(updated.user.email, updated.organizationId, "FeedbackCompleted", {
+    await trySend(updated.user.email, updated.tenantId, "FeedbackCompleted", {
       user: { firstName: firstName(updated.user) },
       feedback: {
         title: updated.title,

@@ -102,7 +102,7 @@ test("priority and description helpers preserve feedback metadata and extract cl
     ],
     submitterName: "Ada Lovelace",
     submitterUsername: "ada",
-    organizationName: "CASWJ",
+    tenantName: "CASWJ",
     adminUrl: `https://voluntime.app/feedback/${feedbackId}`,
   });
 
@@ -157,7 +157,7 @@ test("syncFeedbackInCache updates item and active/inactive list caches immediate
   const baseItem: Feedback = {
     id: "11111111-2222-4333-8444-555555555555",
     userId: "user-1",
-    organizationId: null,
+    tenantId: null,
     type: "Bug",
     priority: "High",
     area: "Dashboard",
@@ -173,7 +173,7 @@ test("syncFeedbackInCache updates item and active/inactive list caches immediate
     createdAt: "2026-10-30T00:00:00.000Z",
     updatedAt: "2026-10-30T00:00:00.000Z",
     user: { id: "user-1", username: "ada", email: "ada@example.com", displayName: "Ada Lovelace" },
-    organization: null,
+    tenant: null,
     actions: [],
   };
 
@@ -222,7 +222,7 @@ test("formatSlackFeedbackPayload and notifySlackFeedbackWebhook format and post 
     ],
     submitterName: "Ada Lovelace",
     submitterUsername: "ada",
-    organizationName: "CASWJ & Friends",
+    tenantName: "CASWJ & Friends",
     adminUrl: "https://voluntime.app/feedback/11111111-2222-4333-8444-555555555555",
     linearIssueIdentifier: "VOL-42",
     ticketUrl: "https://linear.app/voluntime/issue/VOL-42",

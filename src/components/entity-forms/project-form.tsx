@@ -8,7 +8,7 @@ import { DialogActions } from "@/components/dialog-actions";
 import { EntityFormDialog } from "@/components/entity-forms/entity-form-dialog";
 import { EntitySelect } from "@/components/entity-forms/entity-select";
 import { rememberLookup, savedProject, upsertProject } from "@/components/entity-forms/lookup-cache";
-import { CreateDepartmentDialog } from "@/components/entity-forms/name-entity-form";
+import { CreateOrganizationDialog } from "@/components/entity-forms/name-entity-form";
 import { Field } from "@/components/field";
 import { SubmitButton } from "@/components/submit-button";
 import { Button } from "@/components/ui/button";
@@ -16,8 +16,8 @@ import { Input } from "@/components/ui/input";
 import { useActionMutation } from "@/hooks/use-action-mutation";
 import { useLabels } from "@/hooks/use-labels";
 import { useLookups } from "@/hooks/use-lookups";
-import { organizationWide } from "@/hooks/use-placement";
-import { useOrganization } from "@/hooks/use-workspace";
+import { tenantWide } from "@/hooks/use-placement";
+import { useTenant } from "@/hooks/use-workspace";
 import { keys } from "@/lib/queries";
 import type { Project } from "@/lib/types";
 
@@ -29,7 +29,7 @@ const projectTypes = [
 type Draft = {
   title: string;
   projectType: "Project" | "Event";
-  departmentId: string;
+  organizationId: string;
   startDate: string;
   endDate: string;
 };
@@ -37,7 +37,7 @@ type Draft = {
 const blank: Draft = {
   title: "",
   projectType: "Project",
-  departmentId: organizationWide,
+  organizationId: tenantWide,
   startDate: "",
   endDate: "",
 };
@@ -54,7 +54,7 @@ function toInput(draft: Draft): ProjectInput {
   return {
     title: draft.title.trim(),
     projectType: draft.projectType,
-    departmentId: draft.departmentId === organizationWide ? null : draft.departmentId,
+    organizationId: draft.organizationId === tenantWide ? null : draft.organizationId,
     startDate: draft.startDate || null,
     endDate: draft.endDate || null,
   };
@@ -64,7 +64,7 @@ function fromProject(project: Project): Draft {
   return {
     title: project.title,
     projectType: project.projectType === "Event" ? "Event" : "Project",
-    departmentId: project.departmentId ?? organizationWide,
+    organizationId: project.organizationId ?? tenantWide,
     startDate: project.startDate ?? "",
     endDate: project.endDate ?? "",
   };
@@ -91,7 +91,7 @@ export function ProjectForm({
   onSaved?: (project: Project) => void;
   onCancel?: () => void;
 }) {
-  const organization = useOrganization();
+  const tenant = useTenant();
   const copy = useLabels();
   const queryClient = useQueryClient();
   const { lookups } = useLookups();
@@ -99,28 +99,28 @@ export function ProjectForm({
     project ? fromProject(project) : { ...blank, projectType: defaultProjectType },
   );
   const [error, setError] = useState<string | null>(null);
-  const [addingDepartment, setAddingDepartment] = useState(false);
-  const invalidate = [keys.lookups(organization.id)];
-  const departments = [
-    { value: organizationWide, label: `Whole ${copy.organization.toLowerCase()}` },
-    ...lookups.departments.map((item) => ({ value: item.id, label: item.name })),
+  const [addingOrganization, setAddingOrganization] = useState(false);
+  const invalidate = [keys.lookups(tenant.id)];
+  const organizations = [
+    { value: tenantWide, label: `Whole ${copy.tenant.toLowerCase()}` },
+    ...lookups.organizations.map((item) => ({ value: item.id, label: item.name })),
   ];
 
   function remember(saved: Project) {
-    rememberLookup(queryClient, organization.id, (current) => ({
+    rememberLookup(queryClient, tenant.id, (current) => ({
       ...current,
       projects: upsertProject(current.projects, saved),
     }));
   }
 
-  const create = useActionMutation((input: ProjectInput) => createProjectAction(organization.id, input), {
+  const create = useActionMutation((input: ProjectInput) => createProjectAction(tenant.id, input), {
     invalidate,
     onSuccess: (data) => {
       if (savedProject(data)) {
         remember(data);
         onCreated?.(data);
       }
-      setDraft((current) => ({ ...blank, projectType: current.projectType, departmentId: current.departmentId }));
+      setDraft((current) => ({ ...blank, projectType: current.projectType, organizationId: current.organizationId }));
       setError(null);
     },
   });
@@ -178,13 +178,13 @@ export function ProjectForm({
             className="sm:col-span-2"
           />
           <EntitySelect
-            id={`${idPrefix}-department`}
-            label={copy.department}
-            value={draft.departmentId}
-            onValueChange={(departmentId) => setDraft({ ...draft, departmentId })}
-            options={departments}
-            createLabel={`Add a ${copy.department.toLowerCase()}`}
-            onCreate={() => setAddingDepartment(true)}
+            id={`${idPrefix}-organization`}
+            label={copy.organization}
+            value={draft.organizationId}
+            onValueChange={(organizationId) => setDraft({ ...draft, organizationId })}
+            options={organizations}
+            createLabel={`Add a ${copy.organization.toLowerCase()}`}
+            onCreate={() => setAddingOrganization(true)}
             className="sm:col-span-2"
           />
           <Field label="Start date" htmlFor={`${idPrefix}-start`}>
@@ -220,10 +220,10 @@ export function ProjectForm({
           </SubmitButton>
         </DialogActions>
       </form>
-      <CreateDepartmentDialog
-        open={addingDepartment}
-        onOpenChange={setAddingDepartment}
-        onCreated={(department) => setDraft((current) => ({ ...current, departmentId: department.id }))}
+      <CreateOrganizationDialog
+        open={addingOrganization}
+        onOpenChange={setAddingOrganization}
+        onCreated={(organization) => setDraft((current) => ({ ...current, organizationId: organization.id }))}
       />
     </>
   );
@@ -251,7 +251,7 @@ export function ProjectDialog({
       open={open}
       onOpenChange={onOpenChange}
       title={editing ? "Edit project" : defaultProjectType === "Event" ? "Add an event" : "Add a project"}
-      description="Assign a project to a department and give it a start and end date. Leave the department as the whole organization when everyone should see it."
+      description="Assign a project to a organization and give it a start and end date. Leave the organization as the whole tenant when everyone should see it."
       className="sm:max-w-lg"
     >
       <ProjectForm

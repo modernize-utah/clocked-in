@@ -1,6 +1,6 @@
 import { Prisma } from "@/generated/prisma/client";
 import { Access } from "@/lib/api/access";
-import { guard, lockOrganization, transaction } from "@/lib/api/db";
+import { guard, lockTenant, transaction } from "@/lib/api/db";
 import { ApiError, conflict, forbidden, notFound, validation } from "@/lib/api/errors";
 import { linkGuest } from "@/lib/api/features/volunteer-needs";
 import {
@@ -64,94 +64,94 @@ function memberUserJson(user: MemberUser) {
   };
 }
 
-export type DepartmentAssignment = { departmentIds: string[]; managedDepartmentIds: string[] };
+export type OrganizationAssignment = { organizationIds: string[]; managedOrganizationIds: string[] };
 
 export function orgMembershipJson(
   membership: {
     id: string;
     userId: string;
-    organizationId: string;
+    tenantId: string;
     joinedAt: Date;
     rateType: string;
     professionalBillingRate: Prisma.Decimal | null;
     isActive: boolean;
-    primaryDepartmentId: string | null;
-    orgUserTitle: string | null;
-    orgUserDescription: string | null;
+    primaryOrganizationId: string | null;
+    title: string | null;
+    memberDescription: string | null;
     notes: string | null;
     role: RoleRow;
     user: MemberUser;
   },
-  departments: string[] | DepartmentAssignment = [],
+  organizations: string[] | OrganizationAssignment = [],
 ) {
-  const assignment = Array.isArray(departments)
-    ? { departmentIds: departments, managedDepartmentIds: [] as string[] }
-    : departments;
+  const assignment = Array.isArray(organizations)
+    ? { organizationIds: organizations, managedOrganizationIds: [] as string[] }
+    : organizations;
   return {
     id: membership.id,
     userId: membership.userId,
-    organizationId: membership.organizationId,
-    departmentId: null,
+    tenantId: membership.tenantId,
+    organizationId: null,
     role: roleJson(membership.role),
     joinedAt: membership.joinedAt.toISOString(),
     rateType: membership.rateType as string | null,
     professionalBillingRate:
       membership.professionalBillingRate === null ? null : Number(membership.professionalBillingRate),
     isActive: membership.isActive,
-    primaryDepartmentId: membership.primaryDepartmentId,
-    departmentIds: [...assignment.departmentIds].sort(),
-    managedDepartmentIds: [...assignment.managedDepartmentIds].sort(),
-    orgUserTitle: membership.orgUserTitle,
-    orgUserDescription: membership.orgUserDescription,
+    primaryOrganizationId: membership.primaryOrganizationId,
+    organizationIds: [...assignment.organizationIds].sort(),
+    managedOrganizationIds: [...assignment.managedOrganizationIds].sort(),
+    title: membership.title,
+    memberDescription: membership.memberDescription,
     notes: membership.notes,
     user: memberUserJson(membership.user),
   };
 }
 
-export function departmentMembershipJson(
-  membership: { id: string; userId: string; departmentId: string; joinedAt: Date; role: RoleRow; user: MemberUser },
-  organizationId: string,
+export function organizationMembershipJson(
+  membership: { id: string; userId: string; organizationId: string; joinedAt: Date; role: RoleRow; user: MemberUser },
+  tenantId: string,
 ) {
   return {
     id: membership.id,
     userId: membership.userId,
-    organizationId,
-    departmentId: membership.departmentId,
+    tenantId,
+    organizationId: membership.organizationId,
     role: roleJson(membership.role),
     joinedAt: membership.joinedAt.toISOString(),
     rateType: null,
     professionalBillingRate: null,
     isActive: null,
-    primaryDepartmentId: null,
-    departmentIds: [membership.departmentId],
-    orgUserTitle: null,
-    orgUserDescription: null,
+    primaryOrganizationId: null,
+    organizationIds: [membership.organizationId],
+    title: null,
+    memberDescription: null,
     notes: null,
     user: memberUserJson(membership.user),
   };
 }
 
-export async function roleId(code: RoleCode, organizationId?: string | null) {
-  const role = await resolveRole(code, organizationId);
+export async function roleId(code: RoleCode, tenantId?: string | null) {
+  const role = await resolveRole(code, tenantId);
   if (!role) {
     validation("role was not found.");
   }
   return role.id;
 }
 
-export async function resolveRole(code: string, organizationId?: string | null) {
+export async function resolveRole(code: string, tenantId?: string | null) {
   const normalized = code.trim().toUpperCase();
-  if (organizationId) {
+  if (tenantId) {
     const custom = await prisma.role.findFirst({
-      where: { code: normalized, organizationId },
-      select: { id: true, code: true, name: true, organizationId: true, isSystem: true, scope: true },
+      where: { code: normalized, tenantId },
+      select: { id: true, code: true, name: true, tenantId: true, isSystem: true, scope: true },
     });
     if (custom) return custom;
   }
 
   return prisma.role.findFirst({
-    where: { code: normalized, organizationId: null },
-    select: { id: true, code: true, name: true, organizationId: true, isSystem: true, scope: true },
+    where: { code: normalized, tenantId: null },
+    select: { id: true, code: true, name: true, tenantId: true, isSystem: true, scope: true },
   });
 }
 
@@ -168,11 +168,11 @@ export type CreateOrgMembershipRequest = {
   notes: string | null;
   avatarUrl: string | null;
   description: string | null;
-  orgUserTitle: string | null;
-  orgUserDescription: string | null;
+  title: string | null;
+  memberDescription: string | null;
   role: RoleCode;
-  departmentIds: string[];
-  managedDepartmentIds: string[];
+  organizationIds: string[];
+  managedOrganizationIds: string[];
   relationship: MemberRelationship | null;
   emailUser: boolean;
 };
@@ -196,14 +196,14 @@ export function parseCreateOrgMembership(body: Body): CreateOrgMembershipRequest
     notes: body.notes === undefined ? null : limited(body, "notes", 2000, "notes must be 2000 characters or fewer."),
     avatarUrl: body.avatarUrl === undefined ? null : limited(body, "avatarUrl", 2000, "avatarUrl must be a URL."),
     description: body.description === undefined ? null : limited(body, "description", 8000, "description must be 8000 characters or fewer."),
-    orgUserTitle: body.orgUserTitle === undefined ? null : limited(body, "orgUserTitle", 100, "orgUserTitle must be 100 characters or fewer."),
-    orgUserDescription:
-      body.orgUserDescription === undefined
+    title: body.title === undefined ? null : limited(body, "title", 100, "title must be 100 characters or fewer."),
+    memberDescription:
+      body.memberDescription === undefined
         ? null
-        : limited(body, "orgUserDescription", 8000, "orgUserDescription must be 8000 characters or fewer."),
+        : limited(body, "memberDescription", 8000, "memberDescription must be 8000 characters or fewer."),
     role: normalizeRole(requireString(body, "role")),
-    departmentIds: ids(body, "departmentIds", true),
-    managedDepartmentIds: body.managedDepartmentIds === undefined ? [] : ids(body, "managedDepartmentIds", true),
+    organizationIds: ids(body, "organizationIds", true),
+    managedOrganizationIds: body.managedOrganizationIds === undefined ? [] : ids(body, "managedOrganizationIds", true),
     relationship: body.relationship === undefined ? null : normalizeRelationship(requireString(body, "relationship")),
     emailUser: body.emailUser === undefined ? false : requireBool(body, "emailUser"),
   };
@@ -214,9 +214,9 @@ export type UpdateOrgMembershipRequest = {
   rateType: Optional<RateType>;
   professionalBillingRate: Optional<number | null>;
   isActive: Optional<boolean>;
-  primaryDepartmentId: Optional<string | null>;
-  departmentIds: Optional<string[]>;
-  managedDepartmentIds: Optional<string[]>;
+  primaryOrganizationId: Optional<string | null>;
+  organizationIds: Optional<string[]>;
+  managedOrganizationIds: Optional<string[]>;
   firstName: Optional<string>;
   lastName: Optional<string>;
   displayName: Optional<string | null>;
@@ -226,8 +226,8 @@ export type UpdateOrgMembershipRequest = {
   notes: Optional<string | null>;
   avatarUrl: Optional<string | null>;
   description: Optional<string | null>;
-  orgUserTitle: Optional<string | null>;
-  orgUserDescription: Optional<string | null>;
+  title: Optional<string | null>;
+  memberDescription: Optional<string | null>;
   email: Optional<string>;
 };
 
@@ -240,9 +240,9 @@ export function parseUpdateOrgMembership(body: Body): UpdateOrgMembershipRequest
       return rate === null ? null : roundMoney(rate);
     }),
     isActive: optional(body, "isActive", requireBool),
-    primaryDepartmentId: optional(body, "primaryDepartmentId", optionalUuid),
-    departmentIds: optional(body, "departmentIds", (b, k) => ids(b, k, false)),
-    managedDepartmentIds: optional(body, "managedDepartmentIds", (b, k) => ids(b, k, false)),
+    primaryOrganizationId: optional(body, "primaryOrganizationId", optionalUuid),
+    organizationIds: optional(body, "organizationIds", (b, k) => ids(b, k, false)),
+    managedOrganizationIds: optional(body, "managedOrganizationIds", (b, k) => ids(b, k, false)),
     firstName: optional(body, "firstName", (b, k) => personName(requireString(b, k), k)),
     lastName: optional(body, "lastName", (b, k) => personName(requireString(b, k), k)),
     displayName: optional(body, "displayName", (b, k) => limited(b, k, 100, "displayName is required.")),
@@ -256,9 +256,9 @@ export function parseUpdateOrgMembership(body: Body): UpdateOrgMembershipRequest
     notes: optional(body, "notes", (b, k) => limited(b, k, 2000, "notes must be 2000 characters or fewer.")),
     avatarUrl: optional(body, "avatarUrl", (b, k) => limited(b, k, 2000, "avatarUrl must be a URL.")),
     description: optional(body, "description", (b, k) => limited(b, k, 8000, "description must be 8000 characters or fewer.")),
-    orgUserTitle: optional(body, "orgUserTitle", (b, k) => limited(b, k, 100, "orgUserTitle must be 100 characters or fewer.")),
-    orgUserDescription: optional(body, "orgUserDescription", (b, k) =>
-      limited(b, k, 8000, "orgUserDescription must be 8000 characters or fewer."),
+    title: optional(body, "title", (b, k) => limited(b, k, 100, "title must be 100 characters or fewer.")),
+    memberDescription: optional(body, "memberDescription", (b, k) =>
+      limited(b, k, 8000, "memberDescription must be 8000 characters or fewer."),
     ),
     email: optional(body, "email", (b, k) => normalizeEmail(requireString(b, k))),
   };
@@ -267,9 +267,9 @@ export function parseUpdateOrgMembership(body: Body): UpdateOrgMembershipRequest
     !request.rateType.set &&
     !request.professionalBillingRate.set &&
     !request.isActive.set &&
-    !request.primaryDepartmentId.set &&
-    !request.departmentIds.set &&
-    !request.managedDepartmentIds.set &&
+    !request.primaryOrganizationId.set &&
+    !request.organizationIds.set &&
+    !request.managedOrganizationIds.set &&
     !request.firstName.set &&
     !request.lastName.set &&
     !request.displayName.set &&
@@ -279,8 +279,8 @@ export function parseUpdateOrgMembership(body: Body): UpdateOrgMembershipRequest
     !request.notes.set &&
     !request.avatarUrl.set &&
     !request.description.set &&
-    !request.orgUserTitle.set &&
-    !request.orgUserDescription.set &&
+    !request.title.set &&
+    !request.memberDescription.set &&
     !request.email.set
   ) {
     validation("Provide at least one field to update.");
@@ -289,16 +289,16 @@ export function parseUpdateOrgMembership(body: Body): UpdateOrgMembershipRequest
   return request;
 }
 
-export type UpdateDepartmentMembershipRequest = { role: RoleCode };
+export type UpdateOrganizationMembershipRequest = { role: RoleCode };
 
-export function parseUpdateDepartmentMembership(body: Body): UpdateDepartmentMembershipRequest {
+export function parseUpdateOrganizationMembership(body: Body): UpdateOrganizationMembershipRequest {
   return { role: normalizeRole(requireString(body, "role")) };
 }
 
 export async function listRoles(params: URLSearchParams) {
   const paging = page(params);
   const roles = await prisma.role.findMany({
-    where: { organizationId: null, isSystem: true },
+    where: { tenantId: null, isSystem: true },
     orderBy: { code: "asc" },
     skip: paging.offset,
     take: paging.limit,
@@ -307,9 +307,9 @@ export async function listRoles(params: URLSearchParams) {
 }
 
 /** What a caller may see about other members: email needs people-management rights, pay needs manage_members. */
-async function memberVisibility(access: Access, organizationId: string) {
-  const pay = await access.can(organizationId, "manage_members");
-  return { pay, contact: pay || (await access.can(organizationId, "invite_members")) };
+async function memberVisibility(access: Access, tenantId: string) {
+  const pay = await access.can(tenantId, "manage_members");
+  return { pay, contact: pay || (await access.can(tenantId, "invite_members")) };
 }
 
 function redactMember<
@@ -329,25 +329,25 @@ function redactMember<
   };
 }
 
-export async function listOrgMemberships(access: Access, organizationId: string, params: URLSearchParams) {
+export async function listOrgMemberships(access: Access, tenantId: string, params: URLSearchParams) {
   const paging = page(params);
-  await access.requireOrganization(organizationId, false);
-  const visibility = await memberVisibility(access, organizationId);
-  const memberships = await prisma.organizationMembership.findMany({
-    where: { organizationId },
+  await access.requireTenant(tenantId, false);
+  const visibility = await memberVisibility(access, tenantId);
+  const memberships = await prisma.tenantMembership.findMany({
+    where: { tenantId },
     include: membershipInclude,
     orderBy: { joinedAt: "asc" },
     skip: paging.offset,
     take: paging.limit,
   });
-  const departmentIds = await departmentIdsByUser(
-    organizationId,
+  const organizationIds = await organizationIdsByUser(
+    tenantId,
     memberships.map((item) => item.userId),
   );
   return list(
     memberships.map((item) =>
       redactMember(
-        orgMembershipJson(item, departmentIds.get(item.userId) ?? { departmentIds: [], managedDepartmentIds: [] }),
+        orgMembershipJson(item, organizationIds.get(item.userId) ?? { organizationIds: [], managedOrganizationIds: [] }),
         visibility,
         access.actorUserId,
       ),
@@ -356,26 +356,28 @@ export async function listOrgMemberships(access: Access, organizationId: string,
   );
 }
 
-async function assertAnotherAdmin(tx: Prisma.TransactionClient, organizationId: string, exceptMembershipId: string) {
-  const another = await tx.organizationMembership.count({
-    where: { organizationId, role: { code: "ADMIN" }, id: { not: exceptMembershipId } },
+async function assertAnotherAdmin(tx: Prisma.TransactionClient, tenantId: string, exceptMembershipId: string) {
+  const another = await tx.tenantMembership.count({
+    where: { tenantId, role: { code: "ADMIN" }, id: { not: exceptMembershipId } },
   });
   if (another === 0) {
-    conflict("The last organization admin cannot be removed.");
+    conflict("The last tenant admin cannot be removed.");
   }
 }
 
-export async function createOrgMembership(access: Access, organizationId: string, request: CreateOrgMembershipRequest) {
-  const admin = access.isSuperAdmin || (await access.isOrgAdmin(organizationId));
+export async function createOrgMembership(access: Access, tenantId: string, request: CreateOrgMembershipRequest) {
+  const { assertPeopleRolesMutable } = await import("@/lib/api/features/external-sync");
+  await assertPeopleRolesMutable(tenantId);
+  const admin = access.isSuperAdmin || (await access.isOrgAdmin(tenantId));
   let volunteerAdd = false;
   if (admin) {
-    await access.requireOrganizationAdmin(organizationId);
-  } else if (await access.isOrgVolunteer(organizationId)) {
-    const organization = await prisma.organization.findUnique({
-      where: { id: organizationId },
+    await access.requireTenantAdmin(tenantId);
+  } else if (await access.isOrgVolunteer(tenantId)) {
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
       select: { preferences: true },
     });
-    if (!organization || !allowsVolunteerAdds(organization.preferences)) {
+    if (!tenant || !allowsVolunteerAdds(tenant.preferences)) {
       forbidden();
     }
 
@@ -383,8 +385,8 @@ export async function createOrgMembership(access: Access, organizationId: string
       validation("Volunteers can only add volunteers.");
     }
 
-    if (request.departmentIds.length > 0) {
-      validation("Volunteers cannot assign departments.");
+    if (request.organizationIds.length > 0) {
+      validation("Volunteers cannot assign organizations.");
     }
 
     if (!request.relationship) {
@@ -393,28 +395,28 @@ export async function createOrgMembership(access: Access, organizationId: string
 
     volunteerAdd = true;
   } else {
-    await access.requireOrganizationAdmin(organizationId);
+    await access.requireTenantAdmin(tenantId);
   }
   // Resolve outside the transaction. The production pool has one connection, so a
   // query on the global client while the transaction holds it times out.
-  const resolvedRoleId = await roleId(request.role, organizationId);
-  let organizationName = "";
-  let organizationSlug: string | null = null;
+  const resolvedRoleId = await roleId(request.role, tenantId);
+  let tenantName = "";
+  let tenantSlug: string | null = null;
   const membership = await transaction(async (tx) => {
-    await lockOrganization(tx, organizationId);
+    await lockTenant(tx, tenantId);
     const existing = await tx.user.findUnique({
       where: { email: request.email },
-      select: { organizationMemberships: { where: { organizationId }, select: { id: true } } },
+      select: { tenantMemberships: { where: { tenantId }, select: { id: true } } },
     });
-    if (existing?.organizationMemberships.length) {
+    if (existing?.tenantMemberships.length) {
       conflict(
         volunteerAdd
           ? "This person is already a member. Ask an admin to connect you."
-          : "This person is already in the organization.",
+          : "This person is already in the tenant.",
       );
     }
 
-    // Joining someone else's account to an organization would let its admins edit that account.
+    // Joining someone else's account to an tenant would let its admins edit that account.
     if (existing) {
       throw new ApiError(
         409,
@@ -454,30 +456,30 @@ export async function createOrgMembership(access: Access, organizationId: string
     });
 
     await linkGuest(tx, user.email, user.id);
-    const organization = await tx.organization.findUniqueOrThrow({
-      where: { id: organizationId },
+    const tenant = await tx.tenant.findUniqueOrThrow({
+      where: { id: tenantId },
       select: { defaultRateType: true, name: true, slug: true },
     });
-    organizationName = organization.name;
-    organizationSlug = organization.slug;
-    await syncDepartments(tx, organizationId, user.id, request.departmentIds, request.managedDepartmentIds);
-    const saved = await tx.organizationMembership.create({
+    tenantName = tenant.name;
+    tenantSlug = tenant.slug;
+    await syncOrganizations(tx, tenantId, user.id, request.organizationIds, request.managedOrganizationIds);
+    const saved = await tx.tenantMembership.create({
       data: {
         userId: user.id,
-        organizationId,
+        tenantId,
         roleId: resolvedRoleId,
-        rateType: organization.defaultRateType,
+        rateType: tenant.defaultRateType,
         isActive: true,
-        primaryDepartmentId: request.departmentIds[0] ?? null,
-        orgUserTitle: request.orgUserTitle,
-        orgUserDescription: request.orgUserDescription,
+        primaryOrganizationId: request.organizationIds[0] ?? null,
+        title: request.title,
+        memberDescription: request.memberDescription,
         notes: request.notes,
       },
       include: membershipInclude,
     });
     if (volunteerAdd && request.relationship) {
       await insertConnection(tx, {
-        organizationId,
+        tenantId,
         fromUserId: access.actorUserId,
         toUserId: user.id,
         relationship: request.relationship,
@@ -486,20 +488,20 @@ export async function createOrgMembership(access: Access, organizationId: string
     }
 
     return orgMembershipJson(saved, {
-      departmentIds: request.departmentIds,
-      managedDepartmentIds: request.managedDepartmentIds,
+      organizationIds: request.organizationIds,
+      managedOrganizationIds: request.managedOrganizationIds,
     });
   });
   if (request.emailUser && request.username && request.password) {
     try {
       await sendEmail({
         to: request.email,
-        organizationId,
+        tenantId,
         for: "Welcome",
         context: {
-          organization: { name: organizationName },
+          tenant: { name: tenantName },
           user: { username: request.username, password: request.password },
-          account: { url: appUrl("/login", organizationSlug) },
+          account: { url: appUrl("/login", tenantSlug) },
         },
       });
     } catch (error) {
@@ -512,16 +514,16 @@ export async function createOrgMembership(access: Access, organizationId: string
 }
 
 /**
- * Org admins edit a member's account and global profile only while no other organization
+ * Org admins edit a member's account and global profile only while no other tenant
  * shares that person. Changing the login email also requires an account the person has
  * never signed in to, because the email controls password resets.
  */
-function assertOrganizationOwnsAccount(
-  account: { isSuperAdmin: boolean; mustChangePassword: boolean; _count: { organizationMemberships: number } },
+function assertTenantOwnsAccount(
+  account: { isSuperAdmin: boolean; mustChangePassword: boolean; _count: { tenantMemberships: number } },
   emailChanged: boolean,
 ) {
-  if (account.isSuperAdmin || account._count.organizationMemberships > 0) {
-    throw new ApiError(403, "forbidden", "This person belongs to another organization, so only they can change their profile.");
+  if (account.isSuperAdmin || account._count.tenantMemberships > 0) {
+    throw new ApiError(403, "forbidden", "This person belongs to another tenant, so only they can change their profile.");
   }
 
   if (emailChanged && !account.mustChangePassword) {
@@ -531,16 +533,18 @@ function assertOrganizationOwnsAccount(
 
 export async function updateOrgMembership(
   access: Access,
-  organizationId: string,
+  tenantId: string,
   membershipId: string,
   request: UpdateOrgMembershipRequest,
 ) {
-  await access.requireOrganizationAdmin(organizationId);
-  const nextRoleId = request.role.set ? await roleId(request.role.value, organizationId) : undefined;
+  const { assertPeopleRolesMutable } = await import("@/lib/api/features/external-sync");
+  await assertPeopleRolesMutable(tenantId);
+  await access.requireTenantAdmin(tenantId);
+  const nextRoleId = request.role.set ? await roleId(request.role.value, tenantId) : undefined;
   return transaction(async (tx) => {
-    await lockOrganization(tx, organizationId);
-    const membership = await tx.organizationMembership.findFirst({
-      where: { id: membershipId, organizationId },
+    await lockTenant(tx, tenantId);
+    const membership = await tx.tenantMembership.findFirst({
+      where: { id: membershipId, tenantId },
       include: { role: true },
     });
     if (!membership) {
@@ -548,7 +552,7 @@ export async function updateOrgMembership(
     }
 
     if (request.role.set && membership.role.code === "ADMIN" && request.role.value !== "ADMIN") {
-      await assertAnotherAdmin(tx, organizationId, membership.id);
+      await assertAnotherAdmin(tx, tenantId, membership.id);
     }
 
     const rateType = or(request.rateType, membership.rateType);
@@ -556,19 +560,19 @@ export async function updateOrgMembership(
       request.professionalBillingRate,
       membership.professionalBillingRate === null ? null : Number(membership.professionalBillingRate),
     );
-    if (request.departmentIds.set || request.managedDepartmentIds.set) {
-      const nextDepartments = request.departmentIds.set
-        ? request.departmentIds.value
-        : (await departmentIdsByUser(organizationId, [membership.userId], tx)).get(membership.userId)?.departmentIds ?? [];
-      const nextManaged = request.managedDepartmentIds.set
-        ? request.managedDepartmentIds.value
-        : (await departmentIdsByUser(organizationId, [membership.userId], tx)).get(membership.userId)?.managedDepartmentIds ?? [];
-      await syncDepartments(tx, organizationId, membership.userId, nextDepartments, nextManaged);
+    if (request.organizationIds.set || request.managedOrganizationIds.set) {
+      const nextOrganizations = request.organizationIds.set
+        ? request.organizationIds.value
+        : (await organizationIdsByUser(tenantId, [membership.userId], tx)).get(membership.userId)?.organizationIds ?? [];
+      const nextManaged = request.managedOrganizationIds.set
+        ? request.managedOrganizationIds.value
+        : (await organizationIdsByUser(tenantId, [membership.userId], tx)).get(membership.userId)?.managedOrganizationIds ?? [];
+      await syncOrganizations(tx, tenantId, membership.userId, nextOrganizations, nextManaged);
     }
 
-    if (request.primaryDepartmentId.set && request.primaryDepartmentId.value !== null) {
-      await assertDepartment(tx, organizationId, request.primaryDepartmentId.value, "primaryDepartmentId does not belong to this organization.");
-      await ensureDepartmentMembership(tx, membership.userId, request.primaryDepartmentId.value);
+    if (request.primaryOrganizationId.set && request.primaryOrganizationId.value !== null) {
+      await assertOrganization(tx, tenantId, request.primaryOrganizationId.value, "primaryOrganizationId does not belong to this tenant.");
+      await ensureOrganizationMembership(tx, membership.userId, request.primaryOrganizationId.value);
     }
 
     if (rateType === "Volunteer") {
@@ -581,10 +585,10 @@ export async function updateOrgMembership(
       );
     }
 
-    const primaryDepartmentId = request.primaryDepartmentId.set
-      ? request.primaryDepartmentId.value
-      : request.departmentIds.set
-        ? (request.departmentIds.value[0] ?? null)
+    const primaryOrganizationId = request.primaryOrganizationId.set
+      ? request.primaryOrganizationId.value
+      : request.organizationIds.set
+        ? (request.organizationIds.value[0] ?? null)
         : undefined;
 
     const account = await tx.user.findUniqueOrThrow({
@@ -594,7 +598,7 @@ export async function updateOrgMembership(
         isSuperAdmin: true,
         mustChangePassword: true,
         profile: true,
-        _count: { select: { organizationMemberships: { where: { organizationId: { not: organizationId } } } } },
+        _count: { select: { tenantMemberships: { where: { tenantId: { not: tenantId } } } } },
       },
     });
     const nextEmail = request.email.set && request.email.value !== account.email ? request.email.value : null;
@@ -606,7 +610,7 @@ export async function updateOrgMembership(
       return change.set && change.value !== (account.profile?.[field] ?? null);
     });
     if (emailChanged || profileChanged) {
-      assertOrganizationOwnsAccount(account, emailChanged);
+      assertTenantOwnsAccount(account, emailChanged);
     }
     if (request.avatarUrl.set && request.avatarUrl.value) {
       assertOwnAvatarUrl(membership.userId, request.avatarUrl.value);
@@ -635,22 +639,22 @@ export async function updateOrgMembership(
       });
     }
 
-    const saved = await tx.organizationMembership.update({
+    const saved = await tx.tenantMembership.update({
       where: { id: membership.id },
       data: {
         roleId: nextRoleId,
         rateType,
         professionalBillingRate,
         isActive: request.isActive.set ? request.isActive.value : undefined,
-        primaryDepartmentId,
-        orgUserTitle: request.orgUserTitle.set ? request.orgUserTitle.value : undefined,
-        orgUserDescription: request.orgUserDescription.set ? request.orgUserDescription.value : undefined,
+        primaryOrganizationId,
+        title: request.title.set ? request.title.value : undefined,
+        memberDescription: request.memberDescription.set ? request.memberDescription.value : undefined,
         notes: request.notes.set ? request.notes.value : undefined,
       },
       include: membershipInclude,
     });
-    const departmentIds = await departmentIdsByUser(organizationId, [saved.userId], tx);
-    return orgMembershipJson(saved, departmentIds.get(saved.userId) ?? { departmentIds: [], managedDepartmentIds: [] });
+    const organizationIds = await organizationIdsByUser(tenantId, [saved.userId], tx);
+    return orgMembershipJson(saved, organizationIds.get(saved.userId) ?? { organizationIds: [], managedOrganizationIds: [] });
   });
 }
 
@@ -658,11 +662,13 @@ export function parseDeleteOrgMemberships(body: Body) {
   return ids(body, "membershipIds", false);
 }
 
-export async function deleteOrgMembership(access: Access, organizationId: string, membershipId: string) {
-  await deleteOrgMemberships(access, organizationId, [membershipId]);
+export async function deleteOrgMembership(access: Access, tenantId: string, membershipId: string) {
+  await deleteOrgMemberships(access, tenantId, [membershipId]);
 }
 
-export async function deleteOrgMemberships(access: Access, organizationId: string, membershipIds: string[]) {
+export async function deleteOrgMemberships(access: Access, tenantId: string, membershipIds: string[]) {
+  const { assertPeopleRolesMutable } = await import("@/lib/api/features/external-sync");
+  await assertPeopleRolesMutable(tenantId);
   const idsToDelete = [...new Set(membershipIds)];
   if (idsToDelete.length === 0) {
     validation("membershipIds must include at least one id.");
@@ -672,11 +678,11 @@ export async function deleteOrgMemberships(access: Access, organizationId: strin
     validation("membershipIds must include at most 100 ids.");
   }
 
-  const orgAdmin = access.isSuperAdmin || (await access.isOrgAdmin(organizationId));
+  const orgAdmin = access.isSuperAdmin || (await access.isOrgAdmin(tenantId));
   await transaction(async (tx) => {
-    await lockOrganization(tx, organizationId);
-    const memberships = await tx.organizationMembership.findMany({
-      where: { organizationId, id: { in: idsToDelete } },
+    await lockTenant(tx, tenantId);
+    const memberships = await tx.tenantMembership.findMany({
+      where: { tenantId, id: { in: idsToDelete } },
       select: { id: true, userId: true, role: { select: { code: true } } },
     });
     if (memberships.length !== idsToDelete.length) {
@@ -689,30 +695,30 @@ export async function deleteOrgMemberships(access: Access, organizationId: strin
 
     const removingAdmins = memberships.filter((membership) => membership.role.code === "ADMIN").length;
     if (removingAdmins > 0) {
-      const admins = await tx.organizationMembership.count({
-        where: { organizationId, role: { code: "ADMIN" } },
+      const admins = await tx.tenantMembership.count({
+        where: { tenantId, role: { code: "ADMIN" } },
       });
       if (admins - removingAdmins < 1) {
-        conflict("The last organization admin cannot be removed.");
+        conflict("The last tenant admin cannot be removed.");
       }
     }
 
     const userIds = memberships.map((membership) => membership.userId);
-    await tx.departmentMembership.deleteMany({
-      where: { userId: { in: userIds }, department: { organizationId } },
+    await tx.tenantMembership.deleteMany({
+      where: { userId: { in: userIds }, organization: { tenantId } },
     });
-    await tx.organizationMembership.deleteMany({
-      where: { organizationId, id: { in: idsToDelete } },
+    await tx.tenantMembership.deleteMany({
+      where: { tenantId, id: { in: idsToDelete } },
     });
   });
 }
 
-export async function listDepartmentMemberships(access: Access, departmentId: string, params: URLSearchParams) {
+export async function listOrganizationMemberships(access: Access, organizationId: string, params: URLSearchParams) {
   const paging = page(params);
-  const department = await access.requireDepartment(departmentId);
-  const visibility = await memberVisibility(access, department.organizationId);
-  const memberships = await prisma.departmentMembership.findMany({
-    where: { departmentId },
+  const organization = await access.requireOrganization(organizationId);
+  const visibility = await memberVisibility(access, organization.tenantId);
+  const memberships = await prisma.tenantMembership.findMany({
+    where: { organizationId },
     include: membershipInclude,
     orderBy: { joinedAt: "asc" },
     skip: paging.offset,
@@ -720,38 +726,38 @@ export async function listDepartmentMemberships(access: Access, departmentId: st
   });
   return list(
     memberships.map((membership) =>
-      redactMember(departmentMembershipJson(membership, department.organizationId), visibility, access.actorUserId),
+      redactMember(organizationMembershipJson(membership, organization.tenantId), visibility, access.actorUserId),
     ),
     paging,
   );
 }
 
-export async function updateDepartmentMembership(
+export async function updateOrganizationMembership(
   access: Access,
-  departmentId: string,
+  organizationId: string,
   membershipId: string,
-  request: UpdateDepartmentMembershipRequest,
+  request: UpdateOrganizationMembershipRequest,
 ) {
-  const department = await access.requireDepartmentManager(departmentId);
-  const membership = await prisma.departmentMembership.findFirst({ where: { id: membershipId, departmentId } });
+  const organization = await access.requireOrganizationManager(organizationId);
+  const membership = await prisma.tenantMembership.findFirst({ where: { id: membershipId, organizationId } });
   if (!membership) {
     notFound();
   }
 
   const saved = await guard(
-    prisma.departmentMembership.update({
+    prisma.tenantMembership.update({
       where: { id: membership.id },
       data: { roleId: await roleId(request.role) },
       include: membershipInclude,
     }),
   );
-  return departmentMembershipJson(saved, department.organizationId);
+  return organizationMembershipJson(saved, organization.tenantId);
 }
 
-export async function deleteDepartmentMembership(access: Access, departmentId: string, membershipId: string) {
-  const membership = await prisma.departmentMembership.findFirst({
-    where: { id: membershipId, departmentId },
-    include: { department: true },
+export async function deleteOrganizationMembership(access: Access, organizationId: string, membershipId: string) {
+  const membership = await prisma.tenantMembership.findFirst({
+    where: { id: membershipId, organizationId },
+    include: { organization: true },
   });
   if (!membership) {
     notFound();
@@ -760,96 +766,96 @@ export async function deleteDepartmentMembership(access: Access, departmentId: s
   const allowed =
     access.isSuperAdmin ||
     access.actorUserId === membership.userId ||
-    (await access.isOrgAdmin(membership.department.organizationId)) ||
-    (await access.isDepartmentAdmin(departmentId));
+    (await access.isOrgAdmin(membership.organization.tenantId)) ||
+    (await access.isOrganizationAdmin(organizationId));
   if (!allowed) {
     forbidden();
   }
 
-  await guard(prisma.departmentMembership.delete({ where: { id: membership.id } }));
+  await guard(prisma.tenantMembership.delete({ where: { id: membership.id } }));
 }
 
-async function departmentIdsByUser(organizationId: string, userIds: string[], db: Prisma.TransactionClient | typeof prisma = prisma) {
+async function organizationIdsByUser(tenantId: string, userIds: string[], db: Prisma.TransactionClient | typeof prisma = prisma) {
   if (userIds.length === 0) {
-    return new Map<string, DepartmentAssignment>();
+    return new Map<string, OrganizationAssignment>();
   }
 
-  const rows = await db.departmentMembership.findMany({
-    where: { userId: { in: userIds }, department: { organizationId } },
-    select: { userId: true, departmentId: true, role: { select: { code: true } } },
+  const rows = await db.organizationMembership.findMany({
+    where: { userId: { in: userIds }, organization: { tenantId } },
+    select: { userId: true, organizationId: true, role: { select: { code: true } } },
   });
-  const grouped = new Map<string, DepartmentAssignment>();
+  const grouped = new Map<string, OrganizationAssignment>();
   for (const row of rows) {
-    const current = grouped.get(row.userId) ?? { departmentIds: [], managedDepartmentIds: [] };
-    current.departmentIds.push(row.departmentId);
-    if (row.role.code === "ADMIN") current.managedDepartmentIds.push(row.departmentId);
+    const current = grouped.get(row.userId) ?? { organizationIds: [], managedOrganizationIds: [] };
+    current.organizationIds.push(row.organizationId);
+    if (row.role.code === "ADMIN") current.managedOrganizationIds.push(row.organizationId);
     grouped.set(row.userId, current);
   }
 
   return grouped;
 }
 
-async function assertDepartment(
+async function assertOrganization(
   db: Prisma.TransactionClient,
+  tenantId: string,
   organizationId: string,
-  departmentId: string,
   message: string,
 ) {
-  const department = await db.department.findUnique({ where: { id: departmentId } });
-  if (!department) {
+  const organization = await db.organization.findUnique({ where: { id: organizationId } });
+  if (!organization) {
     notFound();
   }
 
-  if (department.organizationId !== organizationId) {
+  if (organization.tenantId !== tenantId) {
     validation(message);
   }
 }
 
-async function ensureDepartmentMembership(db: Prisma.TransactionClient, userId: string, departmentId: string) {
-  const existing = await db.departmentMembership.findUnique({
-    where: { userId_departmentId: { userId, departmentId } },
+async function ensureOrganizationMembership(db: Prisma.TransactionClient, userId: string, organizationId: string) {
+  const existing = await db.organizationMembership.findUnique({
+    where: { userId_organizationId: { userId, organizationId } },
   });
   if (existing) {
     return;
   }
 
   const memberRole = await db.role.findUniqueOrThrow({ where: { code: "MEMBER" }, select: { id: true } });
-  await db.departmentMembership.create({
-    data: { userId, departmentId, roleId: memberRole.id },
+  await db.organizationMembership.create({
+    data: { userId, organizationId, roleId: memberRole.id },
   });
 }
 
-async function syncDepartments(
+async function syncOrganizations(
   db: Prisma.TransactionClient,
-  organizationId: string,
+  tenantId: string,
   userId: string,
-  departmentIds: string[],
-  managedDepartmentIds: string[] = [],
+  organizationIds: string[],
+  managedOrganizationIds: string[] = [],
 ) {
-  const unique = [...new Set(departmentIds)];
-  const managed = new Set(managedDepartmentIds.filter((id) => unique.includes(id)));
-  for (const departmentId of unique) {
-    await assertDepartment(db, organizationId, departmentId, "departmentIds must belong to this organization.");
+  const unique = [...new Set(organizationIds)];
+  const managed = new Set(managedOrganizationIds.filter((id) => unique.includes(id)));
+  for (const organizationId of unique) {
+    await assertOrganization(db, tenantId, organizationId, "organizationIds must belong to this tenant.");
   }
 
-  await db.departmentMembership.deleteMany({
-    where: { userId, department: { organizationId }, departmentId: { notIn: unique } },
+  await db.organizationMembership.deleteMany({
+    where: { userId, organization: { tenantId }, organizationId: { notIn: unique } },
   });
   const memberRole = await db.role.findUniqueOrThrow({ where: { code: "MEMBER" }, select: { id: true } });
   const adminRole = await db.role.findUniqueOrThrow({ where: { code: "ADMIN" }, select: { id: true } });
-  const existing = await db.departmentMembership.findMany({
-    where: { userId, department: { organizationId } },
-    select: { id: true, departmentId: true },
+  const existing = await db.organizationMembership.findMany({
+    where: { userId, organization: { tenantId } },
+    select: { id: true, organizationId: true },
   });
-  const keep = new Map(existing.map((item) => [item.departmentId, item.id]));
-  for (const departmentId of unique) {
-    const roleId = managed.has(departmentId) ? adminRole.id : memberRole.id;
-    const existingId = keep.get(departmentId);
+  const keep = new Map(existing.map((item) => [item.organizationId, item.id]));
+  for (const organizationId of unique) {
+    const roleId = managed.has(organizationId) ? adminRole.id : memberRole.id;
+    const existingId = keep.get(organizationId);
     if (existingId) {
-      await db.departmentMembership.update({ where: { id: existingId }, data: { roleId } });
+      await db.organizationMembership.update({ where: { id: existingId }, data: { roleId } });
     } else {
-      await db.departmentMembership.create({
-        data: { userId, departmentId, roleId },
+      await db.organizationMembership.create({
+        data: { userId, organizationId, roleId },
       });
     }
   }

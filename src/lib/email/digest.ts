@@ -77,10 +77,10 @@ function emailNotConfigured(error: unknown) {
   return error instanceof ApiError && error.code === "email_failed" && error.message === "Email is not configured.";
 }
 
-async function remember(organizationId: string, preferences: Prisma.JsonValue | null, kind: DigestKind, weekKey: string) {
+async function remember(tenantId: string, preferences: Prisma.JsonValue | null, kind: DigestKind, weekKey: string) {
   const current = readDigestStamp(preferences);
-  await prisma.organization.update({
-    where: { id: organizationId },
+  await prisma.tenant.update({
+    where: { id: tenantId },
     data: {
       preferences: {
         ...preferenceRecord(preferences),
@@ -93,48 +93,48 @@ async function remember(organizationId: string, preferences: Prisma.JsonValue | 
 export async function sendWeeklyDigests(now = new Date()) {
   const weekKey = digestWeekKey(now);
   const window = digestWindow(now);
-  const organizations = await prisma.organization.findMany({
+  const tenants = await prisma.tenant.findMany({
     select: { id: true, name: true, slug: true, preferences: true },
   });
   let sent = 0;
   let skipped = 0;
 
-  for (const organization of organizations) {
+  for (const tenant of tenants) {
     const preferences =
-      organization.preferences && typeof organization.preferences === "object" && !Array.isArray(organization.preferences)
-        ? (organization.preferences as Record<string, unknown>)
+      tenant.preferences && typeof tenant.preferences === "object" && !Array.isArray(tenant.preferences)
+        ? (tenant.preferences as Record<string, unknown>)
         : {};
     const settings =
       preferences.emailSettings && typeof preferences.emailSettings === "object" && !Array.isArray(preferences.emailSettings)
         ? (preferences.emailSettings as Record<string, unknown>)
         : {};
-    const stamp = readDigestStamp(organization.preferences);
+    const stamp = readDigestStamp(tenant.preferences);
 
     const logged = digestAction(settings.LoggedTime, stamp, "LoggedTime", weekKey);
     if (logged === "send") {
-      const outcome = await sendLoggedTimeDigest(organization, window);
+      const outcome = await sendLoggedTimeDigest(tenant, window);
       if (outcome === "unconfigured") {
         return { weekKey, sent, skipped, emailConfigured: false };
       }
       sent += outcome;
-      await remember(organization.id, organization.preferences, "LoggedTime", weekKey);
-      organization.preferences = {
-        ...preferenceRecord(organization.preferences),
+      await remember(tenant.id, tenant.preferences, "LoggedTime", weekKey);
+      tenant.preferences = {
+        ...preferenceRecord(tenant.preferences),
         emailDigest: { ...stamp, LoggedTime: weekKey },
       };
     } else if (logged === "skip") {
       skipped += 1;
     }
 
-    const latestStamp = readDigestStamp(organization.preferences);
+    const latestStamp = readDigestStamp(tenant.preferences);
     const unclassified = digestAction(settings.UnclassifiedEntry, latestStamp, "UnclassifiedEntry", weekKey);
     if (unclassified === "send") {
-      const outcome = await sendUnclassifiedDigest(organization);
+      const outcome = await sendUnclassifiedDigest(tenant);
       if (outcome === "unconfigured") {
         return { weekKey, sent, skipped, emailConfigured: false };
       }
       sent += outcome;
-      await remember(organization.id, organization.preferences, "UnclassifiedEntry", weekKey);
+      await remember(tenant.id, tenant.preferences, "UnclassifiedEntry", weekKey);
     } else if (unclassified === "skip") {
       skipped += 1;
     }
@@ -144,15 +144,15 @@ export async function sendWeeklyDigests(now = new Date()) {
 }
 
 async function sendLoggedTimeDigest(
-  organization: { id: string; name: string; slug: string | null },
+  tenant: { id: string; name: string; slug: string | null },
   window: { from: Date; to: Date },
 ) {
   const entries = await prisma.userTimeEntry.findMany({
     where: {
-      organizationId: organization.id,
+      tenantId: tenant.id,
       durationMinutes: { not: null },
       createdAt: { gte: window.from, lt: window.to },
-      NOT: { projectId: null, taskCategoryId: null, departmentId: null },
+      NOT: { projectId: null, taskCategoryId: null, organizationId: null },
     },
     select: {
       userId: true,
@@ -182,16 +182,16 @@ async function sendLoggedTimeDigest(
     try {
       await sendEmail({
         to: person.email,
-        organizationId: organization.id,
+        tenantId: tenant.id,
         for: "LoggedTime",
         ignoreSchedule: true,
         context: {
           user: { firstName: person.firstName },
-          organization: { name: organization.name },
+          tenant: { name: tenant.name },
           entry: {
             hours: String(hoursFromMinutes(person.minutes)),
             date: dateLabel(person.dates[0], person.dates[person.dates.length - 1]),
-            url: appUrl("/entries", organization.slug),
+            url: appUrl("/entries", tenant.slug),
           },
         },
       });
@@ -204,15 +204,15 @@ async function sendLoggedTimeDigest(
   return sent;
 }
 
-async function sendUnclassifiedDigest(organization: { id: string; slug: string | null }) {
+async function sendUnclassifiedDigest(tenant: { id: string; slug: string | null }) {
   const entries = await prisma.userTimeEntry.findMany({
     where: {
-      organizationId: organization.id,
+      tenantId: tenant.id,
       mode: "Punch",
       endedAt: { not: null },
       projectId: null,
       taskCategoryId: null,
-      departmentId: null,
+      organizationId: null,
     },
     select: { userId: true, user: { select: { email: true, profile: { select: { firstName: true } } } } },
     distinct: ["userId"],
@@ -223,12 +223,12 @@ async function sendUnclassifiedDigest(organization: { id: string; slug: string |
     try {
       await sendEmail({
         to: entry.user.email,
-        organizationId: organization.id,
+        tenantId: tenant.id,
         for: "UnclassifiedEntry",
         ignoreSchedule: true,
         context: {
           user: { firstName: entry.user.profile?.firstName || "there" },
-          entry: { url: appUrl("/entries?unclassified=1", organization.slug) },
+          entry: { url: appUrl("/entries?unclassified=1", tenant.slug) },
         },
       });
       sent += 1;

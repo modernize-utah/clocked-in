@@ -1,5 +1,5 @@
 export const permissions = [
-  "manage_organization",
+  "manage_tenant",
   "manage_roles",
   "manage_members",
   "invite_members",
@@ -23,13 +23,13 @@ export const permissions = [
 ] as const;
 
 export type Permission = (typeof permissions)[number];
-export type RoleScope = "organization" | "assigned_groups" | "self";
+export type RoleScope = "tenant" | "assigned_groups" | "self";
 
 export const permissionGroups: { label: string; items: { key: Permission; label: string }[] }[] = [
   {
-    label: "Organization",
+    label: "Tenant",
     items: [
-      { key: "manage_organization", label: "Manage organization settings" },
+      { key: "manage_tenant", label: "Manage tenant settings" },
       { key: "manage_roles", label: "Create and edit roles" },
       { key: "manage_members", label: "Manage people" },
       { key: "invite_members", label: "Invite people" },
@@ -116,7 +116,7 @@ export function defaultPermissionsForCode(code: string | null | undefined): Perm
 
 export function defaultScopeForCode(code: string | null | undefined): RoleScope {
   if (code === "VOLUNTEER") return "self";
-  return "organization";
+  return "tenant";
 }
 
 export function apiKeyPermissions(isAdmin: boolean, canWrite: boolean): Permission[] {
@@ -126,7 +126,7 @@ export function apiKeyPermissions(isAdmin: boolean, canWrite: boolean): Permissi
 }
 
 export function isRoleScope(value: string): value is RoleScope {
-  return value === "organization" || value === "assigned_groups" || value === "self";
+  return value === "tenant" || value === "assigned_groups" || value === "self";
 }
 
 export function isPermission(value: string): value is Permission {

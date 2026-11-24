@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { adminPassword, caswjOrganization, loginAsAdmin, loginBearer } from "./helpers";
+import { adminPassword, caswjTenant, loginAsAdmin, loginBearer } from "./helpers";
 
 test.describe("tenant subdomain host", () => {
   test("pins login, hides org switcher and signup on {slug}.localhost:3025, and keeps apex switcher intact", async ({
@@ -8,17 +8,17 @@ test.describe("tenant subdomain host", () => {
   }, testInfo) => {
     const session = await loginBearer(request);
     const headers = { authorization: `Bearer ${session.accessToken}` };
-    const organization = await caswjOrganization(request, session.accessToken);
+    const tenant = await caswjTenant(request, session.accessToken);
     const slug = "caswj-e2e";
 
-    const otherCreated = await request.post("/organizations", {
+    const otherCreated = await request.post("/tenants", {
       headers,
       data: { name: `Other E2E Org ${Date.now()}` },
     });
     expect(otherCreated.ok(), await otherCreated.text()).toBeTruthy();
     const otherOrg = (await otherCreated.json()) as { id: string; name: string };
 
-    const patched = await request.patch(`/organizations/${organization.id}`, {
+    const patched = await request.patch(`/tenants/${tenant.id}`, {
       headers,
       data: { slug },
     });
@@ -29,12 +29,12 @@ test.describe("tenant subdomain host", () => {
       tenantUrl.hostname = `${slug}.localhost`;
       const tenantOrigin = tenantUrl.origin;
 
-      const tenantOrgs = await request.get(`${tenantOrigin}/organizations`, { headers });
+      const tenantOrgs = await request.get(`${tenantOrigin}/tenants`, { headers });
       expect(tenantOrgs.ok(), await tenantOrgs.text()).toBeTruthy();
       const tenantOrgsBody = (await tenantOrgs.json()) as { items: Array<{ id: string }> };
-      expect(tenantOrgsBody.items.map((item) => item.id)).toEqual([organization.id]);
+      expect(tenantOrgsBody.items.map((item) => item.id)).toEqual([tenant.id]);
 
-      const otherOrgOnTenant = await request.get(`${tenantOrigin}/organizations/${otherOrg.id}`, { headers });
+      const otherOrgOnTenant = await request.get(`${tenantOrigin}/tenants/${otherOrg.id}`, { headers });
       expect(otherOrgOnTenant.status()).toBe(404);
 
       await page.goto(`${tenantOrigin}/signup`);
@@ -49,7 +49,7 @@ test.describe("tenant subdomain host", () => {
       await page.context().addCookies([
         {
           name: "clocked-in-org",
-          value: organization.id,
+          value: tenant.id,
           url: tenantOrigin,
           httpOnly: true,
           sameSite: "Lax",
@@ -57,25 +57,25 @@ test.describe("tenant subdomain host", () => {
       ]);
 
       await page.goto(`${tenantOrigin}/dashboard`);
-      await expect(page.getByText(organization.name).first()).toBeVisible();
-      await expect(page.getByRole("button", { name: new RegExp(organization.name) })).toHaveCount(0);
+      await expect(page.getByText(tenant.name).first()).toBeVisible();
+      await expect(page.getByRole("button", { name: new RegExp(tenant.name) })).toHaveCount(0);
       await expect(page.getByText(otherOrg.name)).toHaveCount(0);
 
-      await page.goto(`${tenantOrigin}/settings/organization`);
+      await page.goto(`${tenantOrigin}/settings/tenant`);
       await expect(page.getByText("White-label address")).toBeVisible();
 
       await loginAsAdmin(page);
       await page.goto("/dashboard");
-      const switcher = page.getByRole("button", { name: new RegExp(organization.name) });
+      const switcher = page.getByRole("button", { name: new RegExp(tenant.name) });
       await expect(switcher).toBeVisible();
       await switcher.click();
-      await expect(page.getByRole("menuitem", { name: /New organization/i })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: /New tenant/i })).toBeVisible();
     } finally {
-      await request.patch(`/organizations/${organization.id}`, {
+      await request.patch(`/tenants/${tenant.id}`, {
         headers,
         data: { slug: null },
       });
-      await request.delete(`/organizations/${otherOrg.id}`, { headers });
+      await request.delete(`/tenants/${otherOrg.id}`, { headers });
     }
   });
 });

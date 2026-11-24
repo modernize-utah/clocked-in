@@ -24,14 +24,14 @@ Repeat first against a restored copy, then against the actual local database whe
 
 `db:baseline` first performs read-only comparison of columns, defaults, nullability, primary/foreign/CHECK constraints, indexes and predicates, enums, extensions, custom functions, views, and triggers. Equivalent implicit/explicit timestamp precision is normalized. It also checks required system role definitions, theme/template IDs, and permission grants. Reference migration history must match this checkout's baseline checksum.
 
-System-role scopes are configurable in the application. Verification accepts the supported `organization`, `assigned_groups`, and `self` scopes without resetting existing settings to baseline defaults. In particular, Staff scoped to assigned groups must not be changed to organization-wide access during adoption. Invalid scopes still block adoption.
+System-role scopes are configurable in the application. Verification accepts the supported `tenant`, `assigned_groups`, and `self` scopes without resetting existing settings to baseline defaults. In particular, Staff scoped to assigned groups must not be changed to tenant-wide access during adoption. Invalid scopes still block adoption.
 
 For Prisma Postgres backups restored to vanilla PostgreSQL, keep the full backup unchanged. Use a reviewed `pg_restore --use-list` TOC that omits only the `prisma_postgres` EXTENSION and its COMMENT entries for the disposable rehearsal. Extension-owned objects are provider-managed and are not recreated locally. Do not remove any application schema or data entries. Round-trip the reference through backup/restore too when PostgreSQL reprints CHECK expressions differently; keep strict constraint comparison.
 
-An existing database missing only the organization slug column/index can use the reviewed catch-up SQL after backup and restored-copy rehearsal:
+An existing database missing only the tenant slug column/index can use the reviewed catch-up SQL after backup and restored-copy rehearsal:
 
 ```bash
-APP_ENV=staging node scripts/with-env.mjs -- prisma db execute --config prisma7.config.ts --file prisma/adoption/organization-slug.sql
+APP_ENV=staging node scripts/with-env.mjs -- prisma db execute --config prisma7.config.ts --file prisma/adoption/tenant-slug.sql
 ```
 
 This transaction adds a nullable `citext` column and its partial unique index without backfilling or changing existing values. Lock and statement timeouts bound the operation. It is not a new migration and does not change the immutable baseline: fresh databases already receive those objects from the baseline. Rerun verification after catch-up; `IF NOT EXISTS` does not prove that preexisting objects have the correct definitions.
@@ -40,7 +40,7 @@ Only after verification succeeds does it run `prisma migrate resolve --applied 0
 
 After adoption, compare application row counts and representative records to the restored pre-adoption state, run smoke tests, and confirm only Prisma's history metadata changed. Do not drop EF history as part of this rollout. Dispose of the reference database after verification.
 
-The baseline was verified against a complete disposable replay of the EF migrations through `20261028204228_OrganizationSlug`, including custom SQL. It contains 18 CHECK constraints and 39 system reference rows (3 roles, 7 themes, 25 permission grants, 4 report templates). Tenant-specific users, organizations, hours, and customizations are never part of the baseline. Actual environment parity is a separate operator verification gate.
+The baseline was verified against a complete disposable replay of the EF migrations through `20261028204228_TenantSlug`, including custom SQL. It contains 18 CHECK constraints and 39 system reference rows (3 roles, 7 themes, 25 permission grants, 4 report templates). Tenant-specific users, tenants, hours, and customizations are never part of the baseline. Actual environment parity is a separate operator verification gate.
 
 ## Fresh Databases
 
@@ -62,7 +62,7 @@ Run deployment once per database in a serialized release step before deploying a
 ## Backend Cutover
 
 1. Adopt the baseline in staging and smoke-test the Next.js revision there before production. Verify login/refresh, tenant access, time entry CRUD/punch, reports and CSV, need/access approval, mail integration, API-key management, and authenticated MCP tools.
-2. Point public REST/MCP clients at the Next.js origin. Existing scoped organization keys remain valid for REST and MCP with the same `API_KEY_PEPPER`; key management requires a human admin JWT. Platform-key endpoints are not part of this app. Existing platform-key rows stay in the database and do not grant access.
+2. Point public REST/MCP clients at the Next.js origin. Existing scoped tenant keys remain valid for REST and MCP with the same `API_KEY_PEPPER`; key management requires a human admin JWT. Platform-key endpoints are not part of this app. Existing platform-key rows stay in the database and do not grant access.
 3. Deploy Next.js after the database gate. Remove retired `CSHARP_API_URL`, `API_TARGET`, and `EF_DATABASE_URL` settings from operator-managed env files/platform configuration; existing local env files are not changed by this task. Keep `DATABASE_URL`, JWT settings, MCP key pepper, mail/GitHub settings, and tenant host configuration intact.
 4. Once smoke tests and client URL changes succeed, stop any previous API service and retire its deployment secrets. Check that no queued workflow can redeploy it. Keep backups available until the rollback window closes.
 

@@ -33,8 +33,8 @@ type ProjectRow = Prisma.ProjectGetPayload<{ include: typeof projectInclude }>;
 function projectJson(project: ProjectRow) {
   return {
     id: project.id,
+    tenantId: project.tenantId,
     organizationId: project.organizationId,
-    departmentId: project.departmentId,
     ownerUserId: project.ownerUserId,
     title: project.title,
     description: project.description,
@@ -50,7 +50,7 @@ function projectJson(project: ProjectRow) {
 export type CreateProjectRequest = {
   accessType: AccessType;
   projectType: ProjectType;
-  departmentId: string | null;
+  organizationId: string | null;
   startDate: Date | null;
   endDate: Date | null;
   editorIds: string[];
@@ -63,7 +63,7 @@ export function parseCreateProject(body: Body): CreateProjectRequest {
   return {
     accessType: normalizeAccessType(requireString(body, "accessType")),
     projectType: has(body, "projectType") ? normalizeProjectType(requireString(body, "projectType")) : "Project",
-    departmentId: optionalUuid(body, "departmentId"),
+    organizationId: optionalUuid(body, "organizationId"),
     startDate: optionalDate(body, "startDate"),
     endDate: optionalDate(body, "endDate"),
     editorIds: ids(body, "editorIds", true),
@@ -76,7 +76,7 @@ export function parseCreateProject(body: Body): CreateProjectRequest {
 export type UpdateProjectRequest = {
   accessType: Optional<AccessType>;
   projectType: Optional<ProjectType>;
-  departmentId: Optional<string | null>;
+  organizationId: Optional<string | null>;
   startDate: Optional<Date | null>;
   endDate: Optional<Date | null>;
   title: Optional<string>;
@@ -89,7 +89,7 @@ export function parseUpdateProject(body: Body): UpdateProjectRequest {
   const request: UpdateProjectRequest = {
     accessType: optional(body, "accessType", (b, k) => normalizeAccessType(requireString(b, k))),
     projectType: optional(body, "projectType", (b, k) => normalizeProjectType(requireString(b, k))),
-    departmentId: optional(body, "departmentId", optionalUuid),
+    organizationId: optional(body, "organizationId", optionalUuid),
     startDate: optional(body, "startDate", optionalDate),
     endDate: optional(body, "endDate", optionalDate),
     title: optional(body, "title", (b, k) => requireName(requireString(b, k), k)),
@@ -114,11 +114,11 @@ async function load(projectId: string) {
 }
 
 async function requireRead(access: Access, project: ProjectRow) {
-  await access.requireOrganization(project.organizationId, false);
+  await access.requireTenant(project.tenantId, false);
   if (
     access.isApiKey ||
     access.isSuperAdmin ||
-    (await access.isOrgAdmin(project.organizationId)) ||
+    (await access.isOrgAdmin(project.tenantId)) ||
     project.accessType === "Public" ||
     project.ownerUserId === access.actorUserId ||
     project.editors.some((editor) => editor.userId === access.actorUserId)
@@ -127,9 +127,9 @@ async function requireRead(access: Access, project: ProjectRow) {
   }
 
   if (
-    project.accessType === "Department" &&
-    project.departmentId &&
-    (await access.departmentIds()).includes(project.departmentId)
+    project.accessType === "Organization" &&
+    project.organizationId &&
+    (await access.organizationIds()).includes(project.organizationId)
   ) {
     return;
   }
@@ -139,7 +139,7 @@ async function requireRead(access: Access, project: ProjectRow) {
 
 async function assertManage(access: Access, project: ProjectRow) {
   if (access.isApiKey) {
-    if (!access.canWrite(project.organizationId)) {
+    if (!access.canWrite(project.tenantId)) {
       forbidden();
     }
 
@@ -148,7 +148,7 @@ async function assertManage(access: Access, project: ProjectRow) {
 
   if (
     access.isSuperAdmin ||
-    (await access.isOrgAdmin(project.organizationId)) ||
+    (await access.isOrgAdmin(project.tenantId)) ||
     project.ownerUserId === access.actorUserId ||
     project.editors.some((editor) => editor.userId === access.actorUserId)
   ) {
@@ -156,9 +156,9 @@ async function assertManage(access: Access, project: ProjectRow) {
   }
 
   if (
-    project.accessType === "Department" &&
-    project.departmentId &&
-    (await access.isDepartmentAdmin(project.departmentId))
+    project.accessType === "Organization" &&
+    project.organizationId &&
+    (await access.isOrganizationAdmin(project.organizationId))
   ) {
     return;
   }
@@ -168,48 +168,48 @@ async function assertManage(access: Access, project: ProjectRow) {
 
 async function assertAccessWrite(
   access: Access,
-  organizationId: string,
+  tenantId: string,
   accessType: string,
-  departmentId: string | null,
+  organizationId: string | null,
 ) {
-  if (accessType !== "Department") {
-    if (departmentId !== null) {
-      validation("departmentId must be empty when accessType is Public or Private.");
+  if (accessType !== "Organization") {
+    if (organizationId !== null) {
+      validation("organizationId must be empty when accessType is Public or Private.");
     }
 
     return;
   }
 
-  if (departmentId === null) {
-    validation("departmentId is required when accessType is Department.");
+  if (organizationId === null) {
+    validation("organizationId is required when accessType is Organization.");
   }
 
-  const department = await prisma.department.findUnique({ where: { id: departmentId } });
-  if (!department) {
+  const organization = await prisma.organization.findUnique({ where: { id: organizationId } });
+  if (!organization) {
     notFound();
   }
 
-  if (department.organizationId !== organizationId) {
-    validation("departmentId does not belong to this organization.");
+  if (organization.tenantId !== tenantId) {
+    validation("organizationId does not belong to this tenant.");
   }
 
   if (
     !access.isSuperAdmin &&
-    !access.canWrite(organizationId) &&
-    !(await access.isOrgAdmin(organizationId)) &&
-    !(await access.isDepartmentAdmin(departmentId))
+    !access.canWrite(tenantId) &&
+    !(await access.isOrgAdmin(tenantId)) &&
+    !(await access.isOrganizationAdmin(organizationId))
   ) {
     forbidden();
   }
 }
 
-function assertDates(accessType: string, departmentId: string | null, startDate: Date | null, endDate: Date | null) {
-  if (accessType === "Department" && departmentId === null) {
-    validation("departmentId is required when accessType is Department.");
+function assertDates(accessType: string, organizationId: string | null, startDate: Date | null, endDate: Date | null) {
+  if (accessType === "Organization" && organizationId === null) {
+    validation("organizationId is required when accessType is Organization.");
   }
 
-  if (accessType !== "Department" && departmentId !== null) {
-    validation("departmentId must be empty when accessType is Public or Private.");
+  if (accessType !== "Organization" && organizationId !== null) {
+    validation("organizationId must be empty when accessType is Public or Private.");
   }
 
   if (startDate && endDate && endDate < startDate) {
@@ -217,34 +217,34 @@ function assertDates(accessType: string, departmentId: string | null, startDate:
   }
 }
 
-async function editors(organizationId: string, ownerUserId: string, editorIds: string[]) {
+async function editors(tenantId: string, ownerUserId: string, editorIds: string[]) {
   const unique = [...new Set(editorIds)].filter((id) => id !== ownerUserId);
   if (unique.length === 0) {
     return unique;
   }
 
-  const members = await prisma.organizationMembership.count({
-    where: { organizationId, userId: { in: unique } },
+  const members = await prisma.tenantMembership.count({
+    where: { tenantId, userId: { in: unique } },
   });
   if (members !== unique.length) {
-    validation("Each editor must be a member of this organization.");
+    validation("Each editor must be a member of this tenant.");
   }
 
   return unique;
 }
 
-export async function listProjects(access: Access, organizationId: string, params: URLSearchParams) {
+export async function listProjects(access: Access, tenantId: string, params: URLSearchParams) {
   const paging = page(params);
-  await access.requireOrganization(organizationId, false);
-  let where: Prisma.ProjectWhereInput = { organizationId };
-  if (!access.isApiKey && !access.isSuperAdmin && !(await access.isOrgAdmin(organizationId))) {
+  await access.requireTenant(tenantId, false);
+  let where: Prisma.ProjectWhereInput = { tenantId };
+  if (!access.isApiKey && !access.isSuperAdmin && !(await access.isOrgAdmin(tenantId))) {
     where = {
-      organizationId,
+      tenantId,
       OR: [
         { accessType: "Public" },
         { ownerUserId: access.actorUserId },
         { editors: { some: { userId: access.actorUserId } } },
-        { accessType: "Department", departmentId: { in: await access.departmentIds() } },
+        { accessType: "Organization", organizationId: { in: await access.organizationIds() } },
       ],
     };
   }
@@ -263,21 +263,21 @@ export async function listProjects(access: Access, organizationId: string, param
   return list(projects.map(projectJson), paging);
 }
 
-export async function createProject(access: Access, organizationId: string, request: CreateProjectRequest) {
-  await access.requireOrganization(organizationId, access.isApiKey);
+export async function createProject(access: Access, tenantId: string, request: CreateProjectRequest) {
+  await access.requireTenant(tenantId, access.isApiKey);
   await access.requirePermission(
-    organizationId,
+    tenantId,
     "create_projects",
-    request.accessType === "Department" ? request.departmentId : null,
+    request.accessType === "Organization" ? request.organizationId : null,
   );
-  await assertAccessWrite(access, organizationId, request.accessType, request.departmentId);
-  assertDates(request.accessType, request.departmentId, request.startDate, request.endDate);
-  const editorIds = await editors(organizationId, access.actorUserId, request.editorIds);
+  await assertAccessWrite(access, tenantId, request.accessType, request.organizationId);
+  assertDates(request.accessType, request.organizationId, request.startDate, request.endDate);
+  const editorIds = await editors(tenantId, access.actorUserId, request.editorIds);
   const project = await guard(
     prisma.project.create({
       data: {
-        organizationId,
-        departmentId: request.accessType === "Department" ? request.departmentId : null,
+        tenantId,
+        organizationId: request.accessType === "Organization" ? request.organizationId : null,
         ownerUserId: access.actorUserId,
         title: request.title,
         description: request.description,
@@ -304,15 +304,15 @@ export async function updateProject(access: Access, projectId: string, request: 
   const project = await load(projectId);
   await assertManage(access, project);
   const accessType = or(request.accessType, project.accessType as AccessType);
-  const departmentId = or(request.departmentId, project.departmentId);
-  await assertAccessWrite(access, project.organizationId, accessType, departmentId);
+  const organizationId = or(request.organizationId, project.organizationId);
+  await assertAccessWrite(access, project.tenantId, accessType, organizationId);
   const startDate = or(request.startDate, project.startDate);
   const endDate = or(request.endDate, project.endDate);
-  assertDates(accessType, departmentId, startDate, endDate);
+  assertDates(accessType, organizationId, startDate, endDate);
   const editorIds = request.editorIds.set
-    ? await editors(project.organizationId, project.ownerUserId, request.editorIds.value)
+    ? await editors(project.tenantId, project.ownerUserId, request.editorIds.value)
     : undefined;
-  const placementChanged = request.accessType.set || request.departmentId.set;
+  const placementChanged = request.accessType.set || request.organizationId.set;
   const updated = await guard(
     prisma.project.update({
       where: { id: projectId },
@@ -321,7 +321,7 @@ export async function updateProject(access: Access, projectId: string, request: 
         description: request.description.set ? request.description.value : undefined,
         projectType: request.projectType.set ? request.projectType.value : undefined,
         accessType: placementChanged ? accessType : undefined,
-        departmentId: placementChanged ? (accessType === "Department" ? departmentId : null) : undefined,
+        organizationId: placementChanged ? (accessType === "Organization" ? organizationId : null) : undefined,
         startDate,
         endDate,
         isActive: request.isActive.set ? request.isActive.value : undefined,

@@ -1,22 +1,22 @@
 import type { Permission } from "@/lib/permissions";
-import type { GroupDepartments } from "@/lib/types";
+import type { GroupOrganizations } from "@/lib/types";
 
-export function canLogGroupTime(groupDepartments: GroupDepartments, permissions?: Iterable<string>) {
+export function canLogGroupTime(groupOrganizations: GroupOrganizations, permissions?: Iterable<string>) {
   if (permissions && new Set(permissions).has("log_group_sessions")) {
     return true;
   }
-  return groupDepartments === "all" || groupDepartments.length > 0;
+  return groupOrganizations === "all" || groupOrganizations.length > 0;
 }
 
-export function isCoordinator(groupDepartments: GroupDepartments) {
-  return groupDepartments !== "all" && groupDepartments.length > 0;
+export function isCoordinator(groupOrganizations: GroupOrganizations) {
+  return groupOrganizations !== "all" && groupOrganizations.length > 0;
 }
 
-export function canLogMemberTime(isAdmin: boolean, groupDepartments: GroupDepartments, permissions?: Iterable<string>) {
+export function canLogMemberTime(isAdmin: boolean, groupOrganizations: GroupOrganizations, permissions?: Iterable<string>) {
   if (permissions && new Set(permissions).has("log_member_time")) {
     return true;
   }
-  return isAdmin || isCoordinator(groupDepartments);
+  return isAdmin || isCoordinator(groupOrganizations);
 }
 
 export function canLogConnectionTime(input: {

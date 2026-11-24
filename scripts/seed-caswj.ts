@@ -13,7 +13,7 @@ import {
   caswjLabels,
   caswjSourceRefPrefix,
   clockedInThemeId,
-  departmentNames,
+  organizationNames,
   indexProjectAliases,
   inKindFromMinutes,
   anonWorkbookPath,
@@ -46,7 +46,7 @@ function namedSeedAllowed() {
 
 async function seedBrandMarks(
   db: PrismaClient,
-  organizationId: string,
+  tenantId: string,
 ) {
   const publicLogo = "/caswj-logo.svg";
   const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
@@ -59,10 +59,10 @@ async function seedBrandMarks(
       const mark = await sharp(svg).resize(64, 64, { fit: "cover", position: "centre" }).webp({ quality: 85 }).toBuffer();
       const wordmark = await sharp(svg).resize(800, 200, { fit: "inside", withoutEnlargement: true }).webp({ quality: 85 }).toBuffer();
       const options = { access, addRandomSuffix: false, allowOverwrite: true, contentType: "image/webp", token } as const;
-      const markBlob = await put(`orgs/${organizationId}/mark.webp`, mark, options);
-      const wordmarkBlob = await put(`orgs/${organizationId}/wordmark.webp`, wordmark, options);
-      await db.organization.update({
-        where: { id: organizationId },
+      const markBlob = await put(`orgs/${tenantId}/mark.webp`, mark, options);
+      const wordmarkBlob = await put(`orgs/${tenantId}/wordmark.webp`, wordmark, options);
+      await db.tenant.update({
+        where: { id: tenantId },
         data: { markUrl: markBlob.url, wordmarkUrl: wordmarkBlob.url, wordmarkOnLightUrl: wordmarkBlob.url },
       });
       return;
@@ -71,8 +71,8 @@ async function seedBrandMarks(
     }
   }
 
-  await db.organization.update({
-    where: { id: organizationId },
+  await db.tenant.update({
+    where: { id: tenantId },
     data: { markUrl: publicLogo, wordmarkUrl: publicLogo, wordmarkOnLightUrl: publicLogo },
   });
 }
@@ -101,9 +101,9 @@ async function main() {
       db.role.findUniqueOrThrow({ where: { code: "VOLUNTEER" } }),
     ]);
     const adminHash = await bcrypt.hash(password, 12);
-    const organization =
-      (await db.organization.findFirst({ where: { name: orgName } })) ??
-      (await db.organization.create({
+    const tenant =
+      (await db.tenant.findFirst({ where: { name: orgName } })) ??
+      (await db.tenant.create({
         data: {
           name: orgName,
           defaultRateType: "Volunteer",
@@ -115,10 +115,10 @@ async function main() {
         },
       }));
     const theme =
-      (await db.theme.findFirst({ where: { organizationId: organization.id, name: baseCaswjThemeName } })) ??
+      (await db.theme.findFirst({ where: { tenantId: tenant.id, name: baseCaswjThemeName } })) ??
       (await db.theme.create({
         data: {
-          organizationId: organization.id,
+          tenantId: tenant.id,
           ...baseCaswjTheme,
         },
       }));
@@ -126,15 +126,15 @@ async function main() {
       where: { id: theme.id },
       data: baseCaswjTheme,
     });
-    await db.organization.update({
-      where: { id: organization.id },
+    await db.tenant.update({
+      where: { id: tenant.id },
       data: {
         defaultRateType: "Volunteer",
         themeId: theme.id,
         preferences: { allowTimeEntryEditing: true, entityLabels: caswjLabels },
       },
     });
-    await seedBrandMarks(db, organization.id);
+    await seedBrandMarks(db, tenant.id);
 
     const admin =
       (await db.user.findFirst({ where: { OR: [{ username: "jbaddley" }, { email: "jasonbaddley+caswj@gmail.com" }] } })) ??
@@ -151,10 +151,10 @@ async function main() {
       where: { id: admin.id },
       data: { username: "jbaddley", email: "jasonbaddley+caswj@gmail.com", passwordHash: adminHash, isSuperAdmin: true },
     });
-    await db.organizationMembership.upsert({
-      where: { userId_organizationId: { userId: admin.id, organizationId: organization.id } },
+    await db.tenantMembership.upsert({
+      where: { userId_tenantId: { userId: admin.id, tenantId: tenant.id } },
       update: { roleId: adminRole.id, isActive: true },
-      create: { userId: admin.id, organizationId: organization.id, roleId: adminRole.id, rateType: "Volunteer", isActive: true },
+      create: { userId: admin.id, tenantId: tenant.id, roleId: adminRole.id, rateType: "Volunteer", isActive: true },
     });
 
     let dworkmanStatus = "skipped";
@@ -187,43 +187,43 @@ async function main() {
       update: { firstName: "Dillon", lastName: "Workman", displayName: "Dillon Workman" },
       create: { userId: dworkman.id, firstName: "Dillon", lastName: "Workman", displayName: "Dillon Workman" },
     });
-    await db.organizationMembership.upsert({
-      where: { userId_organizationId: { userId: dworkman.id, organizationId: organization.id } },
+    await db.tenantMembership.upsert({
+      where: { userId_tenantId: { userId: dworkman.id, tenantId: tenant.id } },
       update: { roleId: adminRole.id, isActive: true },
-      create: { userId: dworkman.id, organizationId: organization.id, roleId: adminRole.id, rateType: "Volunteer", isActive: true },
+      create: { userId: dworkman.id, tenantId: tenant.id, roleId: adminRole.id, rateType: "Volunteer", isActive: true },
     });
     dworkmanStatus = dworkmanExisting ? "updated" : "created";
     }
 
-    const departments = new Map<string, string>();
-    for (const name of departmentNames) {
-      const department =
-        (await db.department.findFirst({ where: { organizationId: organization.id, name: { equals: name, mode: "insensitive" } } })) ??
-        (await db.department.create({ data: { organizationId: organization.id, name } }));
-      departments.set(name.toLowerCase(), department.id);
+    const organizations = new Map<string, string>();
+    for (const name of organizationNames) {
+      const organization =
+        (await db.organization.findFirst({ where: { tenantId: tenant.id, name: { equals: name, mode: "insensitive" } } })) ??
+        (await db.organization.create({ data: { tenantId: tenant.id, name } }));
+      organizations.set(name.toLowerCase(), organization.id);
     }
 
     for (const name of categories) {
       const existing = await db.taskCategory.findFirst({
-        where: { organizationId: organization.id, name: { equals: name, mode: "insensitive" } },
+        where: { tenantId: tenant.id, name: { equals: name, mode: "insensitive" } },
       });
       if (!existing) {
-        await db.taskCategory.create({ data: { organizationId: organization.id, name } });
+        await db.taskCategory.create({ data: { tenantId: tenant.id, name } });
       }
     }
 
     const categoryIds = new Map(
-      (await db.taskCategory.findMany({ where: { organizationId: organization.id } })).map((row) => [row.name.toLowerCase(), row.id]),
+      (await db.taskCategory.findMany({ where: { tenantId: tenant.id } })).map((row) => [row.name.toLowerCase(), row.id]),
     );
     const tags = new Map<string, string>();
     for (const name of new Set(logRows.flatMap((row) => row.tags))) {
       const existing =
-        (await db.tag.findFirst({ where: { organizationId: organization.id, name: { equals: name, mode: "insensitive" } } })) ??
-        (await db.tag.create({ data: { organizationId: organization.id, name } }));
+        (await db.tag.findFirst({ where: { tenantId: tenant.id, name: { equals: name, mode: "insensitive" } } })) ??
+        (await db.tag.create({ data: { tenantId: tenant.id, name } }));
       tags.set(name.toLowerCase(), existing.id);
     }
 
-    const existingProjects = await db.project.findMany({ where: { organizationId: organization.id } });
+    const existingProjects = await db.project.findMany({ where: { tenantId: tenant.id } });
     const projectsByTitle = new Map<string, typeof existingProjects>();
     for (const row of existingProjects) {
       const title = projectAliases.get(row.title.toLowerCase());
@@ -249,7 +249,7 @@ async function main() {
       if (!keep) {
         await db.project.create({
           data: {
-            organizationId: organization.id,
+            tenantId: tenant.id,
             ownerUserId: admin.id,
             accessType: "Public",
             ...fields,
@@ -272,13 +272,13 @@ async function main() {
     }
 
     const projectIds = new Map(
-      (await db.project.findMany({ where: { organizationId: organization.id } })).map((row) => [row.title.toLowerCase(), row.id]),
+      (await db.project.findMany({ where: { tenantId: tenant.id } })).map((row) => [row.title.toLowerCase(), row.id]),
     );
-    let rate = await db.hourlyRate.findFirst({ where: { organizationId: organization.id, isDefault: true } });
+    let rate = await db.hourlyRate.findFirst({ where: { tenantId: tenant.id, isDefault: true } });
     if (!rate) {
       rate = await db.hourlyRate.create({
         data: {
-          organizationId: organization.id,
+          tenantId: tenant.id,
           type: "Volunteer",
           name: "Utah Volunteer Rate",
           perHourRate: 35.47,
@@ -311,13 +311,13 @@ async function main() {
       }
 
       const existing = await db.hourlyRate.findFirst({
-        where: { organizationId: organization.id, type: "Professional", perHourRate: amount, isArchived: false },
+        where: { tenantId: tenant.id, type: "Professional", perHourRate: amount, isArchived: false },
       });
       const created =
         existing ??
         (await db.hourlyRate.create({
           data: {
-            organizationId: organization.id,
+            tenantId: tenant.id,
             type: "Professional",
             name: row.rateType.trim() || `Professional ${amount}`,
             perHourRate: amount,
@@ -375,8 +375,8 @@ async function main() {
           notes,
         },
       });
-      await db.organizationMembership.upsert({
-        where: { userId_organizationId: { userId: existing.id, organizationId: organization.id } },
+      await db.tenantMembership.upsert({
+        where: { userId_tenantId: { userId: existing.id, tenantId: tenant.id } },
         update: {
           isActive: person.displayName.toLowerCase() === "clockify import" ? false : person.active,
           roleId: volunteerRole.id,
@@ -384,19 +384,19 @@ async function main() {
         },
         create: {
           userId: existing.id,
-          organizationId: organization.id,
+          tenantId: tenant.id,
           roleId: volunteerRole.id,
           rateType: membershipRate,
           isActive: person.displayName.toLowerCase() === "clockify import" ? false : person.active,
         },
       });
       if (!anon && person.primaryGroup) {
-        const departmentId = departments.get(person.primaryGroup.toLowerCase());
-        if (departmentId) {
-          await db.departmentMembership.upsert({
-            where: { userId_departmentId: { userId: existing.id, departmentId } },
+        const organizationId = organizations.get(person.primaryGroup.toLowerCase());
+        if (organizationId) {
+          await db.organizationMembership.upsert({
+            where: { userId_organizationId: { userId: existing.id, organizationId } },
             update: {},
-            create: { userId: existing.id, departmentId, roleId: volunteerRole.id },
+            create: { userId: existing.id, organizationId, roleId: volunteerRole.id },
           });
         }
       }
@@ -413,10 +413,10 @@ async function main() {
           profile: { create: { firstName: "", lastName: "", displayName: "" } },
         },
       }));
-    await db.organizationMembership.upsert({
-      where: { userId_organizationId: { userId: unnamed.id, organizationId: organization.id } },
+    await db.tenantMembership.upsert({
+      where: { userId_tenantId: { userId: unnamed.id, tenantId: tenant.id } },
       update: { roleId: volunteerRole.id, isActive: true },
-      create: { userId: unnamed.id, organizationId: organization.id, roleId: volunteerRole.id, rateType: "Volunteer", isActive: true },
+      create: { userId: unnamed.id, tenantId: tenant.id, roleId: volunteerRole.id, rateType: "Volunteer", isActive: true },
     });
 
     let created = 0;
@@ -444,7 +444,7 @@ async function main() {
       }
 
       const groupKey = row.group.toLowerCase();
-      const departmentId = !groupKey || groupKey === "caswj" ? null : departments.get(groupKey);
+      const organizationId = !groupKey || groupKey === "caswj" ? null : organizations.get(groupKey);
 
       const enteredByUserId = row.enteredBy.toLowerCase() === "clockify import" ? usersByName.get("clockify import") ?? admin.id : admin.id;
       const minutes = Math.round(row.hours * 60);
@@ -461,8 +461,8 @@ async function main() {
           data: {
             userId,
             enteredByUserId,
-            organizationId: organization.id,
-            departmentId,
+            tenantId: tenant.id,
+            organizationId,
             projectId,
             taskCategoryId,
             hourlyRateId: catalogRate?.id ?? null,
@@ -496,7 +496,7 @@ async function main() {
     await archiveCaswjClockifyDuplicates(db);
 
     const totals = await db.userTimeEntry.aggregate({
-      where: { organizationId: organization.id, sourceRef: { startsWith: sourceRefPrefix } },
+      where: { tenantId: tenant.id, sourceRef: { startsWith: sourceRefPrefix } },
       _count: { _all: true },
       _sum: { durationMinutes: true, inKindValue: true },
     });
@@ -504,7 +504,7 @@ async function main() {
       JSON.stringify(
         {
           appEnv,
-          organizationId: organization.id,
+          tenantId: tenant.id,
           themeId: theme.id,
           themeName: theme.name,
           dworkman: dworkmanStatus,

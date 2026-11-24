@@ -41,7 +41,7 @@ const relationships = ["Parent", "Child", "Spouse", "Sibling", "Grandparent", "G
 );
 
 const scopes = [
-  { value: "organization", label: "Whole organization" },
+  { value: "tenant", label: "Whole tenant" },
   { value: "assigned_groups", label: "Assigned groups" },
   { value: "self", label: "Own time only" },
 ];
@@ -56,28 +56,28 @@ function inviteStatus(invitation: Invitation) {
 }
 
 export default function PeopleScreen() {
-  const { organization, isAdmin, isCoordinator, groupDepartments, permissions, viewer } = useWorkspace();
+  const { tenant, isAdmin, isCoordinator, groupOrganizations, permissions, viewer } = useWorkspace();
   const { lookups } = useLookups();
   const client = useQueryClient();
   const [view, setView] = useState<PeopleView>("people");
-  const members = useOrgQuery("members", (organizationId) => api.memberships(organizationId));
-  const invitations = useOrgQuery("invitations", (organizationId) => api.invitations(organizationId), view === "invites" && isAdmin);
-  const groupIds = groupDepartments === "all" ? [] : groupDepartments;
-  const departmentInvites = useQuery({
-    queryKey: ["dept-invites", organization.id, groupIds],
+  const members = useOrgQuery("members", (tenantId) => api.memberships(tenantId));
+  const invitations = useOrgQuery("invitations", (tenantId) => api.invitations(tenantId), view === "invites" && isAdmin);
+  const groupIds = groupOrganizations === "all" ? [] : groupOrganizations;
+  const organizationInvites = useQuery({
+    queryKey: ["dept-invites", tenant.id, groupIds],
     enabled: view === "invites" && !isAdmin && groupIds.length > 0,
     queryFn: async () => {
-      const pages = await Promise.all(groupIds.map((id) => api.departmentInvitations(id)));
+      const pages = await Promise.all(groupIds.map((id) => api.organizationInvitations(id)));
       return pages.flatMap((page) => page.items);
     },
   });
   const requests = useOrgQuery(
     "access-requests",
-    (organizationId) => api.accessRequests(organizationId),
+    (tenantId) => api.accessRequests(tenantId),
     view === "invites" && (isAdmin || permissions.includes("approve_access_requests")),
   );
-  const connections = useOrgQuery("connections", (organizationId) => api.connections(organizationId), view === "connections");
-  const rolesQuery = useOrgQuery("roles", (organizationId) => api.roles(organizationId), view === "roles");
+  const connections = useOrgQuery("connections", (tenantId) => api.connections(tenantId), view === "connections");
+  const rolesQuery = useOrgQuery("roles", (tenantId) => api.roles(tenantId), view === "roles");
   const [adding, setAdding] = useState(false);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("VOLUNTEER");
@@ -108,7 +108,7 @@ export default function PeopleScreen() {
     setError(null);
     await Promise.all(
       ["members", "invitations", "connections", "roles", "access-requests", "dept-invites"].map((key) =>
-        client.invalidateQueries({ queryKey: [key, organization.id] }),
+        client.invalidateQueries({ queryKey: [key, tenant.id] }),
       ),
     );
   }
@@ -125,8 +125,8 @@ export default function PeopleScreen() {
         username: preview.data?.username,
       };
       return coordinatorOnly
-        ? api.createDepartmentInvitation(inviteGroup, body)
-        : api.createInvitation(organization.id, body);
+        ? api.createOrganizationInvitation(inviteGroup, body)
+        : api.createInvitation(tenant.id, body);
     },
     onSuccess: async () => {
       setEmail("");
@@ -139,7 +139,7 @@ export default function PeopleScreen() {
 
   const addPerson = useMutation({
     mutationFn: () =>
-      api.createMembership(organization.id, {
+      api.createMembership(tenant.id, {
         email: email.trim(),
         username: username.trim(),
         password,
@@ -160,13 +160,13 @@ export default function PeopleScreen() {
   });
 
   const connect = useMutation({
-    mutationFn: () => api.createConnection(organization.id, { userId, connectedUserId, relationship }),
+    mutationFn: () => api.createConnection(tenant.id, { userId, connectedUserId, relationship }),
     onSuccess: refresh,
     onError: setError,
   });
 
   const createRole = useMutation({
-    mutationFn: () => api.createRole(organization.id, { name: roleName.trim(), scope: "self", permissions: ["log_own_time"] }),
+    mutationFn: () => api.createRole(tenant.id, { name: roleName.trim(), scope: "self", permissions: ["log_own_time"] }),
     onSuccess: async () => {
       setRoleName("");
       await refresh();
@@ -175,7 +175,7 @@ export default function PeopleScreen() {
   });
 
   const saveMember = useMutation({
-    mutationFn: (body: Record<string, unknown>) => api.updateMembership(organization.id, editing!.id, body),
+    mutationFn: (body: Record<string, unknown>) => api.updateMembership(tenant.id, editing!.id, body),
     onSuccess: async () => {
       setEditing(null);
       await refresh();
@@ -184,7 +184,7 @@ export default function PeopleScreen() {
   });
 
   const removePeople = useMutation({
-    mutationFn: (ids: string[]) => (ids.length === 1 ? api.deleteMembership(organization.id, ids[0]) : api.deleteMemberships(organization.id, ids)),
+    mutationFn: (ids: string[]) => (ids.length === 1 ? api.deleteMembership(tenant.id, ids[0]) : api.deleteMemberships(tenant.id, ids)),
     onSuccess: async () => {
       setConfirmDelete(false);
       setSelected([]);
@@ -195,13 +195,13 @@ export default function PeopleScreen() {
   });
 
   if (members.isLoading) return <Loading />;
-  const departmentName = (id: string) => lookups?.departments.find((item) => item.id === id)?.name ?? "Group";
+  const organizationName = (id: string) => lookups?.organizations.find((item) => item.id === id)?.name ?? "Group";
   const visible = (members.data?.items ?? []).filter((member) => {
-    if (groupDepartments === "all" || isAdmin) return true;
-    return (member.departmentIds ?? []).some((id) => groupDepartments.includes(id)) || member.userId === viewer.id;
+    if (groupOrganizations === "all" || isAdmin) return true;
+    return (member.organizationIds ?? []).some((id) => groupOrganizations.includes(id)) || member.userId === viewer.id;
   });
   const options = visible.filter((member) => member.isActive).map((member) => ({ value: member.userId, label: formatPersonName(member.user) }));
-  const inviteItems = isAdmin ? (invitations.data?.items ?? []) : (departmentInvites.data ?? []);
+  const inviteItems = isAdmin ? (invitations.data?.items ?? []) : (organizationInvites.data ?? []);
   const pending = inviteItems.filter((invitation) => !invitation.acceptedAt && !invitation.revokedAt);
   const openRequests = (requests.data?.items ?? []).filter((item) => item.status === "pending");
   const editedRole = rolesQuery.data?.items.find((item) => item.id === roleEditor) ?? null;
@@ -261,7 +261,7 @@ export default function PeopleScreen() {
           ) : null}
           {visible.length === 0 ? <EmptyState icon={UsersIcon} title="No members yet" /> : null}
           {visible.map((member) => {
-            const groups = (member.departmentIds ?? []).map(departmentName).join(", ");
+            const groups = (member.organizationIds ?? []).map(organizationName).join(", ");
             const on = selected.includes(member.id);
             return (
               <ListRow
@@ -288,7 +288,7 @@ export default function PeopleScreen() {
                           { label: "Add time", onPress: () => router.push({ pathname: "/log", params: { view: "member", person: member.userId } }) },
                           {
                             label: member.isActive ? "Deactivate" : "Activate",
-                            onPress: () => void api.updateMembership(organization.id, member.id, { isActive: !member.isActive }).then(refresh).catch(setError),
+                            onPress: () => void api.updateMembership(tenant.id, member.id, { isActive: !member.isActive }).then(refresh).catch(setError),
                           },
                           { label: "Remove", destructive: true, onPress: () => { setSelected([member.id]); setConfirmDelete(true); } },
                         ]}
@@ -316,7 +316,7 @@ export default function PeopleScreen() {
               <Select
                 label="Group"
                 onChange={setInviteGroup}
-                options={groupIds.map((id) => ({ value: id, label: departmentName(id) }))}
+                options={groupIds.map((id) => ({ value: id, label: organizationName(id) }))}
                 value={inviteGroup}
               />
             ) : null}
@@ -338,10 +338,10 @@ export default function PeopleScreen() {
                   right={
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
                       <Badge label={status.label} tone={status.tone} />
-                      {status.label === "Pending" && !invitation.departmentId ? (
+                      {status.label === "Pending" && !invitation.organizationId ? (
                         <Button
                           label="Resend"
-                          onPress={() => void api.resendInvitation(organization.id, invitation.id).then(refresh).catch(setError)}
+                          onPress={() => void api.resendInvitation(tenant.id, invitation.id).then(refresh).catch(setError)}
                           variant="ghost"
                         />
                       ) : null}
@@ -350,9 +350,9 @@ export default function PeopleScreen() {
                           icon={XIcon}
                           label="Revoke invite"
                           onPress={() =>
-                            void (invitation.departmentId
-                              ? api.revokeDepartmentInvitation(invitation.departmentId, invitation.id)
-                              : api.revokeInvitation(organization.id, invitation.id)
+                            void (invitation.organizationId
+                              ? api.revokeOrganizationInvitation(invitation.organizationId, invitation.id)
+                              : api.revokeInvitation(tenant.id, invitation.id)
                             )
                               .then(refresh)
                               .catch(setError)
@@ -378,11 +378,11 @@ export default function PeopleScreen() {
                     <View style={{ gap: 4 }}>
                       <Button
                         label="Approve"
-                        onPress={() => void api.decideAccessRequest(organization.id, request.id, "approved").then(refresh).catch(setError)}
+                        onPress={() => void api.decideAccessRequest(tenant.id, request.id, "approved").then(refresh).catch(setError)}
                       />
                       <Button
                         label="Decline"
-                        onPress={() => void api.decideAccessRequest(organization.id, request.id, "declined").then(refresh).catch(setError)}
+                        onPress={() => void api.decideAccessRequest(tenant.id, request.id, "declined").then(refresh).catch(setError)}
                         variant="outline"
                       />
                     </View>
@@ -477,8 +477,8 @@ export default function PeopleScreen() {
             <Muted>{profile.user.email}</Muted>
             <Muted>{roles.find((item) => item.value === profile.role.code)?.label ?? profile.role.name}</Muted>
             <Muted>{profile.isActive ? "Active" : "Inactive"}</Muted>
-            {(profile.departmentIds ?? []).length ? <Muted>{profile.departmentIds!.map(departmentName).join(", ")}</Muted> : null}
-            {profile.orgUserTitle ? <Muted>{profile.orgUserTitle}</Muted> : null}
+            {(profile.organizationIds ?? []).length ? <Muted>{profile.organizationIds!.map(organizationName).join(", ")}</Muted> : null}
+            {profile.title ? <Muted>{profile.title}</Muted> : null}
             <Button label="Edit" onPress={() => { setEditTab("membership"); setEditing(profile); setProfile(null); }} />
           </View>
         ) : null}
@@ -494,7 +494,7 @@ export default function PeopleScreen() {
           pending={saveMember.isPending}
           error={saveMember.error}
           onSave={(body) => saveMember.mutate(body)}
-          departments={(lookups?.departments ?? []).map((item) => ({ value: item.id, label: item.name }))}
+          organizations={(lookups?.organizations ?? []).map((item) => ({ value: item.id, label: item.name }))}
         />
       ) : null}
 
@@ -504,14 +504,14 @@ export default function PeopleScreen() {
         onClose={() => setRoleEditor(null)}
         onDelete={() => {
           if (!editedRole) return;
-          void api.deleteRole(organization.id, editedRole.id).then(async () => {
+          void api.deleteRole(tenant.id, editedRole.id).then(async () => {
             setRoleEditor(null);
             await refresh();
           }).catch(setError);
         }}
         onSave={(body) => {
           if (!editedRole) return;
-          void api.updateRole(organization.id, editedRole.id, body).then(async () => {
+          void api.updateRole(tenant.id, editedRole.id, body).then(async () => {
             setRoleEditor(null);
             await refresh();
           }).catch(setError);
@@ -520,7 +520,7 @@ export default function PeopleScreen() {
 
       <ConfirmDialog
         confirmLabel="Remove"
-        description="This removes the selected people from the organization."
+        description="This removes the selected people from the tenant."
         destructive
         onCancel={() => setConfirmDelete(false)}
         onConfirm={() => removePeople.mutate(selected)}
@@ -540,7 +540,7 @@ function MemberEditor({
   onSave,
   pending,
   error,
-  departments,
+  organizations,
 }: {
   member: Membership | null;
   tab: "membership" | "profile";
@@ -549,16 +549,16 @@ function MemberEditor({
   onSave: (body: Record<string, unknown>) => void;
   pending: boolean;
   error: unknown;
-  departments: { value: string; label: string }[];
+  organizations: { value: string; label: string }[];
 }) {
   const [role, setRole] = useState(member?.role.code ?? "VOLUNTEER");
-  const [groups, setGroups] = useState<string[]>(member?.departmentIds ?? []);
+  const [groups, setGroups] = useState<string[]>(member?.organizationIds ?? []);
   const [first, setFirst] = useState(member?.user.firstName ?? "");
   const [last, setLast] = useState(member?.user.lastName ?? "");
   const [display, setDisplay] = useState(member?.user.displayName ?? "");
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState(member?.notes ?? "");
-  const [title, setTitle] = useState(member?.orgUserTitle ?? "");
+  const [title, setTitle] = useState(member?.title ?? "");
   return (
     <Sheet onClose={onClose} open={Boolean(member)} title="Edit person">
       <View style={{ flexDirection: "row", gap: 8 }}>
@@ -569,14 +569,14 @@ function MemberEditor({
         <>
           <Select label="Role" onChange={setRole} options={roles} value={role} />
           <Muted>Groups</Muted>
-          {departments.map((department) => {
-            const on = groups.includes(department.value);
+          {organizations.map((organization) => {
+            const on = groups.includes(organization.value);
             return (
               <Pressable
-                key={department.value}
-                onPress={() => setGroups((current) => (on ? current.filter((id) => id !== department.value) : [...current, department.value]))}
+                key={organization.value}
+                onPress={() => setGroups((current) => (on ? current.filter((id) => id !== organization.value) : [...current, organization.value]))}
               >
-                <Text>{on ? "✓ " : ""}{department.label}</Text>
+                <Text>{on ? "✓ " : ""}{organization.label}</Text>
               </Pressable>
             );
           })}
@@ -588,7 +588,7 @@ function MemberEditor({
           <Field label="Display name" onChangeText={setDisplay} value={display} />
           <Field label="Title" onChangeText={setTitle} value={title} />
           <Field label="Phone" onChangeText={setPhone} placeholder="Leave blank to keep" value={phone} />
-          <Field label="Organization notes" onChangeText={setNotes} value={notes} />
+          <Field label="Tenant notes" onChangeText={setNotes} value={notes} />
         </>
       )}
       <ErrorText error={error} />
@@ -597,8 +597,8 @@ function MemberEditor({
         onPress={() =>
           onSave(
             tab === "membership"
-              ? { role, departmentIds: groups }
-              : { firstName: first, lastName: last, displayName: display, orgUserTitle: title, ...(phone.trim() ? { phone } : {}), notes: notes || null },
+              ? { role, organizationIds: groups }
+              : { firstName: first, lastName: last, displayName: display, title: title, ...(phone.trim() ? { phone } : {}), notes: notes || null },
           )
         }
         pending={pending}

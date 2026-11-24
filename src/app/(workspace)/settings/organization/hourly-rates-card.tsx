@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { useActionMutation } from "@/hooks/use-action-mutation";
 import { useLookups } from "@/hooks/use-lookups";
-import { useOrganization } from "@/hooks/use-workspace";
+import { useTenant } from "@/hooks/use-workspace";
 import { formatCurrency } from "@/lib/format";
 import { keys } from "@/lib/queries";
 import type { HourlyRate } from "@/lib/types";
@@ -24,9 +24,9 @@ const types = [
 ];
 
 export function HourlyRatesCard() {
-  const organization = useOrganization();
+  const tenant = useTenant();
   const { lookups } = useLookups();
-  const invalidate = [keys.lookups(organization.id), keys.organization(organization.id)];
+  const invalidate = [keys.lookups(tenant.id), keys.tenant(tenant.id)];
   const [name, setName] = useState("");
   const [type, setType] = useState("Volunteer");
   const [perHourRate, setPerHourRate] = useState("35.47");
@@ -34,7 +34,7 @@ export function HourlyRatesCard() {
   const [isDefault, setIsDefault] = useState(false);
   const create = useActionMutation(
     () =>
-      createHourlyRateAction(organization.id, {
+      createHourlyRateAction(tenant.id, {
         type,
         name,
         perHourRate: Number(perHourRate),
@@ -67,7 +67,7 @@ export function HourlyRatesCard() {
       <CardHeader>
         <CardTitle>Hourly rates</CardTitle>
         <CardDescription>
-          Each organization needs one default volunteer rate. Archived rates stay here but cannot be selected on new
+          Each tenant needs one default volunteer rate. Archived rates stay here but cannot be selected on new
           entries.
         </CardDescription>
       </CardHeader>

@@ -27,7 +27,7 @@ export type Session = {
 export type Theme = {
   id: string;
   name: string;
-  organizationId: string | null;
+  tenantId: string | null;
   primary: string;
   primaryForeground: string;
   highlight: string;
@@ -45,13 +45,13 @@ export type Theme = {
 };
 
 export type EntityLabels = {
-  organization: string;
+  tenant: string;
   project: string;
-  department: string;
+  organization: string;
   taskCategory: string;
 };
 
-export type OrganizationPreferences = {
+export type TenantPreferences = {
   allowTimeEntryEditing: boolean;
   allowVolunteersToAddVolunteers: boolean;
   entityLabels: EntityLabels;
@@ -59,13 +59,13 @@ export type OrganizationPreferences = {
   emailSettings: Record<string, string | boolean>;
 };
 
-export type Organization = {
+export type Tenant = {
   id: string;
   name: string;
   slug: string | null;
   volunteerHourlyRate: number;
   defaultRateType: string;
-  preferences: OrganizationPreferences;
+  preferences: TenantPreferences;
   themeId: string;
   theme: Theme;
   wordmarkUrl: string | null;
@@ -90,14 +90,14 @@ export type Viewer = {
 
 export type Workspace = {
   viewer: Viewer;
-  organizations: Organization[];
-  organization: Organization | null;
+  tenants: Tenant[];
+  tenant: Tenant | null;
   isAdmin: boolean;
   isCoordinator: boolean;
   canSelectRate: boolean;
   role: string | null;
   permissions: string[];
-  groupDepartments: "all" | string[];
+  groupOrganizations: "all" | string[];
 };
 
 export type Page<T> = { items: T[]; limit: number; offset: number };
@@ -108,7 +108,7 @@ export type Project = {
   title: string;
   accessType: string;
   projectType: string;
-  departmentId: string | null;
+  organizationId: string | null;
   isActive: boolean;
   description: string | null;
   startDate?: string | null;
@@ -118,7 +118,7 @@ export type Project = {
 export type HourlyRate = { id: string; name: string; type: string; perHourRate: number; isDefault: boolean; isArchived: boolean };
 
 export type Lookups = {
-  departments: Named[];
+  organizations: Named[];
   projects: Project[];
   categories: Named[];
   tags: Named[];
@@ -129,8 +129,8 @@ export type TimeEntry = {
   id: string;
   userId: string;
   enteredByUserId: string;
-  organizationId: string;
-  departmentId: string | null;
+  tenantId: string;
+  organizationId: string | null;
   projectId: string | null;
   taskCategoryId: string | null;
   mode: "Punch" | "Duration" | "Total";
@@ -148,13 +148,13 @@ export type TimeEntry = {
 export type Membership = {
   id: string;
   userId: string;
-  organizationId: string;
+  tenantId: string;
   role: { id: string; code: string; name: string };
   isActive: boolean;
-  departmentIds?: string[];
-  primaryDepartmentId?: string | null;
-  orgUserTitle?: string | null;
-  /** The organization's private notes. Null unless the caller has manage_members. */
+  organizationIds?: string[];
+  primaryOrganizationId?: string | null;
+  title?: string | null;
+  /** The tenant's private notes. Null unless the caller has manage_members. */
   notes?: string | null;
   user: {
     id: string;
@@ -170,12 +170,12 @@ export type Membership = {
 export type Invitation = {
   id: string;
   email: string;
-  organizationId: string;
+  tenantId: string;
   role: { id: string; code: string; name: string };
   expiresAt: string;
   acceptedAt: string | null;
   revokedAt: string | null;
-  departmentId?: string | null;
+  organizationId?: string | null;
 };
 
 export type Connection = {
@@ -200,7 +200,7 @@ export type OrgRole = {
   id: string;
   code: string;
   name: string;
-  organizationId: string | null;
+  tenantId: string | null;
   isSystem: boolean;
   scope: string;
   permissions: string[];
@@ -225,7 +225,7 @@ export type VolunteerNeed = {
   requiredBy?: string | null;
   projectId?: string | null;
   taskCategoryId?: string | null;
-  departmentId?: string | null;
+  organizationId?: string | null;
   questions?: NeedQuestions;
 };
 export type NeedSignup = {
@@ -254,7 +254,7 @@ export type ReportSide = {
   volunteers: number;
   entries: number;
   inKind: number;
-  byDepartment: ReportBucket[];
+  byOrganization: ReportBucket[];
   byCategory: ReportBucket[];
   byPerson: ReportBucket[];
   byProject: ReportBucket[];
@@ -263,7 +263,7 @@ export type ReportSide = {
 
 export type SavedReport = {
   id: string;
-  organizationId: string;
+  tenantId: string;
   name: string;
   isDefault: boolean;
   isDashboard: boolean;
@@ -274,7 +274,7 @@ export type SavedReport = {
 };
 
 export type ReportFilters = {
-  departmentId?: string[];
+  organizationId?: string[];
   taskCategoryId?: string[];
   projectId?: string[];
   userId?: string[];
@@ -304,7 +304,7 @@ export type ReportCard = {
 export type Report = {
   user: ReportSide;
   staff: ReportSide;
-  collective: { hours: number; entries: number; inKind: number; byDepartment: ReportBucket[]; byProject: ReportBucket[] };
+  collective: { hours: number; entries: number; inKind: number; byOrganization: ReportBucket[]; byProject: ReportBucket[] };
 };
 
 export type Payroll = {
@@ -317,8 +317,8 @@ export type Payroll = {
 
 export type CollectiveEntry = {
   id: string;
-  organizationId: string;
-  departmentId: string | null;
+  tenantId: string;
+  organizationId: string | null;
   projectId: string;
   taskCategoryId: string;
   startedAt: string;
@@ -330,8 +330,8 @@ export type CollectiveEntry = {
 };
 
 export type Placement = {
-  organizationId: string;
-  departmentId?: string | null;
+  tenantId: string;
+  organizationId?: string | null;
   projectId?: string | null;
   taskCategoryId?: string | null;
   description?: string | null;

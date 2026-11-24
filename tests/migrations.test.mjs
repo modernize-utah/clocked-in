@@ -89,13 +89,13 @@ test(
       INSERT INTO ef."__EFMigrationsHistory" VALUES ('preserve-history');
       INSERT INTO "User" (id, username, email, "passwordHash", "updatedAt")
       VALUES ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'preserve', 'preserve@example.test', 'unchanged', now());
-      INSERT INTO "Organization" (id, name) VALUES ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Preserve organization');`);
-      await adopted.query(`UPDATE "Role" SET scope='assigned_groups' WHERE code='MEMBER' AND "organizationId" IS NULL`);
+      INSERT INTO "Tenant" (id, name) VALUES ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Preserve tenant');`);
+      await adopted.query(`UPDATE "Role" SET scope='assigned_groups' WHERE code='MEMBER' AND "tenantId" IS NULL`);
       const before = await applicationData(adopted);
       const beforeSchema = await schemaSnapshot(adopted);
-      await adopted.query(`DROP INDEX "IX_Organization_slug"; ALTER TABLE "Organization" DROP COLUMN "slug"`);
+      await adopted.query(`DROP INDEX "IX_Tenant_slug"; ALTER TABLE "Tenant" DROP COLUMN "slug"`);
       await assert.rejects(verifyBaseline(adopted, reference), /mismatch in columns/);
-      const catchup = readFileSync("prisma/adoption/organization-slug.sql", "utf8");
+      const catchup = readFileSync("prisma/adoption/tenant-slug.sql", "utf8");
       await adopted.query(catchup);
       await adopted.query(catchup);
       assert.deepEqual(await applicationData(adopted), before);
@@ -113,9 +113,9 @@ test(
           ),
       };
       await verifyBaseline(managedProvider, reference);
-      await adopted.query(`UPDATE "Role" SET scope='invalid' WHERE code='MEMBER' AND "organizationId" IS NULL`);
+      await adopted.query(`UPDATE "Role" SET scope='invalid' WHERE code='MEMBER' AND "tenantId" IS NULL`);
       await assert.rejects(verifyBaseline(adopted, reference), /missing required system roles/);
-      await adopted.query(`UPDATE "Role" SET scope='assigned_groups' WHERE code='MEMBER' AND "organizationId" IS NULL`);
+      await adopted.query(`UPDATE "Role" SET scope='assigned_groups' WHERE code='MEMBER' AND "tenantId" IS NULL`);
       await verifyBaseline(adopted, reference);
       await adopted.query(`ALTER TABLE "User" ALTER COLUMN "createdAt" TYPE timestamptz`);
       await verifyBaseline(adopted, reference);
@@ -145,7 +145,7 @@ test(
         (await adopted.query(`SELECT count(*)::int AS total FROM ef."__EFMigrationsHistory"`)).rows[0].total,
         1,
       );
-      assert.equal((await adopted.query(`SELECT count(*)::int AS total FROM "Organization"`)).rows[0].total, 1);
+      assert.equal((await adopted.query(`SELECT count(*)::int AS total FROM "Tenant"`)).rows[0].total, 1);
       assert.equal(beforeSchema.constraints.filter((row) => row.contype === "c").length, 18);
       assert.equal((await schemaSnapshot(fresh)).constraints.filter((row) => row.contype === "c").length, 18);
       await assert.rejects(adopted.query(`UPDATE "User" SET email='UPPER@example.test'`), { code: "23514" });

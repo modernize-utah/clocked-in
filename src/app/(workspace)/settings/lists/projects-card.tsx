@@ -11,7 +11,7 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { useActionMutation } from "@/hooks/use-action-mutation";
 import { useLabels } from "@/hooks/use-labels";
 import { useLookups } from "@/hooks/use-lookups";
-import { useOrganization, useWorkspace } from "@/hooks/use-workspace";
+import { useTenant, useWorkspace } from "@/hooks/use-workspace";
 import { formatDate } from "@/lib/format";
 import { keys } from "@/lib/queries";
 import type { Project } from "@/lib/types";
@@ -27,8 +27,8 @@ function dateRange(project: Project) {
 }
 
 export function ProjectsCard({ projectType = "Project" }: { projectType?: "Project" | "Event" }) {
-  const organization = useOrganization();
-  const { isCoordinator, groupDepartments } = useWorkspace();
+  const tenant = useTenant();
+  const { isCoordinator, groupOrganizations } = useWorkspace();
   const copy = useLabels();
   const { lookups, names } = useLookups();
   const [creating, setCreating] = useState(false);
@@ -38,19 +38,19 @@ export function ProjectsCard({ projectType = "Project" }: { projectType?: "Proje
     isCoordinator
       ? lookups.projects.filter(
           (project) =>
-            project.accessType === "Department" &&
-            project.departmentId &&
-            groupDepartments.includes(project.departmentId),
+            project.accessType === "Organization" &&
+            project.organizationId &&
+            groupOrganizations.includes(project.organizationId),
         )
       : lookups.projects
   ).filter((project) => (project.projectType === "Event" ? "Event" : "Project") === projectType);
 
   const remove = useActionMutation((id: string) => deleteLookupAction("projects", id), {
-    invalidate: [keys.lookups(organization.id)],
+    invalidate: [keys.lookups(tenant.id)],
   });
   const archive = useActionMutation(
     ({ id, isActive }: { id: string; isActive: boolean }) => archiveProjectAction(id, isActive),
-    { invalidate: [keys.lookups(organization.id)] },
+    { invalidate: [keys.lookups(tenant.id)] },
   );
 
   const isEvent = projectType === "Event";
@@ -62,8 +62,8 @@ export function ProjectsCard({ projectType = "Project" }: { projectType?: "Proje
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         <CardDescription>
-          Assign {isEvent ? "an event" : `a ${noun}`} to a {copy.department.toLowerCase()} and give it a start and end date. Leave the{" "}
-          {copy.department.toLowerCase()} as the whole {copy.organization.toLowerCase()} when everyone should see it.
+          Assign {isEvent ? "an event" : `a ${noun}`} to a {copy.organization.toLowerCase()} and give it a start and end date. Leave the{" "}
+          {copy.organization.toLowerCase()} as the whole {copy.tenant.toLowerCase()} when everyone should see it.
         </CardDescription>
         <CardAction>
           <Button type="button" size="sm" className="h-8" onClick={() => setCreating(true)}>
@@ -83,7 +83,7 @@ export function ProjectsCard({ projectType = "Project" }: { projectType?: "Proje
                     {project.isActive === false ? <span className="ml-2 text-xs text-muted-foreground">Archived</span> : null}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {project.departmentId ? (names.department.get(project.departmentId) ?? copy.department) : `Whole ${copy.organization.toLowerCase()}`}
+                    {project.organizationId ? (names.organization.get(project.organizationId) ?? copy.organization) : `Whole ${copy.tenant.toLowerCase()}`}
                     {" · "}
                     {dateRange(project)}
                   </p>

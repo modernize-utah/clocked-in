@@ -26,7 +26,7 @@ export async function createGroupSessionAction(session: NewGroupSession) {
 }
 
 export type GroupSessionPatch = {
-  departmentId?: string | null;
+  organizationId?: string | null;
   projectId?: string | null;
   taskCategoryId?: string | null;
   description?: string | null;

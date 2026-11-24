@@ -6,7 +6,7 @@ import type {
   Invitation,
   Lookups,
   Membership,
-  Organization,
+  Tenant,
   OrgRole,
   Page,
   Payroll,
@@ -99,22 +99,22 @@ export class Api {
     return this.request<User>("/users/me", { method: "PATCH", body });
   }
 
-  workspace(organizationId?: string | null) {
+  workspace(tenantId?: string | null) {
     return this.request<Workspace>("/users/me/workspace", {
-      query: organizationId ? { organizationId } : undefined,
+      query: tenantId ? { tenantId } : undefined,
     });
   }
 
-  createOrganization(name: string) {
-    return this.request<Organization>("/organizations", { method: "POST", body: { name } });
+  createTenant(name: string) {
+    return this.request<Tenant>("/tenants", { method: "POST", body: { name } });
   }
 
-  updateOrganization(organizationId: string, body: Record<string, unknown>) {
-    return this.request<Organization>(`/organizations/${organizationId}`, { method: "PATCH", body });
+  updateTenant(tenantId: string, body: Record<string, unknown>) {
+    return this.request<Tenant>(`/tenants/${tenantId}`, { method: "PATCH", body });
   }
 
-  lookups(organizationId: string) {
-    return this.request<Lookups>(`/organizations/${organizationId}/lookups`);
+  lookups(tenantId: string) {
+    return this.request<Lookups>(`/tenants/${tenantId}/lookups`);
   }
 
   entries(userId: string, query?: Record<string, string | number | undefined>) {
@@ -157,20 +157,20 @@ export class Api {
     return this.request<void>(`/time-entries/${entryId}`, { method: "DELETE" });
   }
 
-  report(organizationId: string, query?: Record<string, string | undefined>) {
-    return this.request<Report>(`/organizations/${organizationId}/report`, { query });
+  report(tenantId: string, query?: Record<string, string | undefined>) {
+    return this.request<Report>(`/tenants/${tenantId}/report`, { query });
   }
 
-  savedReports(organizationId: string) {
-    return this.request<Page<SavedReport>>(`/organizations/${organizationId}/reports`, { query: { limit: 100 } });
+  savedReports(tenantId: string) {
+    return this.request<Page<SavedReport>>(`/tenants/${tenantId}/reports`, { query: { limit: 100 } });
   }
 
-  updateSavedReport(organizationId: string, reportId: string, body: { filters?: ReportFilters; name?: string }) {
-    return this.request<SavedReport>(`/organizations/${organizationId}/reports/${reportId}`, { method: "PATCH", body });
+  updateSavedReport(tenantId: string, reportId: string, body: { filters?: ReportFilters; name?: string }) {
+    return this.request<SavedReport>(`/tenants/${tenantId}/reports/${reportId}`, { method: "PATCH", body });
   }
 
-  deleteSavedReport(organizationId: string, reportId: string) {
-    return this.request<void>(`/organizations/${organizationId}/reports/${reportId}`, { method: "DELETE" });
+  deleteSavedReport(tenantId: string, reportId: string) {
+    return this.request<void>(`/tenants/${tenantId}/reports/${reportId}`, { method: "DELETE" });
   }
 
   async download(path: string, query?: Record<string, string | undefined>) {
@@ -183,68 +183,68 @@ export class Api {
     return this.readText(response);
   }
 
-  payroll(organizationId: string) {
-    return this.request<Payroll>(`/organizations/${organizationId}/payroll`);
+  payroll(tenantId: string) {
+    return this.request<Payroll>(`/tenants/${tenantId}/payroll`);
   }
 
-  memberships(organizationId: string) {
-    return this.request<Page<Membership>>(`/organizations/${organizationId}/memberships`, { query: { limit: 100 } });
+  memberships(tenantId: string) {
+    return this.request<Page<Membership>>(`/tenants/${tenantId}/memberships`, { query: { limit: 100 } });
   }
 
-  createMembership(organizationId: string, body: Record<string, unknown>) {
-    return this.request<Membership>(`/organizations/${organizationId}/memberships`, { method: "POST", body });
+  createMembership(tenantId: string, body: Record<string, unknown>) {
+    return this.request<Membership>(`/tenants/${tenantId}/memberships`, { method: "POST", body });
   }
 
-  invitations(organizationId: string) {
-    return this.request<Page<Invitation>>(`/organizations/${organizationId}/invitations`, { query: { limit: 100 } });
+  invitations(tenantId: string) {
+    return this.request<Page<Invitation>>(`/tenants/${tenantId}/invitations`, { query: { limit: 100 } });
   }
 
-  createInvitation(organizationId: string, body: Record<string, unknown>) {
-    return this.request<Invitation>(`/organizations/${organizationId}/invitations`, { method: "POST", body });
+  createInvitation(tenantId: string, body: Record<string, unknown>) {
+    return this.request<Invitation>(`/tenants/${tenantId}/invitations`, { method: "POST", body });
   }
 
-  revokeInvitation(organizationId: string, invitationId: string) {
-    return this.request<Invitation>(`/organizations/${organizationId}/invitations/${invitationId}`, { method: "DELETE" });
+  revokeInvitation(tenantId: string, invitationId: string) {
+    return this.request<Invitation>(`/tenants/${tenantId}/invitations/${invitationId}`, { method: "DELETE" });
   }
 
-  departmentInvitations(departmentId: string) {
-    return this.request<Page<Invitation>>(`/departments/${departmentId}/invitations`, { query: { limit: 100 } });
+  organizationInvitations(organizationId: string) {
+    return this.request<Page<Invitation>>(`/tenants/${organizationId}/invitations`, { query: { limit: 100 } });
   }
 
-  createDepartmentInvitation(departmentId: string, body: Record<string, unknown>) {
-    return this.request<Invitation>(`/departments/${departmentId}/invitations`, { method: "POST", body });
+  createOrganizationInvitation(organizationId: string, body: Record<string, unknown>) {
+    return this.request<Invitation>(`/tenants/${organizationId}/invitations`, { method: "POST", body });
   }
 
-  revokeDepartmentInvitation(departmentId: string, invitationId: string) {
-    return this.request<Invitation>(`/departments/${departmentId}/invitations/${invitationId}`, { method: "DELETE" });
+  revokeOrganizationInvitation(organizationId: string, invitationId: string) {
+    return this.request<Invitation>(`/tenants/${organizationId}/invitations/${invitationId}`, { method: "DELETE" });
   }
 
-  connections(organizationId: string) {
-    return this.request<Page<Connection>>(`/organizations/${organizationId}/connections`, { query: { limit: 100 } });
+  connections(tenantId: string) {
+    return this.request<Page<Connection>>(`/tenants/${tenantId}/connections`, { query: { limit: 100 } });
   }
 
-  createConnection(organizationId: string, body: { userId: string; connectedUserId: string; relationship: string }) {
-    return this.request<Connection>(`/organizations/${organizationId}/connections`, { method: "POST", body });
+  createConnection(tenantId: string, body: { userId: string; connectedUserId: string; relationship: string }) {
+    return this.request<Connection>(`/tenants/${tenantId}/connections`, { method: "POST", body });
   }
 
-  roles(organizationId: string) {
-    return this.request<Page<OrgRole>>(`/organizations/${organizationId}/roles`, { query: { limit: 100 } });
+  roles(tenantId: string) {
+    return this.request<Page<OrgRole>>(`/tenants/${tenantId}/roles`, { query: { limit: 100 } });
   }
 
-  createRole(organizationId: string, body: { name: string; scope: string; permissions: string[] }) {
-    return this.request<OrgRole>(`/organizations/${organizationId}/roles`, { method: "POST", body });
+  createRole(tenantId: string, body: { name: string; scope: string; permissions: string[] }) {
+    return this.request<OrgRole>(`/tenants/${tenantId}/roles`, { method: "POST", body });
   }
 
-  updateRole(organizationId: string, roleId: string, body: { name?: string; scope?: string; permissions?: string[] }) {
-    return this.request<OrgRole>(`/organizations/${organizationId}/roles/${roleId}`, { method: "PATCH", body });
+  updateRole(tenantId: string, roleId: string, body: { name?: string; scope?: string; permissions?: string[] }) {
+    return this.request<OrgRole>(`/tenants/${tenantId}/roles/${roleId}`, { method: "PATCH", body });
   }
 
-  needs(organizationId: string, query?: Record<string, string | number | undefined>) {
-    return this.request<Page<VolunteerNeed>>(`/organizations/${organizationId}/volunteer-needs`, { query: { limit: 100, ...query } });
+  needs(tenantId: string, query?: Record<string, string | number | undefined>) {
+    return this.request<Page<VolunteerNeed>>(`/tenants/${tenantId}/volunteer-needs`, { query: { limit: 100, ...query } });
   }
 
-  createNeed(organizationId: string, body: Record<string, unknown>) {
-    return this.request<VolunteerNeed>(`/organizations/${organizationId}/volunteer-needs`, { method: "POST", body });
+  createNeed(tenantId: string, body: Record<string, unknown>) {
+    return this.request<VolunteerNeed>(`/tenants/${tenantId}/volunteer-needs`, { method: "POST", body });
   }
 
   getNeed(needId: string) {
@@ -279,54 +279,54 @@ export class Api {
     return this.request<{ sent: number }>(`/volunteer-needs/${needId}/emails`, { method: "POST", body });
   }
 
-  departments(organizationId: string) {
-    return this.request<Page<{ id: string; name: string }>>(`/organizations/${organizationId}/departments`, {
+  organizations(tenantId: string) {
+    return this.request<Page<{ id: string; name: string }>>(`/tenants/${tenantId}/tenants`, {
       query: { limit: 100 },
     });
   }
 
-  createDepartment(organizationId: string, name: string) {
-    return this.request<{ id: string; name: string }>(`/organizations/${organizationId}/departments`, {
+  createOrganization(tenantId: string, name: string) {
+    return this.request<{ id: string; name: string }>(`/tenants/${tenantId}/tenants`, {
       method: "POST",
       body: { name },
     });
   }
 
-  projects(organizationId: string) {
-    return this.request<Page<Project>>(`/organizations/${organizationId}/projects`, { query: { limit: 100 } });
+  projects(tenantId: string) {
+    return this.request<Page<Project>>(`/tenants/${tenantId}/projects`, { query: { limit: 100 } });
   }
 
-  createProject(organizationId: string, body: { title: string; accessType: string; projectType?: string; departmentId?: string | null }) {
-    return this.request<{ id: string; title: string }>(`/organizations/${organizationId}/projects`, { method: "POST", body });
+  createProject(tenantId: string, body: { title: string; accessType: string; projectType?: string; organizationId?: string | null }) {
+    return this.request<{ id: string; title: string }>(`/tenants/${tenantId}/projects`, { method: "POST", body });
   }
 
-  categories(organizationId: string) {
-    return this.request<Page<{ id: string; name: string }>>(`/organizations/${organizationId}/task-categories`, {
+  categories(tenantId: string) {
+    return this.request<Page<{ id: string; name: string }>>(`/tenants/${tenantId}/task-categories`, {
       query: { limit: 100 },
     });
   }
 
-  createCategory(organizationId: string, name: string) {
-    return this.request<{ id: string; name: string }>(`/organizations/${organizationId}/task-categories`, {
+  createCategory(tenantId: string, name: string) {
+    return this.request<{ id: string; name: string }>(`/tenants/${tenantId}/task-categories`, {
       method: "POST",
       body: { name },
     });
   }
 
-  tags(organizationId: string) {
-    return this.request<Page<{ id: string; name: string }>>(`/organizations/${organizationId}/tags`, { query: { limit: 100 } });
+  tags(tenantId: string) {
+    return this.request<Page<{ id: string; name: string }>>(`/tenants/${tenantId}/tags`, { query: { limit: 100 } });
   }
 
-  createTag(organizationId: string, name: string) {
-    return this.request<{ id: string; name: string }>(`/organizations/${organizationId}/tags`, { method: "POST", body: { name } });
+  createTag(tenantId: string, name: string) {
+    return this.request<{ id: string; name: string }>(`/tenants/${tenantId}/tags`, { method: "POST", body: { name } });
   }
 
-  updateDepartment(departmentId: string, name: string) {
-    return this.request(`/departments/${departmentId}`, { method: "PATCH", body: { name } });
+  updateOrganization(organizationId: string, name: string) {
+    return this.request(`/tenants/${organizationId}`, { method: "PATCH", body: { name } });
   }
 
-  deleteDepartment(departmentId: string) {
-    return this.request<void>(`/departments/${departmentId}`, { method: "DELETE" });
+  deleteOrganization(organizationId: string) {
+    return this.request<void>(`/tenants/${organizationId}`, { method: "DELETE" });
   }
 
   updateProject(projectId: string, body: Record<string, unknown>) {
@@ -353,12 +353,12 @@ export class Api {
     return this.request<void>(`/tags/${tagId}`, { method: "DELETE" });
   }
 
-  hourlyRates(organizationId: string) {
-    return this.request<Page<HourlyRate>>(`/organizations/${organizationId}/hourly-rates`, { query: { limit: 100 } });
+  hourlyRates(tenantId: string) {
+    return this.request<Page<HourlyRate>>(`/tenants/${tenantId}/hourly-rates`, { query: { limit: 100 } });
   }
 
-  createHourlyRate(organizationId: string, body: { name: string; type: string; perHourRate: number; isDefault?: boolean }) {
-    return this.request<HourlyRate>(`/organizations/${organizationId}/hourly-rates`, { method: "POST", body });
+  createHourlyRate(tenantId: string, body: { name: string; type: string; perHourRate: number; isDefault?: boolean }) {
+    return this.request<HourlyRate>(`/tenants/${tenantId}/hourly-rates`, { method: "POST", body });
   }
 
   updateHourlyRate(rateId: string, body: Record<string, unknown>) {
@@ -369,23 +369,23 @@ export class Api {
     return this.request<void>(`/hourly-rates/${rateId}`, { method: "DELETE" });
   }
 
-  themes(organizationId: string) {
-    return this.request<Page<Theme>>(`/organizations/${organizationId}/themes`);
+  themes(tenantId: string) {
+    return this.request<Page<Theme>>(`/tenants/${tenantId}/themes`);
   }
 
-  deleteTheme(organizationId: string, themeId: string) {
-    return this.request<void>(`/organizations/${organizationId}/themes/${themeId}`, { method: "DELETE" });
+  deleteTheme(tenantId: string, themeId: string) {
+    return this.request<void>(`/tenants/${tenantId}/themes/${themeId}`, { method: "DELETE" });
   }
 
-  uploadBrand(organizationId: string, kind: "mark" | "wordmark" | "wordmarkOnLight", file: { uri: string; name: string; type: string }) {
+  uploadBrand(tenantId: string, kind: "mark" | "wordmark" | "wordmarkOnLight", file: { uri: string; name: string; type: string }) {
     const form = new FormData();
     form.append("kind", kind);
     form.append("file", { uri: file.uri, name: file.name, type: file.type } as unknown as Blob);
-    return this.upload<Organization>(`/organizations/${organizationId}/brand`, form);
+    return this.upload<Tenant>(`/tenants/${tenantId}/brand`, form);
   }
 
-  deleteBrand(organizationId: string, kind: "mark" | "wordmark" | "wordmarkOnLight") {
-    return this.request<Organization>(`/organizations/${organizationId}/brand/${kind}`, { method: "DELETE" });
+  deleteBrand(tenantId: string, kind: "mark" | "wordmark" | "wordmarkOnLight") {
+    return this.request<Tenant>(`/tenants/${tenantId}/brand/${kind}`, { method: "DELETE" });
   }
 
   uploadAvatar(file: { uri: string; name: string; type: string }) {
@@ -398,17 +398,17 @@ export class Api {
     return this.request<User>("/users/me/avatar", { method: "DELETE" });
   }
 
-  saveTheme(organizationId: string, themeId: string, organizationOwnsTheme: boolean, body: Record<string, unknown>) {
-    if (organizationOwnsTheme) {
-      return this.request(`/organizations/${organizationId}/themes/${themeId}`, { method: "PATCH", body });
+  saveTheme(tenantId: string, themeId: string, tenantOwnsTheme: boolean, body: Record<string, unknown>) {
+    if (tenantOwnsTheme) {
+      return this.request(`/tenants/${tenantId}/themes/${themeId}`, { method: "PATCH", body });
     }
-    return this.request<{ id: string }>(`/organizations/${organizationId}/themes`, { method: "POST", body }).then((created) =>
-      this.updateOrganization(organizationId, { themeId: created.id }),
+    return this.request<{ id: string }>(`/tenants/${tenantId}/themes`, { method: "POST", body }).then((created) =>
+      this.updateTenant(tenantId, { themeId: created.id }),
     );
   }
 
-  collective(organizationId: string) {
-    return this.request<Page<CollectiveEntry>>("/collective-time-entries", { query: { organizationId, limit: 50 } });
+  collective(tenantId: string) {
+    return this.request<Page<CollectiveEntry>>("/collective-time-entries", { query: { tenantId, limit: 50 } });
   }
 
   createCollective(body: Record<string, unknown>) {
@@ -423,32 +423,32 @@ export class Api {
     return this.request<void>(`/collective-time-entries/${entryId}`, { method: "DELETE" });
   }
 
-  unclassifiedCount(organizationId: string) {
-    return this.request<{ count: number }>(`/organizations/${organizationId}/unclassified-count`);
+  unclassifiedCount(tenantId: string) {
+    return this.request<{ count: number }>(`/tenants/${tenantId}/unclassified-count`);
   }
 
-  orgEntries(organizationId: string, query?: Record<string, string | number | undefined>) {
-    return this.request<Page<TimeEntry>>(`/organizations/${organizationId}/time-entries`, { query });
+  orgEntries(tenantId: string, query?: Record<string, string | number | undefined>) {
+    return this.request<Page<TimeEntry>>(`/tenants/${tenantId}/time-entries`, { query });
   }
 
   logDays(userId: string, body: Record<string, unknown>) {
     return this.request<{ items: TimeEntry[] }>(`/users/${userId}/time-entries/batch`, { method: "POST", body });
   }
 
-  resendInvitation(organizationId: string, invitationId: string) {
-    return this.request<Invitation>(`/organizations/${organizationId}/invitations/${invitationId}/resend`, { method: "POST" });
+  resendInvitation(tenantId: string, invitationId: string) {
+    return this.request<Invitation>(`/tenants/${tenantId}/invitations/${invitationId}/resend`, { method: "POST" });
   }
 
-  updateMembership(organizationId: string, membershipId: string, body: Record<string, unknown>) {
-    return this.request<Membership>(`/organizations/${organizationId}/memberships/${membershipId}`, { method: "PATCH", body });
+  updateMembership(tenantId: string, membershipId: string, body: Record<string, unknown>) {
+    return this.request<Membership>(`/tenants/${tenantId}/memberships/${membershipId}`, { method: "PATCH", body });
   }
 
-  deleteMembership(organizationId: string, membershipId: string) {
-    return this.request<void>(`/organizations/${organizationId}/memberships/${membershipId}`, { method: "DELETE" });
+  deleteMembership(tenantId: string, membershipId: string) {
+    return this.request<void>(`/tenants/${tenantId}/memberships/${membershipId}`, { method: "DELETE" });
   }
 
-  deleteMemberships(organizationId: string, ids: string[]) {
-    return this.request<void>(`/organizations/${organizationId}/memberships`, { method: "DELETE", body: { ids } });
+  deleteMemberships(tenantId: string, ids: string[]) {
+    return this.request<void>(`/tenants/${tenantId}/memberships`, { method: "DELETE", body: { ids } });
   }
 
   updateConnection(connectionId: string, relationship: string) {
@@ -459,23 +459,23 @@ export class Api {
     return this.request<void>(`/connections/${connectionId}`, { method: "DELETE" });
   }
 
-  deleteRole(organizationId: string, roleId: string) {
-    return this.request<void>(`/organizations/${organizationId}/roles/${roleId}`, { method: "DELETE" });
+  deleteRole(tenantId: string, roleId: string) {
+    return this.request<void>(`/tenants/${tenantId}/roles/${roleId}`, { method: "DELETE" });
   }
 
-  accessRequests(organizationId: string) {
-    return this.request<{ items: AccessRequest[] }>(`/organizations/${organizationId}/access-requests`);
+  accessRequests(tenantId: string) {
+    return this.request<{ items: AccessRequest[] }>(`/tenants/${tenantId}/access-requests`);
   }
 
-  decideAccessRequest(organizationId: string, requestId: string, status: "approved" | "declined") {
-    return this.request<AccessRequest>(`/organizations/${organizationId}/access-requests/${requestId}`, {
+  decideAccessRequest(tenantId: string, requestId: string, status: "approved" | "declined") {
+    return this.request<AccessRequest>(`/tenants/${tenantId}/access-requests/${requestId}`, {
       method: "PATCH",
       body: { status },
     });
   }
 
-  createAccessRequest(organizationId: string, message: string) {
-    return this.request<AccessRequest>(`/organizations/${organizationId}/access-requests`, {
+  createAccessRequest(tenantId: string, message: string) {
+    return this.request<AccessRequest>(`/tenants/${tenantId}/access-requests`, {
       method: "POST",
       body: { message, requestedRole: "GROUP_MANAGER" },
     });

@@ -327,7 +327,7 @@ export function normalizePassword(value: string) {
 export type SystemRoleCode = "MEMBER" | "VOLUNTEER" | "ADMIN";
 export type RoleCode = string;
 export type RateType = "Volunteer" | "Professional" | "Paid";
-export type AccessType = "Public" | "Private" | "Department";
+export type AccessType = "Public" | "Private" | "Organization";
 export type ProjectType = "Project" | "Event";
 export type FeedbackType = "Bug" | "Feature";
 export type FeedbackPriority = "Urgent" | "High" | "Medium" | "Low";
@@ -382,8 +382,8 @@ export function normalizeProjectType(value: string): ProjectType {
 
 export function normalizeAccessType(value: string): AccessType {
   const accessType = value.trim();
-  if (accessType !== "Public" && accessType !== "Private" && accessType !== "Department") {
-    validation("accessType must be Public, Private, or Department.");
+  if (accessType !== "Public" && accessType !== "Private" && accessType !== "Organization") {
+    validation("accessType must be Public, Private, or Organization.");
   }
 
   return accessType;

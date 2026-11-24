@@ -36,12 +36,12 @@ export function PersonSelect({
   placeholder?: string;
   allOption?: { value: string; label: string };
 }) {
-  const { viewer, isAdmin, isCoordinator, groupDepartments } = useWorkspace();
-  const canPick = canLogMemberTime(isAdmin, groupDepartments);
+  const { viewer, isAdmin, isCoordinator, groupOrganizations } = useWorkspace();
+  const canPick = canLogMemberTime(isAdmin, groupOrganizations);
   const { members } = useMembers({ enabled: canPick });
   if (!canPick) return null;
   const scoped = isCoordinator
-    ? members.filter((member) => (member.departmentIds ?? []).some((id) => groupDepartments.includes(id)))
+    ? members.filter((member) => (member.organizationIds ?? []).some((id) => groupOrganizations.includes(id)))
     : members;
 
   const options = selectableMembers(scoped, viewer.id, { excludeSelf, activeOnly }).map((member) => {

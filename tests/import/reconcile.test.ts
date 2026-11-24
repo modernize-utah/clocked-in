@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { departmentFields, peopleFields, projectFields } from "../../src/lib/import/fields.ts";
+import { organizationFields, peopleFields, projectFields } from "../../src/lib/import/fields.ts";
 import { parseCsv } from "../../src/lib/import/parse-csv.ts";
 import { fieldChoices, reconcile } from "../../src/lib/import/reconcile.ts";
 import { usernameFromEmail } from "../../src/lib/import/username.ts";
@@ -67,7 +67,7 @@ describe("reconcile", () => {
   });
 
   test("maps group and project columns from their own catalogs", () => {
-    const groups = reconcile(departmentFields("Group"), ["Group"], [["Kitchen"]]);
+    const groups = reconcile(organizationFields("Group"), ["Group"], [["Kitchen"]]);
     assert.equal(groups[0].field, "name");
     const projects = reconcile(
       projectFields("Group"),

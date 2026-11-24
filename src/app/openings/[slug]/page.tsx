@@ -31,7 +31,7 @@ async function PublicOpenings({ params }: { params: Promise<{ slug: string }> })
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-10">
       <div>
         <p className="text-sm text-muted-foreground">Volunteer openings</p>
-        <h1 className="text-3xl font-semibold">{catalog.organizationName}</h1>
+        <h1 className="text-3xl font-semibold">{catalog.tenantName}</h1>
         <p className="mt-2 text-sm text-muted-foreground">Anyone can browse these needs and send a sign-up request.</p>
       </div>
       {catalog.items.length === 0 ? (
@@ -45,7 +45,7 @@ async function PublicOpenings({ params }: { params: Promise<{ slug: string }> })
               <p className="mt-2 text-sm">
                 {need.remaining} of {need.countNeeded} spots open
               </p>
-              <Link href={`/volunteer/${need.token}`} className="mt-3 inline-block text-sm font-medium text-primary hover:underline">
+              <Link href={`/volunteer/${need.token}`} className="mt-3 inline-block text-sm font-medium">
                 Sign up
               </Link>
             </li>

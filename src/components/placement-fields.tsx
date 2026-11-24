@@ -5,18 +5,18 @@ import { XIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createLookupAction } from "@/app/actions/lookups";
 import { EntitySelect } from "@/components/entity-forms/entity-select";
-import { CreateDepartmentDialog, CreateTaskCategoryDialog } from "@/components/entity-forms/name-entity-form";
+import { CreateOrganizationDialog, CreateTaskCategoryDialog } from "@/components/entity-forms/name-entity-form";
 import { namedEntity, rememberLookup, upsertNamed } from "@/components/entity-forms/lookup-cache";
 import { CreateProjectDialog } from "@/components/entity-forms/project-form";
 import { Field } from "@/components/field";
 import { useActionMutation } from "@/hooks/use-action-mutation";
-import { organizationWide, type PlacementState } from "@/hooks/use-placement";
+import { tenantWide, type PlacementState } from "@/hooks/use-placement";
 import { useLabels } from "@/hooks/use-labels";
-import { useOrganization, useWorkspace } from "@/hooks/use-workspace";
+import { useTenant, useWorkspace } from "@/hooks/use-workspace";
 import { keys } from "@/lib/queries";
 import type { Project } from "@/lib/types";
 
-type Creating = "project" | "category" | "department" | null;
+type Creating = "project" | "category" | "organization" | null;
 type TagOption = { id: string; name: string };
 
 const projectTypeGroups = [
@@ -40,14 +40,14 @@ const none = "none";
 
 export function PlacementFields({
   state,
-  departmentIds,
+  organizationIds,
   embedded = false,
   optional = false,
 }: {
   state: PlacementState;
   /** Accepted so existing timer usage stays valid. Layout no longer changes with it. */
   compact?: boolean;
-  departmentIds?: string[];
+  organizationIds?: string[];
   /** Join a parent `alignedEntryGridClass` so these columns line up with date, start, and end. */
   embedded?: boolean;
   /** Allow leaving project and task category empty. */
@@ -58,9 +58,9 @@ export function PlacementFields({
     () => projectOptions(lookups.projects.filter((project) => project.isActive !== false)),
     [lookups.projects],
   );
-  const departments = departmentIds
-    ? lookups.departments.filter((item) => departmentIds.includes(item.id))
-    : lookups.departments;
+  const organizations = organizationIds
+    ? lookups.organizations.filter((item) => organizationIds.includes(item.id))
+    : lookups.organizations;
   const { isAdmin } = useWorkspace();
   const copy = useLabels();
   const [creating, setCreating] = useState<Creating>(null);
@@ -100,19 +100,19 @@ export function PlacementFields({
           onCreate={() => setCreating("category")}
         />
         <EntitySelect
-          label={copy.department}
-          value={value.departmentId}
-          onValueChange={(departmentId) => set({ departmentId })}
+          label={copy.organization}
+          value={value.organizationId}
+          onValueChange={(organizationId) => set({ organizationId })}
           options={
-            departmentIds
-              ? departments.map((item) => ({ value: item.id, label: item.name }))
+            organizationIds
+              ? organizations.map((item) => ({ value: item.id, label: item.name }))
               : [
-                  { value: organizationWide, label: `Whole ${copy.organization.toLowerCase()}` },
-                  ...departments.map((item) => ({ value: item.id, label: item.name })),
+                  { value: tenantWide, label: `Whole ${copy.tenant.toLowerCase()}` },
+                  ...organizations.map((item) => ({ value: item.id, label: item.name })),
                 ]
           }
-          createLabel={`Add a ${copy.department.toLowerCase()}`}
-          onCreate={departmentIds ? undefined : () => setCreating("department")}
+          createLabel={`Add a ${copy.organization.toLowerCase()}`}
+          onCreate={organizationIds ? undefined : () => setCreating("organization")}
         />
         {lookups.tags.length || isAdmin ? (
           <Field label='Tags' className={tagClass}>
@@ -135,10 +135,10 @@ export function PlacementFields({
         onOpenChange={(open) => !open && setCreating(null)}
         onCreated={(category) => set({ taskCategoryId: category.id })}
       />
-      <CreateDepartmentDialog
-        open={creating === "department"}
+      <CreateOrganizationDialog
+        open={creating === "organization"}
         onOpenChange={(open) => !open && setCreating(null)}
-        onCreated={(department) => set({ departmentId: department.id })}
+        onCreated={(organization) => set({ organizationId: organization.id })}
       />
     </>
   );
@@ -155,7 +155,7 @@ function TagInput({
   onChange: (ids: string[]) => void;
   canCreate: boolean;
 }) {
-  const organization = useOrganization();
+  const tenant = useTenant();
   const queryClient = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
   const selectedRef = useRef(selected);
@@ -165,16 +165,16 @@ function TagInput({
     selectedRef.current = selected;
   }, [selected]);
 
-  const create = useActionMutation((name: string) => createLookupAction("tags", organization.id, name), {
-    invalidate: [keys.lookups(organization.id)],
+  const create = useActionMutation((name: string) => createLookupAction("tags", tenant.id, name), {
+    invalidate: [keys.lookups(tenant.id)],
     silent: true,
     onSuccess: (data) => {
       if (!namedEntity(data)) return;
-      rememberLookup(queryClient, organization.id, (current) => ({
+      rememberLookup(queryClient, tenant.id, (current) => ({
         ...current,
         tags: upsertNamed(current.tags, {
           id: data.id,
-          organizationId: organization.id,
+          tenantId: tenant.id,
           name: data.name,
           isArchived: false,
         }),

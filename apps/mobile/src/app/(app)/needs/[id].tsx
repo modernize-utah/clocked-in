@@ -14,7 +14,7 @@ function origin() {
 export default function NeedDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const needId = Array.isArray(id) ? id[0] : id;
-  const { organization, permissions } = useWorkspace();
+  const { tenant, permissions } = useWorkspace();
   const client = useQueryClient();
   const need = useQuery({ queryKey: ["need", needId], queryFn: () => api.getNeed(needId), enabled: Boolean(needId) });
   const signups = useQuery({ queryKey: ["signups", needId], queryFn: () => api.signups(needId), enabled: Boolean(needId) });
@@ -27,7 +27,7 @@ export default function NeedDetailScreen() {
   const refresh = async () => {
     await client.invalidateQueries({ queryKey: ["need", needId] });
     await client.invalidateQueries({ queryKey: ["signups", needId] });
-    await client.invalidateQueries({ queryKey: ["needs", organization.id] });
+    await client.invalidateQueries({ queryKey: ["needs", tenant.id] });
   };
   const decide = useMutation({
     mutationFn: (status: "published" | "rejected") => api.decideNeed(needId, status),

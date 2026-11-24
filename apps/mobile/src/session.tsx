@@ -5,20 +5,20 @@ import type { Session, User } from "@/api/types";
 import { deleteSecret, readSecret, writeSecret } from "@/storage";
 
 const refreshKey = "voluntime.refreshToken";
-const organizationKey = "voluntime.organizationId";
+const tenantKey = "voluntime.tenantId";
 
 type Status = "loading" | "signedOut" | "password" | "ready";
 
 type SessionValue = {
   status: Status;
   user: User | null;
-  organizationId: string | null;
+  tenantId: string | null;
   login: (username: string, password: string) => Promise<void>;
   start: (session: Session) => Promise<void>;
   replaceUser: (user: User) => void;
   logout: () => Promise<void>;
   changePassword: (currentPassword: string, password: string) => Promise<void>;
-  setOrganizationId: (organizationId: string) => Promise<void>;
+  setTenantId: (tenantId: string) => Promise<void>;
   pendingPassword: string;
 };
 
@@ -32,7 +32,7 @@ async function persist(session: Session) {
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>("loading");
   const [user, setUser] = useState<User | null>(null);
-  const [organizationId, setOrganizationIdState] = useState<string | null>(null);
+  const [tenantId, setTenantIdState] = useState<string | null>(null);
   const [pendingPassword, setPendingPassword] = useState("");
 
   useEffect(() => {
@@ -42,7 +42,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
     let cancelled = false;
     (async () => {
-      const [refreshToken, storedOrganizationId] = await Promise.all([readSecret(refreshKey), readSecret(organizationKey)]);
+      const [refreshToken, storedTenantId] = await Promise.all([readSecret(refreshKey), readSecret(tenantKey)]);
       if (!refreshToken) {
         if (!cancelled) setStatus("signedOut");
         return;
@@ -52,7 +52,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
         await persist(session);
         setUser(session.user);
-        setOrganizationIdState(storedOrganizationId);
+        setTenantIdState(storedTenantId);
         setStatus(session.user.mustChangePassword ? "password" : "ready");
       } catch {
         await deleteSecret(refreshKey);
@@ -69,7 +69,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     () => ({
       status,
       user,
-      organizationId,
+      tenantId,
       pendingPassword,
       async login(username, password) {
         const session = await api.login(username.trim(), password);
@@ -108,12 +108,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setPendingPassword("");
         setStatus("ready");
       },
-      async setOrganizationId(next) {
-        setOrganizationIdState(next);
-        await writeSecret(organizationKey, next);
+      async setTenantId(next) {
+        setTenantIdState(next);
+        await writeSecret(tenantKey, next);
       },
     }),
-    [organizationId, pendingPassword, status, user],
+    [tenantId, pendingPassword, status, user],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

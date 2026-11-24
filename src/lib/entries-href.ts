@@ -34,7 +34,7 @@ export function entriesSearch(filter: EntriesHrefFilter) {
   set("person", single(filter.userId));
   set("projectId", single(filter.projectId));
   set("taskCategoryId", single(filter.taskCategoryId));
-  set("departmentId", single(filter.departmentId));
+  set("organizationId", single(filter.organizationId));
   if (filter.unclassified) params.set("unclassified", "1");
   if (filter.everyone) params.set("everyone", "1");
   const text = params.toString();
@@ -55,7 +55,7 @@ export function entriesHrefFromAccessor(
   const dimension = parts[1];
 
   if (side === "entries") {
-    if (dimension === "organization") filter.everyone = true;
+    if (dimension === "tenant") filter.everyone = true;
     return entriesHref(filter);
   }
 
@@ -71,8 +71,8 @@ export function entriesHrefFromAccessor(
       filter.taskCategoryId = [rowId];
     } else if (dimension === "byProject") {
       filter.projectId = [rowId];
-    } else if (dimension === "byDepartment" && rowId !== "organization") {
-      filter.departmentId = [rowId];
+    } else if (dimension === "byOrganization" && rowId !== "tenant") {
+      filter.organizationId = [rowId];
     } else if (dimension === "byPerson" || dimension === "byVolunteer") {
       filter.userId = [rowId];
       filter.everyone = false;

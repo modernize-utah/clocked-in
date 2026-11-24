@@ -20,8 +20,8 @@ import { body, run } from "@/lib/server/action";
 import { requireAccess } from "@/lib/server/session";
 
 export type Placement = {
-  organizationId: string;
-  departmentId: string | null;
+  tenantId: string;
+  organizationId: string | null;
   projectId: string | null;
   taskCategoryId: string | null;
   description: string | null;
@@ -89,7 +89,7 @@ export async function createDayEntriesAction(
 }
 
 export type EntryPatch = {
-  departmentId?: string | null;
+  organizationId?: string | null;
   projectId?: string | null;
   taskCategoryId?: string | null;
   description?: string | null;
@@ -142,7 +142,7 @@ export async function clockOutAction(
     tagIds?: string[];
     projectId?: string | null;
     taskCategoryId?: string | null;
-    departmentId?: string | null;
+    organizationId?: string | null;
   } = {},
 ) {
   return run(async () => {

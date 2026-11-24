@@ -34,7 +34,7 @@ export function HourlyRateSelect({
   if (locked) {
     return (
       <Field label="Hourly rate" hint="Volunteer default. This cannot be changed.">
-        <p className="flex h-10 items-center text-sm">
+        <p className="flex h-11 items-center text-base">
           {selected ? `${selected.name} · ${formatCurrency(selected.perHourRate)}/h` : "Volunteer default"}
         </p>
       </Field>
@@ -49,7 +49,6 @@ export function HourlyRateSelect({
         onValueChange={onValueChange}
         options={options}
         disabled={disabled || options.length === 0}
-        className="h-10"
       />
     </Field>
   );

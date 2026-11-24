@@ -22,11 +22,11 @@ function blankQuestion(): NeedQuestion {
 }
 
 export function NeedForm({ need, onSaved }: { need?: VolunteerNeed; onSaved: () => void }) {
-  const { organization } = useWorkspace();
+  const { tenant } = useWorkspace();
   const client = useQueryClient();
   const placement = usePlacement(
     need
-      ? { departmentId: need.departmentId ?? undefined, projectId: need.projectId ?? "", taskCategoryId: need.taskCategoryId ?? "" }
+      ? { organizationId: need.organizationId ?? undefined, projectId: need.projectId ?? "", taskCategoryId: need.taskCategoryId ?? "" }
       : undefined,
   );
   const [name, setName] = useState(need?.name ?? "");
@@ -69,12 +69,12 @@ export function NeedForm({ need, onSaved }: { need?: VolunteerNeed; onSaved: () 
         questions: form,
         projectId: placed.projectId,
         taskCategoryId: placed.taskCategoryId,
-        departmentId: placed.departmentId,
+        organizationId: placed.organizationId,
       };
-      return need ? api.updateNeed(need.id, body) : api.createNeed(organization.id, body);
+      return need ? api.updateNeed(need.id, body) : api.createNeed(tenant.id, body);
     },
     onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: ["needs", organization.id] });
+      await client.invalidateQueries({ queryKey: ["needs", tenant.id] });
       onSaved();
     },
     onError: setError,

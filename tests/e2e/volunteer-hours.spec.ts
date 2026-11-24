@@ -31,7 +31,7 @@ test.afterAll(async ({ request }) => {
 
 test("volunteer logs Duration and Total and does not see Reports", async ({ page, request }) => {
   await createOrgPerson(request, person);
-  const organization = await loginAs(page, person.username, person.password);
+  const tenant = await loginAs(page, person.username, person.password);
   await page.goto("/log/own");
   await page.getByRole("tab", { name: "Manual" }).click();
   await expect(page.getByText("Add time manually")).toBeVisible();
@@ -59,8 +59,8 @@ test("volunteer logs Duration and Total and does not see Reports", async ({ page
   });
   expect(volunteerSession.ok(), await volunteerSession.text()).toBeTruthy();
   const volunteer = (await volunteerSession.json()) as { accessToken: string };
-  const mine = await getReport(page.request, organization.id, volunteer.accessToken);
-  const all = await getReport(page.request, organization.id, session.accessToken);
+  const mine = await getReport(page.request, tenant.id, volunteer.accessToken);
+  const all = await getReport(page.request, tenant.id, session.accessToken);
   expect(mine.user.hours).toBe(3);
   expect(all.user.hours).toBeGreaterThan(mine.user.hours);
 });

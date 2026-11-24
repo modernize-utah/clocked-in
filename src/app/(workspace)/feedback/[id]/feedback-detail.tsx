@@ -54,7 +54,7 @@ function loadError(error: Error) {
   }
 
   if (error instanceof HttpError && error.status === 403) {
-    return "Only the sender, an organization admin, or a super admin can open this feedback.";
+    return "Only the sender, an tenant admin, or a super admin can open this feedback.";
   }
 
   return error.message;
@@ -459,8 +459,8 @@ function FeedbackEditor({ feedback, canUpdateStatus }: { feedback: Feedback; can
                 {formatPersonName(feedback.user)} ({feedback.user.username})
               </span>
             </MetaRow>
-            <MetaRow icon={Building2Icon} label="Organization">
-              <span className="text-foreground">{feedback.organization?.name ?? "—"}</span>
+            <MetaRow icon={Building2Icon} label="Tenant">
+              <span className="text-foreground">{feedback.tenant?.name ?? "—"}</span>
             </MetaRow>
             <MetaRow icon={TagIcon} label="Linear">
               {feedback.ticketUrl ? (

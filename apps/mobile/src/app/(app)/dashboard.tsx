@@ -20,15 +20,15 @@ function webOrigin() {
 }
 
 export default function DashboardScreen() {
-  const { viewer, organization, isAdmin } = useWorkspace();
+  const { viewer, tenant, isAdmin } = useWorkspace();
   const saved = useQuery({
-    queryKey: ["saved-reports", organization.id],
-    queryFn: () => api.savedReports(organization.id),
+    queryKey: ["saved-reports", tenant.id],
+    queryFn: () => api.savedReports(tenant.id),
   });
   const dashboard = saved.data?.items.find((item) => item.isDashboard);
   const report = useQuery({
-    queryKey: ["report", organization.id, dashboard?.id ?? "default"],
-    queryFn: () => api.report(organization.id, dashboard?.filters.from || dashboard?.filters.to ? { from: dashboard.filters.from, to: dashboard.filters.to } : undefined),
+    queryKey: ["report", tenant.id, dashboard?.id ?? "default"],
+    queryFn: () => api.report(tenant.id, dashboard?.filters.from || dashboard?.filters.to ? { from: dashboard.filters.from, to: dashboard.filters.to } : undefined),
   });
   if (saved.isLoading || report.isLoading) return <Loading />;
   const cards = (dashboard?.layout.cards as ReportCard[] | undefined) ?? defaultDashboardCards();

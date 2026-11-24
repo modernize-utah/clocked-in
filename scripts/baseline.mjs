@@ -70,12 +70,12 @@ export async function verifyBaseline(target, reference) {
     }
   }
   const referenceQueries = {
-    roles: `SELECT id, code, name, "isSystem" FROM "Role" WHERE "organizationId" IS NULL
-      AND scope IN ('organization', 'assigned_groups', 'self') ORDER BY id`,
-    themes: `SELECT id FROM "Theme" WHERE "organizationId" IS NULL ORDER BY id`,
-    templates: `SELECT id, key FROM "ReportTemplate" WHERE "organizationId" IS NULL ORDER BY id`,
+    roles: `SELECT id, code, name, "isSystem" FROM "Role" WHERE "tenantId" IS NULL
+      AND scope IN ('tenant', 'assigned_groups', 'self') ORDER BY id`,
+    themes: `SELECT id FROM "Theme" WHERE "tenantId" IS NULL ORDER BY id`,
+    templates: `SELECT id, key FROM "ReportTemplate" WHERE "tenantId" IS NULL ORDER BY id`,
     permissions: `SELECT p."roleId", p.permission, p.allowed FROM "RolePermission" p
-      JOIN "Role" r ON r.id=p."roleId" WHERE r."organizationId" IS NULL ORDER BY p."roleId", p.permission`,
+      JOIN "Role" r ON r.id=p."roleId" WHERE r."tenantId" IS NULL ORDER BY p."roleId", p.permission`,
   };
   for (const [name, sql] of Object.entries(referenceQueries)) {
     const required = (await reference.query(sql)).rows.map((row) => JSON.stringify(row));

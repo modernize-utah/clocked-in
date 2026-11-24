@@ -39,7 +39,7 @@ function webOrigin() {
 
 function queryFrom(filters: ReportFilters) {
   return {
-    departmentId: filters.departmentId?.join(","),
+    organizationId: filters.organizationId?.join(","),
     taskCategoryId: filters.taskCategoryId?.join(","),
     projectId: filters.projectId?.join(","),
     userId: filters.userId?.join(","),
@@ -52,14 +52,14 @@ export default function ReportsScreen() {
   const workspace = useWorkspace();
   const colors = useColors();
   const client = useQueryClient();
-  const { labels, organization, isAdmin, permissions } = workspace;
+  const { labels, tenant, isAdmin, permissions } = workspace;
   const canDesign = isAdmin || permissions.includes("design_reports");
   const allowed = canSeeReports(workspace);
   const payrollAllowed = canViewPayroll(workspace);
   const { lookups } = useLookups();
   const saved = useQuery({
-    queryKey: ["saved-reports", organization.id],
-    queryFn: () => api.savedReports(organization.id),
+    queryKey: ["saved-reports", tenant.id],
+    queryFn: () => api.savedReports(tenant.id),
     enabled: allowed,
   });
   const custom = (saved.data?.items ?? []).filter((item) => !item.isDashboard);
@@ -76,13 +76,13 @@ export default function ReportsScreen() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [downloadError, setDownloadError] = useState<unknown>(null);
   const report = useQuery({
-    queryKey: ["report", organization.id, active, filters],
-    queryFn: () => api.report(organization.id, queryFrom(filters)),
+    queryKey: ["report", tenant.id, active, filters],
+    queryFn: () => api.report(tenant.id, queryFrom(filters)),
     enabled: allowed && active !== "payroll",
   });
   const payroll = useQuery({
-    queryKey: ["payroll", organization.id, filters],
-    queryFn: () => api.payroll(organization.id),
+    queryKey: ["payroll", tenant.id, filters],
+    queryFn: () => api.payroll(tenant.id),
     enabled: allowed && payrollAllowed && active === "payroll",
   });
   const options = useMemo(
@@ -95,22 +95,22 @@ export default function ReportsScreen() {
   );
   const cards: ReportCard[] = current?.layout.cards?.length ? current.layout.cards : standardCards(active, labels);
   const save = useMutation({
-    mutationFn: () => api.updateSavedReport(organization.id, current!.id, { filters }),
-    onSuccess: () => client.invalidateQueries({ queryKey: ["saved-reports", organization.id] }),
+    mutationFn: () => api.updateSavedReport(tenant.id, current!.id, { filters }),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["saved-reports", tenant.id] }),
   });
   const remove = useMutation({
-    mutationFn: () => api.deleteSavedReport(organization.id, current!.id),
+    mutationFn: () => api.deleteSavedReport(tenant.id, current!.id),
     onSuccess: async () => {
       setConfirmDelete(false);
       setSelected("summary");
-      await client.invalidateQueries({ queryKey: ["saved-reports", organization.id] });
+      await client.invalidateQueries({ queryKey: ["saved-reports", tenant.id] });
     },
   });
 
   async function download(kind: "time-entries.csv" | "summary.csv" | "view.csv" | "payroll.csv", filename: string) {
     try {
       setDownloadError(null);
-      const text = await api.download(`/organizations/${organization.id}/${kind}`, queryFrom(filters));
+      const text = await api.download(`/tenants/${tenant.id}/${kind}`, queryFrom(filters));
       await saveTextFile(filename, text);
     } catch (error) {
       setDownloadError(error);
@@ -189,10 +189,10 @@ export default function ReportsScreen() {
       <Sheet onClose={() => setFiltersOpen(false)} open={filtersOpen} title="Filters">
         <DateRangeField onChange={(next) => setFilters((currentFilters) => ({ ...currentFilters, from: next.from, to: next.to }))} value={range} />
         <FilterChoices
-          label={labels.department}
-          onChange={(departmentId) => setFilters((currentFilters) => ({ ...currentFilters, departmentId }))}
-          options={lookups.departments.map((item) => ({ id: item.id, label: item.name }))}
-          selected={filters.departmentId ?? []}
+          label={labels.organization}
+          onChange={(organizationId) => setFilters((currentFilters) => ({ ...currentFilters, organizationId }))}
+          options={lookups.organizations.map((item) => ({ id: item.id, label: item.name }))}
+          selected={filters.organizationId ?? []}
         />
         <FilterChoices
           label={labels.taskCategory}

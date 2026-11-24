@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { useOrganization } from "@/hooks/use-workspace";
+import { useTenant } from "@/hooks/use-workspace";
 import { apiGroups, defaultOperationId, type ApiContract, type ApiOperation } from "@/lib/developer/api-catalog";
 import { cn } from "cn";
 
@@ -20,10 +20,10 @@ const methodVariant = {
   DELETE: "destructive",
 } as const;
 
-function organizationValue(operation: ApiOperation, organizationId: string, name: string) {
-  if (name === "organizationId") return organizationId;
-  if (name === "id" && (operation.path === "/organizations/{id}" || operation.path.startsWith("/organizations/{id}/"))) {
-    return organizationId;
+function tenantValue(operation: ApiOperation, tenantId: string, name: string) {
+  if (name === "tenantId") return tenantId;
+  if (name === "id" && (operation.path === "/tenants/{id}" || operation.path.startsWith("/tenants/{id}/"))) {
+    return tenantId;
   }
   return "";
 }
@@ -54,22 +54,22 @@ function ContractList({ heading, contracts }: { heading: string; contracts: ApiC
   );
 }
 
-function initialValues(operation: ApiOperation, organizationId: string) {
+function initialValues(operation: ApiOperation, tenantId: string) {
   return Object.fromEntries(
     operation.parameters.filter((parameter) => parameter.location === "path").map((parameter) => [
       parameter.name,
-      organizationValue(operation, organizationId, parameter.name),
+      tenantValue(operation, tenantId, parameter.name),
     ]),
   );
 }
 
 export function ApiView() {
-  const organization = useOrganization();
+  const tenant = useTenant();
   const operations = useMemo(() => apiGroups.flatMap((group) => group.operations), []);
   const [selectedId, setSelectedId] = useState(defaultOperationId);
   const operation = operations.find((item) => item.id === selectedId) ?? operations[0];
   const [pathValues, setPathValues] = useState<Record<string, string>>(() =>
-    operation ? initialValues(operation, organization.id) : {},
+    operation ? initialValues(operation, tenant.id) : {},
   );
   const [queryValues, setQueryValues] = useState<Record<string, string>>({});
   const [body, setBody] = useState("");
@@ -80,7 +80,7 @@ export function ApiView() {
 
   function select(next: ApiOperation) {
     setSelectedId(next.id);
-    setPathValues(initialValues(next, organization.id));
+    setPathValues(initialValues(next, tenant.id));
     setQueryValues({});
     setBody("");
     setError(null);
@@ -160,7 +160,7 @@ export function ApiView() {
           <CardTitle>HTTP API</CardTitle>
           <CardDescription>
             Calls use your signed-in admin session. External clients send <span className="font-mono text-xs">Authorization: Bearer</span> or{" "}
-            <span className="font-mono text-xs">X-Api-Key</span> with an organization API key. Lists take <span className="font-mono text-xs">limit</span>{" "}
+            <span className="font-mono text-xs">X-Api-Key</span> with an tenant API key. Lists take <span className="font-mono text-xs">limit</span>{" "}
             (1–100, default 50) and <span className="font-mono text-xs">offset</span>. Errors are{" "}
             <span className="font-mono text-xs">{`{ "code", "message" }`}</span>: 400 validation_error, 401 unauthorized, 403 forbidden, 404 not_found,
             409 conflict.
@@ -302,7 +302,7 @@ export function ApiView() {
         open={confirming}
         onOpenChange={setConfirming}
         title={`Send DELETE ${operation.path}?`}
-        description="This runs against the live organization and cannot be undone."
+        description="This runs against the live tenant and cannot be undone."
         confirmLabel="Send"
         onConfirm={() => {
           setConfirming(false);

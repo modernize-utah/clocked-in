@@ -2,7 +2,7 @@
  * Multi-day time entry. Runs locally and on staging. Production stays on the read-only crawl.
  */
 import { expect, test, type APIRequestContext } from "@playwright/test";
-import { deleteE2eEntries, loginAsAdmin, loginBearer, sessionOrganization } from "./helpers";
+import { deleteE2eEntries, loginAsAdmin, loginBearer, sessionTenant } from "./helpers";
 
 test.afterEach(async ({ request }) => {
   await deleteE2eEntries(request);
@@ -11,12 +11,12 @@ test.afterEach(async ({ request }) => {
 
 async function deleteRecentE2eEntries(request: APIRequestContext) {
   const session = await loginBearer(request);
-  const organization = await sessionOrganization(request, session.accessToken);
+  const tenant = await sessionTenant(request, session.accessToken);
   const today = new Date();
   const from = localDate(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 3));
   const headers = { authorization: `Bearer ${session.accessToken}` };
   const listed = await request.get(
-    `/users/${session.user.id}/time-entries?organizationId=${organization.id}&from=${from}&to=${localDate(today)}&limit=100`,
+    `/users/${session.user.id}/time-entries?tenantId=${tenant.id}&from=${from}&to=${localDate(today)}&limit=100`,
     { headers },
   );
   expect(listed.ok(), await listed.text()).toBeTruthy();
@@ -34,7 +34,7 @@ function localDate(date: Date) {
 }
 
 test("adding days saves the same entry once per day", async ({ page }) => {
-  const organization = await loginAsAdmin(page);
+  const tenant = await loginAsAdmin(page);
   await page.goto("/log/own");
   await page.getByRole("tab", { name: "Manual" }).click();
   await expect(page.getByText("Add time manually")).toBeVisible();
@@ -76,7 +76,7 @@ test("adding days saves the same entry once per day", async ({ page }) => {
 
   const session = await loginBearer(page.request);
   const listed = await page.request.get(
-    `/users/${session.user.id}/time-entries?organizationId=${organization.id}&from=${yesterdayValue}&to=${todayValue}&limit=100`,
+    `/users/${session.user.id}/time-entries?tenantId=${tenant.id}&from=${yesterdayValue}&to=${todayValue}&limit=100`,
     { headers: { authorization: `Bearer ${session.accessToken}` } },
   );
   expect(listed.ok(), await listed.text()).toBeTruthy();
@@ -88,7 +88,7 @@ test("adding days saves the same entry once per day", async ({ page }) => {
         durationMinutes: number;
         projectId: string;
         taskCategoryId: string;
-        departmentId: string | null;
+        organizationId: string | null;
         startedAt: string | null;
         endedAt: string | null;
       }[];
@@ -98,7 +98,7 @@ test("adding days saves the same entry once per day", async ({ page }) => {
   expect(new Set(matches.map((item) => item.durationMinutes)).size).toBe(1);
   expect(new Set(matches.map((item) => item.projectId)).size).toBe(1);
   expect(new Set(matches.map((item) => item.taskCategoryId)).size).toBe(1);
-  expect(new Set(matches.map((item) => item.departmentId)).size).toBe(1);
+  expect(new Set(matches.map((item) => item.organizationId)).size).toBe(1);
   expect(matches.every((item) => item.startedAt && item.endedAt)).toBeTruthy();
 
   await page.goto("/log/member");

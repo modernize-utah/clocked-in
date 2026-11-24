@@ -33,7 +33,7 @@ export const workbookPath = path.resolve(process.cwd(), process.env.CASWJ_WORKBO
 export const anonWorkbookPath = path.resolve(process.cwd(), "docs/base/clockify-export-ANONYMIZED-sample.xlsx");
 export const fallbackProjectTitle = "No Specific Project";
 export const caswjSourceRefPrefix = "caswj-log:";
-export const departmentNames = [
+export const organizationNames = [
   "Literary Arts Society",
   "Sugar Factory Playhouse",
   "Visual Arts Society",
@@ -44,9 +44,9 @@ export const departmentNames = [
   "West Jordan Youth Theatre",
 ];
 export const caswjLabels = {
-  organization: "Organization",
+  tenant: "Tenant",
   project: "Project / Event",
-  department: "Group",
+  organization: "Group",
   taskCategory: "Task Category",
 };
 
@@ -112,7 +112,7 @@ export type ExpectedCaswjReport = {
   volunteers: number;
   entries: number;
   inKind: number;
-  byDepartment: ReportGroup[];
+  byOrganization: ReportGroup[];
   byCategory: ReportGroup[];
   byPerson: ReportGroup[];
   byVolunteer: ReportGroup[];
@@ -224,13 +224,13 @@ function columnIndex(row: ExcelJS.Row) {
   };
 }
 
-function matchDepartment(group: string) {
+function matchOrganization(group: string) {
   const key = group.trim().toLowerCase();
   if (!key) {
     return "";
   }
 
-  return departmentNames.find((name) => key.includes(name.toLowerCase()) || name.toLowerCase().includes(key)) ?? group;
+  return organizationNames.find((name) => key.includes(name.toLowerCase()) || name.toLowerCase().includes(key)) ?? group;
 }
 
 export function asNumber(value: unknown) {
@@ -519,7 +519,7 @@ export async function loadClockifyExport(filePath = anonWorkbookPath): Promise<C
     const email = text(cell(row.getCell(cols("email") || 7).value));
     const projectTitle = text(cell(row.getCell(cols("project") || 1).value)) || fallbackProjectTitle;
     const category = text(cell(row.getCell(cols("task") || 4).value)) || "Imported hours";
-    const group = matchDepartment(text(cell(row.getCell(cols("group") || 6).value)));
+    const group = matchOrganization(text(cell(row.getCell(cols("group") || 6).value)));
     const notes = text(cell(row.getCell(cols("description") || 3).value));
     const tags = text(cell(row.getCell(cols("tags") || 8).value))
       .split(",")
@@ -584,14 +584,14 @@ function ordinal(a: string, b: string) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-function departmentOf(group: string) {
+function organizationOf(group: string) {
   const key = group.trim().toLowerCase();
   if (!key || key === "caswj") {
-    return { id: "organization", label: orgName };
+    return { id: "tenant", label: orgName };
   }
 
-  const name = departmentNames.find((department) => department.toLowerCase() === key);
-  return name ? { id: name.toLowerCase(), label: name } : { id: "organization", label: orgName };
+  const name = organizationNames.find((organization) => organization.toLowerCase() === key);
+  return name ? { id: name.toLowerCase(), label: name } : { id: "tenant", label: orgName };
 }
 
 function personOf(people: Map<string, CaswjPerson>, volunteer: string) {
@@ -611,7 +611,7 @@ function sorted(rows: ReportGroup[]) {
 export function expectedCaswjReport(data: CaswjWorkbook): ExpectedCaswjReport {
   type Bucket = { id: string; label: string; minutes: number; inKindCents: number; entries: number; users: Set<string> };
   const buckets = {
-    department: new Map<string, Bucket>(),
+    organization: new Map<string, Bucket>(),
     category: new Map<string, Bucket>(),
     person: new Map<string, Bucket>(),
     project: new Map<string, Bucket>(),
@@ -631,9 +631,9 @@ export function expectedCaswjReport(data: CaswjWorkbook): ExpectedCaswjReport {
   for (const row of data.logRows) {
     const minutes = Math.round(row.hours * 60);
     const inKindCents = cents(inKindFromMinutes(minutes, money(row.hourlyRate)));
-    const department = departmentOf(row.group);
+    const organization = organizationOf(row.group);
     const person = personOf(data.people, row.volunteer);
-    add(buckets.department, department.id, department.label, minutes, inKindCents, person.id);
+    add(buckets.organization, organization.id, organization.label, minutes, inKindCents, person.id);
     add(buckets.category, row.category.toLowerCase(), row.category, minutes, inKindCents, person.id);
     add(buckets.project, row.project.toLowerCase(), row.project, minutes, inKindCents, person.id);
     add(buckets.person, person.id, person.label, minutes, inKindCents, person.id);
@@ -665,7 +665,7 @@ export function expectedCaswjReport(data: CaswjWorkbook): ExpectedCaswjReport {
     volunteers: people.length,
     entries: data.logRows.length,
     inKind: personBuckets.reduce((sum, row) => sum + row.inKindCents, 0) / 100,
-    byDepartment: sorted(groups(buckets.department)),
+    byOrganization: sorted(groups(buckets.organization)),
     byCategory: sorted(groups(buckets.category)),
     byPerson: people,
     byVolunteer: sorted(

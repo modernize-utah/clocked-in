@@ -1,5 +1,5 @@
 import { createContext, useContext, type ReactNode } from "react";
-import type { Organization, Theme } from "@/api/types";
+import type { Tenant, Theme } from "@/api/types";
 
 export type Colors = {
   primary: string;
@@ -111,19 +111,19 @@ function pluralize(label: string) {
   return `${label}s`;
 }
 
-export function entityLabels(organization?: Organization | null) {
-  const labels = organization?.preferences.entityLabels;
+export function entityLabels(tenant?: Tenant | null) {
+  const labels = tenant?.preferences.entityLabels;
   const entity = {
-    organization: labels?.organization || "Organization",
+    tenant: labels?.tenant || "Tenant",
     project: labels?.project || "Project",
-    department: labels?.department || "Department",
+    organization: labels?.organization || "Organization",
     taskCategory: labels?.taskCategory || "Task category",
   };
   return {
     ...entity,
-    organizations: pluralize(entity.organization),
+    tenants: pluralize(entity.tenant),
     projects: pluralize(entity.project),
-    departments: pluralize(entity.department),
+    organizations: pluralize(entity.organization),
     taskCategories: pluralize(entity.taskCategory),
   };
 }

@@ -45,7 +45,7 @@ test("add person closes on success and shows a conflict in the dialog", async ({
   await fillAddPerson(dialog, person);
   await dialog.getByRole("button", { name: "Add person" }).click();
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole("alert")).toHaveText("This person is already in the organization.");
+  await expect(dialog.getByRole("alert")).toHaveText("This person is already in the tenant.");
   await expect(dialog.getByRole("alert")).toBeVisible();
 });
 

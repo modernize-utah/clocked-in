@@ -40,17 +40,17 @@ test("coordinator logs for a group member and sees only that group on Reports", 
   const session = await loginBearer(request);
   const headers = { authorization: `Bearer ${session.accessToken}` };
   const created = await createOrgPerson(request, coordinator);
-  const lookups = await request.get(`/organizations/${created.organization.id}/lookups`, { headers });
+  const lookups = await request.get(`/tenants/${created.tenant.id}/lookups`, { headers });
   expect(lookups.ok(), await lookups.text()).toBeTruthy();
-  const catalog = (await lookups.json()) as { departments: { id: string; name: string }[] };
-  const department = catalog.departments.find((item) => item.name === "Visual Arts Society") ?? catalog.departments[0];
-  expect(department, "department").toBeTruthy();
-  const assigned = await request.patch(`/organizations/${created.organization.id}/memberships/${created.membership.id}`, {
-    headers, data: { departmentIds: [department.id] },
+  const catalog = (await lookups.json()) as { organizations: { id: string; name: string }[] };
+  const organization = catalog.organizations.find((item) => item.name === "Visual Arts Society") ?? catalog.organizations[0];
+  expect(organization, "organization").toBeTruthy();
+  const assigned = await request.patch(`/tenants/${created.tenant.id}/memberships/${created.membership.id}`, {
+    headers, data: { organizationIds: [organization.id] },
   });
   expect(assigned.ok(), await assigned.text()).toBeTruthy();
-  await makeCoordinator(request, created.membership.userId, department.id);
-  await createOrgPerson(request, { ...member, departmentIds: [department.id] });
+  await makeCoordinator(request, created.membership.userId, organization.id);
+  await createOrgPerson(request, { ...member, organizationIds: [organization.id] });
 
   await loginAs(page, coordinator.username, coordinator.password);
   await page.getByRole("button", { name: "Account menu" }).click();
@@ -71,8 +71,8 @@ test("coordinator logs for a group member and sees only that group on Reports", 
   await page.getByRole("button", { name: "Choose report" }).click();
   await expect(page.getByRole("menuitem", { name: "Summary" })).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.getByText(department.name, { exact: true }).first()).toBeVisible();
-  const other = catalog.departments.find((item) => item.id !== department.id);
+  await expect(page.getByText(organization.name, { exact: true }).first()).toBeVisible();
+  const other = catalog.organizations.find((item) => item.id !== organization.id);
   if (other) {
     await expect(page.getByText(other.name, { exact: true })).toHaveCount(0);
   }

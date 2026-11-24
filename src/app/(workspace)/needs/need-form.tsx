@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useActionMutation } from "@/hooks/use-action-mutation";
 import { useLookups } from "@/hooks/use-lookups";
 import { CreateProjectDialog } from "@/components/entity-forms/project-form";
-import { useOrganization, useWorkspace } from "@/hooks/use-workspace";
+import { useTenant, useWorkspace } from "@/hooks/use-workspace";
 import { keys } from "@/lib/queries";
 import type { VolunteerNeed } from "@/lib/types";
 
@@ -29,7 +29,7 @@ function localInput(value: string | null) {
 }
 
 export function NeedForm({ need, onDone }: { need?: VolunteerNeed; onDone: () => void }) {
-  const organization = useOrganization();
+  const tenant = useTenant();
   const { permissions } = useWorkspace();
   const { lookups } = useLookups();
   const [creatingProject, setCreatingProject] = useState(false);
@@ -43,13 +43,13 @@ export function NeedForm({ need, onDone }: { need?: VolunteerNeed; onDone: () =>
   const [allowPublic, setAllowPublic] = useState(need?.allowPublic ?? false);
   const [requireVetting, setRequireVetting] = useState(need?.requireVetting ?? false);
   const [projectId, setProjectId] = useState(need?.projectId ?? none);
-  const [departmentId, setDepartmentId] = useState(need?.departmentId ?? none);
+  const [organizationId, setOrganizationId] = useState(need?.organizationId ?? none);
   const [taskCategoryId, setTaskCategoryId] = useState(need?.taskCategoryId ?? none);
   const [questions, setQuestions] = useState<QuestionDraft[]>(need?.questions.items ?? []);
   const save = useActionMutation(
-    (body: Record<string, unknown>) => (need ? updateNeedAction(need.id, body) : createNeedAction(organization.id, body)),
+    (body: Record<string, unknown>) => (need ? updateNeedAction(need.id, body) : createNeedAction(tenant.id, body)),
     {
-      invalidate: [keys.needs(organization.id), ...(need ? [keys.need(need.id)] : [])],
+      invalidate: [keys.needs(tenant.id), ...(need ? [keys.need(need.id)] : [])],
       onSuccess: onDone,
     },
   );
@@ -76,7 +76,7 @@ export function NeedForm({ need, onDone }: { need?: VolunteerNeed; onDone: () =>
           allowPublic,
           requireVetting,
           projectId: optionalId(projectId),
-          departmentId: optionalId(departmentId),
+          organizationId: optionalId(organizationId),
           taskCategoryId: optionalId(taskCategoryId),
           questions: { version: 1, items: questions },
         });
@@ -143,9 +143,9 @@ export function NeedForm({ need, onDone }: { need?: VolunteerNeed; onDone: () =>
       <Field label="Group">
         <SelectField
           aria-label="Group"
-          value={departmentId}
-          options={[{ value: none, label: "None" }, ...lookups.departments.map((department) => ({ value: department.id, label: department.name }))]}
-          onValueChange={setDepartmentId}
+          value={organizationId}
+          options={[{ value: none, label: "None" }, ...lookups.organizations.map((organization) => ({ value: organization.id, label: organization.name }))]}
+          onValueChange={setOrganizationId}
         />
       </Field>
       <label className="flex items-center gap-2 text-sm">

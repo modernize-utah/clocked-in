@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { useActionMutation } from "@/hooks/use-action-mutation";
 import { useClientRedirect } from "@/hooks/use-client-redirect";
 import { useLookups } from "@/hooks/use-lookups";
-import { useOrganization, useWorkspace } from "@/hooks/use-workspace";
+import { useTenant, useWorkspace } from "@/hooks/use-workspace";
 import { formatDate } from "@/lib/format";
 import { isOwnedNeed, needStatusLabel, needStatusRank, needStatusVariant } from "@/lib/need-status";
 import { keys, needsQuery } from "@/lib/queries";
@@ -35,12 +35,12 @@ function dates(need: VolunteerNeed) {
 
 export function NeedsView() {
   const router = useRouter();
-  const organization = useOrganization();
-  const { viewer, isAdmin, isCoordinator, permissions, groupDepartments } = useWorkspace();
+  const tenant = useTenant();
+  const { viewer, isAdmin, isCoordinator, permissions, groupOrganizations } = useWorkspace();
   const { names } = useLookups();
   const canApprove = permissions.includes("approve_needs");
   useClientRedirect(!(isAdmin || isCoordinator || permissions.includes("create_needs")), "/dashboard");
-  const { data, isPending } = useQuery(needsQuery(organization.id));
+  const { data, isPending } = useQuery(needsQuery(tenant.id));
   const [search, setSearch] = useState("");
   const [type, setType] = useState("all");
   const [visibility, setVisibility] = useState("all");
@@ -49,7 +49,7 @@ export function NeedsView() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [creating, setCreating] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<VolunteerNeed | null>(null);
-  const invalidate = [keys.needs(organization.id)];
+  const invalidate = [keys.needs(tenant.id)];
   const remove = useActionMutation((id: string) => deleteNeedAction(id), {
     invalidate,
     onSuccess: () => setPendingDelete(null),
@@ -66,14 +66,14 @@ export function NeedsView() {
   const rows = useMemo(() => {
     const needle = search.trim().toLowerCase();
     const filtered = (data?.items ?? []).filter((need) => {
-      if (!isAdmin && !isOwnedNeed(need, viewer.id, groupDepartments)) return false;
+      if (!isAdmin && !isOwnedNeed(need, viewer.id, groupOrganizations)) return false;
       if (type !== "all" && need.type !== type) return false;
       if (visibility === "public" && !need.allowPublic) return false;
       if (visibility === "private" && need.allowPublic) return false;
       if (status !== "all" && need.status !== status) return false;
       if (!needle) return true;
       const project = need.projectId ? names.project.get(need.projectId) : "";
-      const group = need.departmentId ? names.department.get(need.departmentId) : "";
+      const group = need.organizationId ? names.organization.get(need.organizationId) : "";
       return `${need.name} ${need.description ?? ""} ${project ?? ""} ${group ?? ""}`.toLowerCase().includes(needle);
     });
     return [...filtered].sort((left, right) => {
@@ -85,7 +85,7 @@ export function NeedsView() {
       const b = sortKey === "countVetted" ? String(right.countVetted).padStart(6, "0") : (right[sortKey] ?? "");
       return a.localeCompare(b) * (sortDir === "asc" ? 1 : -1);
     });
-  }, [data?.items, groupDepartments, isAdmin, names.department, names.project, search, sortDir, sortKey, status, type, viewer.id, visibility]);
+  }, [data?.items, groupOrganizations, isAdmin, names.organization, names.project, search, sortDir, sortKey, status, type, viewer.id, visibility]);
 
   if (isPending) return <PageSkeleton rows={8} />;
 
@@ -173,8 +173,8 @@ export function NeedsView() {
 
   const description = canApprove
     ? pendingCount
-      ? `${pendingCount} waiting for review. You see every need in the organization.`
-      : "You see every need in the organization."
+      ? `${pendingCount} waiting for review. You see every need in the tenant.`
+      : "You see every need in the tenant."
     : "Needs you posted, and needs for groups you lead. Pending needs wait for an admin to publish.";
 
   return (

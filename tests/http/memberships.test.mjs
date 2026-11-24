@@ -26,47 +26,47 @@ describe("memberships", suite, () => {
     ctx.admin = await signUp("memadmin");
     ctx.member = await signUp("memmember");
     ctx.second = await signUp("memsecond");
-    ctx.departmentAdmin = await signUp("memdept");
-    ctx.org = await createJson(ctx.admin.accessToken, "/organizations", { name: label("Membership org") });
-    ctx.otherOrg = await createJson(ctx.admin.accessToken, "/organizations", { name: label("Other membership org") });
-    ctx.department = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/departments`, {
-      name: label("Membership department"),
+    ctx.tenantAdmin = await signUp("memdept");
+    ctx.org = await createJson(ctx.admin.accessToken, "/tenants", { name: label("Membership org") });
+    ctx.otherOrg = await createJson(ctx.admin.accessToken, "/tenants", { name: label("Other membership org") });
+    ctx.tenant = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/tenants`, {
+      name: label("Membership organization"),
     });
-    ctx.otherDepartment = await createJson(ctx.admin.accessToken, `/organizations/${ctx.otherOrg.id}/departments`, {
+    ctx.otherOrganization = await createJson(ctx.admin.accessToken, `/tenants/${ctx.otherOrg.id}/tenants`, {
       name: label("Elsewhere"),
     });
-    ctx.category = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/task-categories`, {
+    ctx.category = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/task-categories`, {
       name: label("Category"),
     });
-    ctx.project = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/projects`, {
+    ctx.project = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/projects`, {
       title: label("Project"),
       accessType: "Public",
     });
-    await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/invitations`, {
+    await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/invitations`, {
       email: ctx.member.email,
       role: "MEMBER",
     });
     ctx.memberAccept = await acceptInvite(ctx.member.accessToken, ctx.member.email);
-    await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/invitations`, {
+    await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/invitations`, {
       email: ctx.second.email,
       role: "ADMIN",
     });
     await acceptInvite(ctx.second.accessToken, ctx.second.email);
-    await createJson(ctx.admin.accessToken, `/departments/${ctx.department.id}/invitations`, {
-      email: ctx.departmentAdmin.email,
+    await createJson(ctx.admin.accessToken, `/tenants/${ctx.tenant.id}/invitations`, {
+      email: ctx.tenantAdmin.email,
       role: "ADMIN",
     });
-    ctx.departmentAccept = await acceptInvite(ctx.departmentAdmin.accessToken, ctx.departmentAdmin.email);
+    ctx.tenantAccept = await acceptInvite(ctx.tenantAdmin.accessToken, ctx.tenantAdmin.email);
   });
 
-  test("list organization memberships", async () => {
-    const response = await callApi(`/organizations/${ctx.org.id}/memberships`, { token: ctx.member.accessToken });
+  test("list tenant memberships", async () => {
+    const response = await callApi(`/tenants/${ctx.org.id}/memberships`, { token: ctx.member.accessToken });
     assertList(response.json);
     const admin = response.json.items.find((item) => item.userId === ctx.admin.user.id);
     const member = response.json.items.find((item) => item.userId === ctx.member.user.id);
     assertMembership(admin, {
-      organizationId: ctx.org.id,
-      departmentId: null,
+      tenantId: ctx.org.id,
+      organizationId: null,
       role: "ADMIN",
       userId: ctx.admin.user.id,
     });
@@ -74,46 +74,46 @@ describe("memberships", suite, () => {
     assert.equal(admin.user.email, null);
     assert.equal(admin.professionalBillingRate, null);
     assert.equal(admin.isActive, true);
-    assert.equal(admin.primaryDepartmentId, null);
-    assert.deepEqual(admin.departmentIds, []);
+    assert.equal(admin.primaryOrganizationId, null);
+    assert.deepEqual(admin.organizationIds, []);
     assert.equal(admin.user.firstName, "Ada");
     assert.equal(admin.user.lastName, "Lovelace");
     assertMembership(member, {
-      organizationId: ctx.org.id,
-      departmentId: null,
+      tenantId: ctx.org.id,
+      organizationId: null,
       role: "MEMBER",
       userId: ctx.member.user.id,
-      departmentIds: [],
+      organizationIds: [],
     });
-    const unauthenticated = await callApi(`/organizations/${ctx.org.id}/memberships`);
+    const unauthenticated = await callApi(`/tenants/${ctx.org.id}/memberships`);
     assertError(unauthenticated, 401, "unauthorized", "Authentication is required.");
   });
 
-  test("patch organization membership updates role, rate, and department", async () => {
-    const listed = await callApi(`/organizations/${ctx.org.id}/memberships`, { token: ctx.admin.accessToken });
+  test("patch tenant membership updates role, rate, and organization", async () => {
+    const listed = await callApi(`/tenants/${ctx.org.id}/memberships`, { token: ctx.admin.accessToken });
     const member = listed.json.items.find((item) => item.userId === ctx.member.user.id);
     const admin = listed.json.items.find((item) => item.userId === ctx.admin.user.id);
-    const forbidden = await callApi(`/organizations/${ctx.org.id}/memberships/${member.id}`, {
+    const forbidden = await callApi(`/tenants/${ctx.org.id}/memberships/${member.id}`, {
       method: "PATCH",
       token: ctx.member.accessToken,
       body: { role: "ADMIN" },
     });
-    const empty = await callApi(`/organizations/${ctx.org.id}/memberships/${member.id}`, {
+    const empty = await callApi(`/tenants/${ctx.org.id}/memberships/${member.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
       body: {},
     });
-    const last = await callApi(`/organizations/${ctx.org.id}/memberships/${admin.id}`, {
+    const last = await callApi(`/tenants/${ctx.org.id}/memberships/${admin.id}`, {
       method: "PATCH",
       token: ctx.second.accessToken,
       body: { role: "MEMBER" },
     });
-    const elsewhere = await callApi(`/organizations/${ctx.org.id}/memberships/${member.id}`, {
+    const elsewhere = await callApi(`/tenants/${ctx.org.id}/memberships/${member.id}`, {
       method: "PATCH",
       token: ctx.second.accessToken,
-      body: { primaryDepartmentId: ctx.otherDepartment.id },
+      body: { primaryOrganizationId: ctx.otherOrganization.id },
     });
-    const professional = await callApi(`/organizations/${ctx.org.id}/memberships/${member.id}`, {
+    const professional = await callApi(`/tenants/${ctx.org.id}/memberships/${member.id}`, {
       method: "PATCH",
       token: ctx.second.accessToken,
       body: { rateType: "Professional" },
@@ -122,26 +122,26 @@ describe("memberships", suite, () => {
     assertError(empty, 400, "validation_error", "Provide at least one field to update.");
     assert.equal(last.status, 200);
     assert.equal(last.json.role.code, "MEMBER");
-    assertError(elsewhere, 400, "validation_error", "primaryDepartmentId does not belong to this organization.");
+    assertError(elsewhere, 400, "validation_error", "primaryOrganizationId does not belong to this tenant.");
     assertError(professional, 400, "validation_error", "professionalBillingRate is required when rateType is Professional.");
 
-    const updated = await callApi(`/organizations/${ctx.org.id}/memberships/${member.id}`, {
+    const updated = await callApi(`/tenants/${ctx.org.id}/memberships/${member.id}`, {
       method: "PATCH",
       token: ctx.second.accessToken,
       body: {
         rateType: "Professional",
         professionalBillingRate: 80,
         isActive: true,
-        primaryDepartmentId: ctx.department.id,
+        primaryOrganizationId: ctx.tenant.id,
       },
     });
     assert.equal(updated.status, 200);
     assert.equal(updated.json.rateType, "Professional");
     assertMoney(updated.json.professionalBillingRate, 80);
-    assert.equal(updated.json.primaryDepartmentId, ctx.department.id);
-    assert.deepEqual(updated.json.departmentIds, [ctx.department.id]);
+    assert.equal(updated.json.primaryOrganizationId, ctx.tenant.id);
+    assert.deepEqual(updated.json.organizationIds, [ctx.tenant.id]);
     const entry = await createJson(ctx.member.accessToken, "/time/duration", {
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       durationMinutes: 60,
@@ -150,7 +150,7 @@ describe("memberships", suite, () => {
     assertMoney(entry.hourlyRate, 35.47);
     assertMoney(entry.inKindValue, 35.47);
 
-    const inactive = await callApi(`/organizations/${ctx.org.id}/memberships/${member.id}`, {
+    const inactive = await callApi(`/tenants/${ctx.org.id}/memberships/${member.id}`, {
       method: "PATCH",
       token: ctx.second.accessToken,
       body: { isActive: false, rateType: "Volunteer" },
@@ -162,7 +162,7 @@ describe("memberships", suite, () => {
       method: "POST",
       token: ctx.member.accessToken,
       body: {
-        organizationId: ctx.org.id,
+        tenantId: ctx.org.id,
         projectId: ctx.project.id,
         taskCategoryId: ctx.category.id,
         durationMinutes: 30,
@@ -172,84 +172,84 @@ describe("memberships", suite, () => {
     assertError(blocked, 403, "forbidden", "Forbidden.");
   });
 
-  test("delete keeps the last organization admin and removes department memberships", async () => {
-    const listed = await callApi(`/organizations/${ctx.org.id}/memberships`, { token: ctx.second.accessToken });
+  test("delete keeps the last tenant admin and removes organization memberships", async () => {
+    const listed = await callApi(`/tenants/${ctx.org.id}/memberships`, { token: ctx.second.accessToken });
     const remainingAdmin = listed.json.items.find((item) => item.role.code === "ADMIN");
-    const blocked = await callApi(`/organizations/${ctx.org.id}/memberships/${remainingAdmin.id}`, {
+    const blocked = await callApi(`/tenants/${ctx.org.id}/memberships/${remainingAdmin.id}`, {
       method: "DELETE",
       token: ctx.second.accessToken,
     });
-    assertError(blocked, 409, "conflict", "The last organization admin cannot be removed.");
-    const departmentListed = await callApi(`/departments/${ctx.department.id}/memberships`, {
+    assertError(blocked, 409, "conflict", "The last tenant admin cannot be removed.");
+    const organizationListed = await callApi(`/tenants/${ctx.tenant.id}/memberships`, {
       token: ctx.second.accessToken,
     });
-    assertList(departmentListed.json);
-    const departmentMembership = departmentListed.json.items.find((item) => item.userId === ctx.departmentAdmin.user.id);
-    assertMembership(departmentMembership, {
-      organizationId: ctx.org.id,
-      departmentId: ctx.department.id,
+    assertList(organizationListed.json);
+    const organizationMembership = organizationListed.json.items.find((item) => item.userId === ctx.tenantAdmin.user.id);
+    assertMembership(organizationMembership, {
+      tenantId: ctx.org.id,
+      organizationId: ctx.tenant.id,
       role: "ADMIN",
-      userId: ctx.departmentAdmin.user.id,
-      departmentIds: [ctx.department.id],
+      userId: ctx.tenantAdmin.user.id,
+      organizationIds: [ctx.tenant.id],
     });
-    assert.equal(departmentMembership.rateType, null);
-    assert.equal(departmentMembership.isActive, null);
-    const orgMembership = listed.json.items.find((item) => item.userId === ctx.departmentAdmin.user.id);
-    await remove(ctx.second.accessToken, `/organizations/${ctx.org.id}/memberships/${orgMembership.id}`);
-    const after = await callApi(`/departments/${ctx.department.id}/memberships`, { token: ctx.second.accessToken });
-    assert.equal(after.json.items.some((item) => item.userId === ctx.departmentAdmin.user.id), false);
-    const missing = await callApi(`/organizations/${ctx.org.id}/memberships/${missingId()}`, {
+    assert.equal(organizationMembership.rateType, null);
+    assert.equal(organizationMembership.isActive, null);
+    const orgMembership = listed.json.items.find((item) => item.userId === ctx.tenantAdmin.user.id);
+    await remove(ctx.second.accessToken, `/tenants/${ctx.org.id}/memberships/${orgMembership.id}`);
+    const after = await callApi(`/tenants/${ctx.tenant.id}/memberships`, { token: ctx.second.accessToken });
+    assert.equal(after.json.items.some((item) => item.userId === ctx.tenantAdmin.user.id), false);
+    const missing = await callApi(`/tenants/${ctx.org.id}/memberships/${missingId()}`, {
       method: "DELETE",
       token: ctx.second.accessToken,
     });
     assertError(missing, 404, "not_found", "Not found.");
   });
 
-  test("department admins can change a department role", async () => {
+  test("organization admins can change a organization role", async () => {
     const recruit = await signUp("memrecruit");
-    await createJson(ctx.second.accessToken, `/departments/${ctx.department.id}/invitations`, {
+    await createJson(ctx.second.accessToken, `/tenants/${ctx.tenant.id}/invitations`, {
       email: recruit.email,
       role: "MEMBER",
     });
     await acceptInvite(recruit.accessToken, recruit.email);
-    const listed = await callApi(`/departments/${ctx.department.id}/memberships`, { token: ctx.second.accessToken });
+    const listed = await callApi(`/tenants/${ctx.tenant.id}/memberships`, { token: ctx.second.accessToken });
     const membership = listed.json.items.find((item) => item.userId === recruit.user.id);
-    const updated = await callApi(`/departments/${ctx.department.id}/memberships/${membership.id}`, {
+    const updated = await callApi(`/tenants/${ctx.tenant.id}/memberships/${membership.id}`, {
       method: "PATCH",
       token: ctx.second.accessToken,
       body: { role: "ADMIN" },
     });
     assert.equal(updated.status, 200);
     assert.equal(updated.json.role.code, "ADMIN");
-    await remove(recruit.accessToken, `/departments/${ctx.department.id}/memberships/${membership.id}`);
-    const after = await callApi(`/departments/${ctx.department.id}/memberships`, { token: ctx.second.accessToken });
+    await remove(recruit.accessToken, `/tenants/${ctx.tenant.id}/memberships/${membership.id}`);
+    const after = await callApi(`/tenants/${ctx.tenant.id}/memberships`, { token: ctx.second.accessToken });
     assert.equal(after.json.items.some((item) => item.userId === recruit.user.id), false);
   });
 
-  test("organization admins can add a person with a temporary password and departments", async () => {
-    const extraDepartment = await createJson(ctx.second.accessToken, `/organizations/${ctx.org.id}/departments`, {
-      name: label("Second department"),
+  test("tenant admins can add a person with a temporary password and organizations", async () => {
+    const extraOrganization = await createJson(ctx.second.accessToken, `/tenants/${ctx.org.id}/tenants`, {
+      name: label("Second organization"),
     });
     const person = identity("newperson");
-    const created = await createJson(ctx.second.accessToken, `/organizations/${ctx.org.id}/memberships`, {
+    const created = await createJson(ctx.second.accessToken, `/tenants/${ctx.org.id}/memberships`, {
       email: person.email,
       username: person.username,
       password: person.password,
       firstName: "New",
       lastName: "Person",
       role: "VOLUNTEER",
-      departmentIds: [ctx.department.id, extraDepartment.id],
+      organizationIds: [ctx.tenant.id, extraOrganization.id],
     });
     assertMembership(created, {
-      organizationId: ctx.org.id,
-      departmentId: null,
+      tenantId: ctx.org.id,
+      organizationId: null,
       role: "VOLUNTEER",
       userId: created.userId,
-      departmentIds: [ctx.department.id, extraDepartment.id],
+      organizationIds: [ctx.tenant.id, extraOrganization.id],
     });
     assert.equal(created.user.firstName, "New");
     assert.equal(created.user.lastName, "Person");
-    assert.equal(created.primaryDepartmentId, ctx.department.id);
+    assert.equal(created.primaryOrganizationId, ctx.tenant.id);
     const session = await callApi("/auth/login", {
       method: "POST",
       body: { username: person.username, password: person.password },
@@ -258,7 +258,7 @@ describe("memberships", suite, () => {
     assert.equal(session.json.user.mustChangePassword, true);
 
     const existing = await signUp("alreadyin");
-    const refused = await callApi(`/organizations/${ctx.org.id}/memberships`, {
+    const refused = await callApi(`/tenants/${ctx.org.id}/memberships`, {
       method: "POST",
       token: ctx.second.accessToken,
       body: {
@@ -266,7 +266,7 @@ describe("memberships", suite, () => {
         firstName: "Already",
         lastName: "Here",
         role: "MEMBER",
-        departmentIds: [extraDepartment.id],
+        organizationIds: [extraOrganization.id],
       },
     });
     assertError(refused, 409, "account_exists", "This email already has an account. Send them an invitation instead.");
@@ -275,17 +275,17 @@ describe("memberships", suite, () => {
 
     const added = await joinOrg(ctx.second.accessToken, ctx.org.id, existing, {
       role: "MEMBER",
-      departmentIds: [extraDepartment.id],
+      organizationIds: [extraOrganization.id],
     });
     assert.equal(added.userId, existing.user.id);
-    assert.deepEqual(added.departmentIds, [extraDepartment.id]);
+    assert.deepEqual(added.organizationIds, [extraOrganization.id]);
     const samePassword = await callApi("/auth/login", {
       method: "POST",
       body: { username: existing.username, password: existing.password },
     });
     assert.equal(samePassword.status, 200);
 
-    const duplicate = await callApi(`/organizations/${ctx.org.id}/memberships`, {
+    const duplicate = await callApi(`/tenants/${ctx.org.id}/memberships`, {
       method: "POST",
       token: ctx.second.accessToken,
       body: {
@@ -295,9 +295,9 @@ describe("memberships", suite, () => {
         role: "MEMBER",
       },
     });
-    assertError(duplicate, 409, "conflict", "This person is already in the organization.");
+    assertError(duplicate, 409, "conflict", "This person is already in the tenant.");
 
-    const forbidden = await callApi(`/organizations/${ctx.org.id}/memberships`, {
+    const forbidden = await callApi(`/tenants/${ctx.org.id}/memberships`, {
       method: "POST",
       token: ctx.member.accessToken,
       body: {
@@ -311,14 +311,14 @@ describe("memberships", suite, () => {
     });
     assertError(forbidden, 403, "forbidden", "Forbidden.");
 
-    const denied = await callApi(`/organizations/${ctx.org.id}/memberships/${added.id}`, {
+    const denied = await callApi(`/tenants/${ctx.org.id}/memberships/${added.id}`, {
       method: "PATCH",
       token: ctx.member.accessToken,
       body: { email: "member-change@example.com" },
     });
     assertError(denied, 403, "forbidden", "Forbidden.");
 
-    const claimed = await callApi(`/organizations/${ctx.org.id}/memberships/${added.id}`, {
+    const claimed = await callApi(`/tenants/${ctx.org.id}/memberships/${added.id}`, {
       method: "PATCH",
       token: ctx.second.accessToken,
       body: { email: `patched.${existing.email}` },
@@ -326,7 +326,7 @@ describe("memberships", suite, () => {
     assertError(claimed, 403, "forbidden", "This person has signed in, so only they can change their email.");
 
     const nextEmail = `patched.${person.email}`;
-    const profile = await callApi(`/organizations/${ctx.org.id}/memberships/${created.id}`, {
+    const profile = await callApi(`/tenants/${ctx.org.id}/memberships/${created.id}`, {
       method: "PATCH",
       token: ctx.second.accessToken,
       body: {
@@ -334,7 +334,7 @@ describe("memberships", suite, () => {
         firstName: "Patched",
         lastName: "Name",
         displayName: "Patched Name",
-        departmentIds: [ctx.department.id, extraDepartment.id],
+        organizationIds: [ctx.tenant.id, extraOrganization.id],
       },
     });
     assert.equal(profile.status, 200);
@@ -342,30 +342,30 @@ describe("memberships", suite, () => {
     assert.equal(profile.json.user.firstName, "Patched");
     assert.equal(profile.json.user.lastName, "Name");
     assert.equal(profile.json.user.displayName, "Patched Name");
-    assert.deepEqual(profile.json.departmentIds, [ctx.department.id, extraDepartment.id].sort());
+    assert.deepEqual(profile.json.organizationIds, [ctx.tenant.id, extraOrganization.id].sort());
 
-    const taken = await callApi(`/organizations/${ctx.org.id}/memberships/${created.id}`, {
+    const taken = await callApi(`/tenants/${ctx.org.id}/memberships/${created.id}`, {
       method: "PATCH",
       token: ctx.second.accessToken,
       body: { email: existing.email },
     });
     assertError(taken, 409, "conflict", "That email is already in use.");
 
-    await remove(ctx.second.accessToken, `/organizations/${ctx.org.id}/memberships/${added.id}`);
+    await remove(ctx.second.accessToken, `/tenants/${ctx.org.id}/memberships/${added.id}`);
     const stillExists = await callApi("/auth/login", {
       method: "POST",
       body: { username: existing.username, password: existing.password },
     });
     assert.equal(stillExists.status, 200);
-    const gone = await callApi(`/organizations/${ctx.org.id}/memberships`, { token: ctx.second.accessToken });
+    const gone = await callApi(`/tenants/${ctx.org.id}/memberships`, { token: ctx.second.accessToken });
     assert.equal(gone.json.items.some((item) => item.userId === existing.user.id), false);
   });
 
-  test("another organization's admin cannot take over or edit a shared account", async () => {
+  test("another tenant's admin cannot take over or edit a shared account", async () => {
     const victim = await signUp("takeover");
     const attacker = await signUp("attacker");
-    const attackerOrg = await createJson(attacker.accessToken, "/organizations", { name: label("Attacker org") });
-    const forced = await callApi(`/organizations/${attackerOrg.id}/memberships`, {
+    const attackerOrg = await createJson(attacker.accessToken, "/tenants", { name: label("Attacker org") });
+    const forced = await callApi(`/tenants/${attackerOrg.id}/memberships`, {
       method: "POST",
       token: attacker.accessToken,
       body: { email: victim.email, firstName: "Taken", lastName: "Over", role: "MEMBER" },
@@ -374,28 +374,28 @@ describe("memberships", suite, () => {
 
     const membership = await joinOrg(ctx.second.accessToken, ctx.org.id, victim, { role: "MEMBER" });
     await joinOrg(attacker.accessToken, attackerOrg.id, victim, { role: "MEMBER" });
-    const attackerView = await callApi(`/organizations/${attackerOrg.id}/memberships`, { token: attacker.accessToken });
+    const attackerView = await callApi(`/tenants/${attackerOrg.id}/memberships`, { token: attacker.accessToken });
     const shared = attackerView.json.items.find((item) => item.userId === victim.user.id);
-    const reEmail = await callApi(`/organizations/${attackerOrg.id}/memberships/${shared.id}`, {
+    const reEmail = await callApi(`/tenants/${attackerOrg.id}/memberships/${shared.id}`, {
       method: "PATCH",
       token: attacker.accessToken,
       body: { email: `owned.${attacker.email}` },
     });
-    assertError(reEmail, 403, "forbidden", "This person belongs to another organization, so only they can change their profile.");
-    const rename = await callApi(`/organizations/${ctx.org.id}/memberships/${membership.id}`, {
+    assertError(reEmail, 403, "forbidden", "This person belongs to another tenant, so only they can change their profile.");
+    const rename = await callApi(`/tenants/${ctx.org.id}/memberships/${membership.id}`, {
       method: "PATCH",
       token: ctx.second.accessToken,
       body: { firstName: "Renamed" },
     });
-    assertError(rename, 403, "forbidden", "This person belongs to another organization, so only they can change their profile.");
+    assertError(rename, 403, "forbidden", "This person belongs to another tenant, so only they can change their profile.");
 
-    const unchangedProfile = await callApi(`/organizations/${ctx.org.id}/memberships/${membership.id}`, {
+    const unchangedProfile = await callApi(`/tenants/${ctx.org.id}/memberships/${membership.id}`, {
       method: "PATCH",
       token: ctx.second.accessToken,
-      body: { firstName: victim.firstName, email: victim.email, orgUserTitle: "Usher" },
+      body: { firstName: victim.firstName, email: victim.email, title: "Usher" },
     });
     assert.equal(unchangedProfile.status, 200, unchangedProfile.text);
-    assert.equal(unchangedProfile.json.orgUserTitle, "Usher");
+    assert.equal(unchangedProfile.json.title, "Usher");
     const me = await callApi("/users/me", { token: victim.accessToken });
     assert.equal(me.json.email, victim.email);
     assert.equal(me.json.profile.firstName, victim.firstName);
@@ -404,7 +404,7 @@ describe("memberships", suite, () => {
   test("members see names but not other members' emails or pay", async () => {
     const volunteer = await signUp("memvisible");
     await joinOrg(ctx.second.accessToken, ctx.org.id, volunteer, { role: "VOLUNTEER" });
-    const path = `/organizations/${ctx.org.id}/memberships?limit=100`;
+    const path = `/tenants/${ctx.org.id}/memberships?limit=100`;
     const asVolunteer = await callApi(path, { token: volunteer.accessToken });
     assert.equal(asVolunteer.status, 200, asVolunteer.text);
     const others = asVolunteer.json.items.filter((item) => item.userId !== volunteer.user.id);
@@ -421,9 +421,9 @@ describe("memberships", suite, () => {
     assert.equal(seen.rateType, "Volunteer");
   });
 
-  test("organization notes stay on the membership, not the person's profile", async () => {
+  test("tenant notes stay on the membership, not the person's profile", async () => {
     const person = identity("memnotes");
-    const created = await createJson(ctx.second.accessToken, `/organizations/${ctx.org.id}/memberships`, {
+    const created = await createJson(ctx.second.accessToken, `/tenants/${ctx.org.id}/memberships`, {
       email: person.email,
       username: person.username,
       password: person.password,
@@ -433,7 +433,7 @@ describe("memberships", suite, () => {
       notes: "Prefers mornings",
     });
     assert.equal(created.notes, "Prefers mornings");
-    const patched = await callApi(`/organizations/${ctx.org.id}/memberships/${created.id}`, {
+    const patched = await callApi(`/tenants/${ctx.org.id}/memberships/${created.id}`, {
       method: "PATCH",
       token: ctx.second.accessToken,
       body: { notes: "Prefers evenings" },
@@ -445,12 +445,12 @@ describe("memberships", suite, () => {
 
     const peer = await signUp("memnotespeer");
     await joinOrg(ctx.second.accessToken, ctx.org.id, peer, { role: "VOLUNTEER" });
-    const asPeer = await callApi(`/organizations/${ctx.org.id}/memberships?limit=100`, { token: peer.accessToken });
+    const asPeer = await callApi(`/tenants/${ctx.org.id}/memberships?limit=100`, { token: peer.accessToken });
     assert.equal(asPeer.json.items.find((item) => item.id === created.id).notes, null);
   });
 
   test("batch delete removes the selected memberships", async () => {
-    const path = `/organizations/${ctx.org.id}/memberships`;
+    const path = `/tenants/${ctx.org.id}/memberships`;
     const firstPerson = identity("batchone");
     const secondPerson = identity("batchtwo");
     const first = await createJson(ctx.second.accessToken, path, {
@@ -460,7 +460,7 @@ describe("memberships", suite, () => {
       firstName: "Batch",
       lastName: "One",
       role: "VOLUNTEER",
-      departmentIds: [ctx.department.id],
+      organizationIds: [ctx.tenant.id],
     });
     const second = await createJson(ctx.second.accessToken, path, {
       email: secondPerson.email,
@@ -469,7 +469,7 @@ describe("memberships", suite, () => {
       firstName: "Batch",
       lastName: "Two",
       role: "VOLUNTEER",
-      departmentIds: [ctx.department.id],
+      organizationIds: [ctx.tenant.id],
     });
 
     const empty = await callApi(path, { method: "DELETE", token: ctx.second.accessToken, body: { membershipIds: [] } });
@@ -505,7 +505,7 @@ describe("memberships", suite, () => {
     assertError(malformed, 400, "validation_error", "membershipIds must be an array of ids.");
     assertError(forbidden, 403, "forbidden", "Forbidden.");
     assertError(missing, 404, "not_found", "Not found.");
-    assertError(blocked, 409, "conflict", "The last organization admin cannot be removed.");
+    assertError(blocked, 409, "conflict", "The last tenant admin cannot be removed.");
 
     const stillThere = await callApi(path, { token: ctx.second.accessToken });
     assert.equal(stillThere.json.items.some((item) => item.id === first.id), true);
@@ -524,9 +524,9 @@ describe("memberships", suite, () => {
     const after = await callApi(path, { token: ctx.second.accessToken });
     assert.equal(after.json.items.some((item) => item.userId === first.userId), false);
     assert.equal(after.json.items.some((item) => item.userId === second.userId), false);
-    const departments = await callApi(`/departments/${ctx.department.id}/memberships`, { token: ctx.second.accessToken });
-    assert.equal(departments.json.items.some((item) => item.userId === first.userId), false);
-    assert.equal(departments.json.items.some((item) => item.userId === second.userId), false);
+    const organizations = await callApi(`/tenants/${ctx.tenant.id}/memberships`, { token: ctx.second.accessToken });
+    assert.equal(organizations.json.items.some((item) => item.userId === first.userId), false);
+    assert.equal(organizations.json.items.some((item) => item.userId === second.userId), false);
     const login = await callApi("/auth/login", {
       method: "POST",
       body: { username: firstPerson.username, password: firstPerson.password },
@@ -536,7 +536,7 @@ describe("memberships", suite, () => {
 
   test("emailUser sends a new account its temporary password", async () => {
     const person = identity("emailed");
-    const created = await createJson(ctx.second.accessToken, `/organizations/${ctx.org.id}/memberships`, {
+    const created = await createJson(ctx.second.accessToken, `/tenants/${ctx.org.id}/memberships`, {
       email: person.email,
       username: person.username,
       password: person.password,
@@ -553,7 +553,7 @@ describe("memberships", suite, () => {
     assert.match(messages[0].text, /\/login/);
 
     const quiet = identity("quiet");
-    await createJson(ctx.second.accessToken, `/organizations/${ctx.org.id}/memberships`, {
+    await createJson(ctx.second.accessToken, `/tenants/${ctx.org.id}/memberships`, {
       email: quiet.email,
       username: quiet.username,
       password: quiet.password,
@@ -567,7 +567,7 @@ describe("memberships", suite, () => {
     assert.deepEqual(await quietMail.json(), []);
 
     const existing = await signUp("mailexisting");
-    const refused = await callApi(`/organizations/${ctx.org.id}/memberships`, {
+    const refused = await callApi(`/tenants/${ctx.org.id}/memberships`, {
       method: "POST",
       token: ctx.second.accessToken,
       body: { email: existing.email, firstName: "Existing", lastName: "Mail", role: "MEMBER", emailUser: true },
@@ -578,7 +578,7 @@ describe("memberships", suite, () => {
     const existingMessages = await existingMail.json();
     assert.equal(existingMessages.some((message) => String(message.text).includes("Temporary password")), false);
 
-    const invalid = await callApi(`/organizations/${ctx.org.id}/memberships`, {
+    const invalid = await callApi(`/tenants/${ctx.org.id}/memberships`, {
       method: "POST",
       token: ctx.second.accessToken,
       body: {

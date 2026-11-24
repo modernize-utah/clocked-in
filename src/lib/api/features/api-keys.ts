@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 
 type KeyRow = {
   id: string;
-  organizationId: string;
+  tenantId: string;
   name: string;
   prefix: string;
   scopes: string;
@@ -21,7 +21,7 @@ type KeyRow = {
 function keyJson(key: KeyRow, secret?: string) {
   return {
     id: key.id,
-    organizationId: key.organizationId,
+    tenantId: key.tenantId,
     name: key.name,
     prefix: key.prefix,
     scopes: parseScopes(key.scopes),
@@ -94,9 +94,9 @@ export function parseUpdateApiKey(body: Body) {
   return request;
 }
 
-async function managed(access: Access, organizationId: string, keyId: string) {
-  await access.requireOrganizationAdmin(organizationId);
-  const key = await prisma.organizationApiKey.findFirst({ where: { id: keyId, organizationId } });
+async function managed(access: Access, tenantId: string, keyId: string) {
+  await access.requireTenantAdmin(tenantId);
+  const key = await prisma.tenantApiKey.findFirst({ where: { id: keyId, tenantId } });
   if (!key || key.revokedAt) {
     notFound();
   }
@@ -104,12 +104,12 @@ async function managed(access: Access, organizationId: string, keyId: string) {
   return key;
 }
 
-export async function listApiKeys(access: Access, organizationId: string, params: URLSearchParams) {
+export async function listApiKeys(access: Access, tenantId: string, params: URLSearchParams) {
   access.requireHuman();
-  await access.requireOrganizationAdmin(organizationId);
+  await access.requireTenantAdmin(tenantId);
   const paging = page(params);
-  const keys = await prisma.organizationApiKey.findMany({
-    where: { organizationId, revokedAt: null },
+  const keys = await prisma.tenantApiKey.findMany({
+    where: { tenantId, revokedAt: null },
     orderBy: { createdAt: "desc" },
     skip: paging.offset,
     take: paging.limit,
@@ -117,15 +117,15 @@ export async function listApiKeys(access: Access, organizationId: string, params
   return list(keys.map((key) => keyJson(key)), paging);
 }
 
-export async function createApiKey(access: Access, organizationId: string, request: ReturnType<typeof parseCreateApiKey>) {
+export async function createApiKey(access: Access, tenantId: string, request: ReturnType<typeof parseCreateApiKey>) {
   const user = access.requireHuman();
-  await access.requireOrganizationAdmin(organizationId);
+  await access.requireTenantAdmin(tenantId);
   const issued = issueApiKey();
   const key = await guard(
-    prisma.organizationApiKey.create({
+    prisma.tenantApiKey.create({
       data: {
         id: randomUUID(),
-        organizationId,
+        tenantId,
         name: request.name,
         prefix: issued.prefix,
         keyHash: hashApiKey(combineApiKey(issued.prefix, issued.secret)),
@@ -141,14 +141,14 @@ export async function createApiKey(access: Access, organizationId: string, reque
 
 export async function updateApiKey(
   access: Access,
-  organizationId: string,
+  tenantId: string,
   keyId: string,
   request: ReturnType<typeof parseUpdateApiKey>,
 ) {
   access.requireHuman();
-  const key = await managed(access, organizationId, keyId);
+  const key = await managed(access, tenantId, keyId);
   const updated = await guard(
-    prisma.organizationApiKey.update({
+    prisma.tenantApiKey.update({
       where: { id: key.id },
       data: {
         name: request.name.set ? request.name.value : undefined,
@@ -160,12 +160,12 @@ export async function updateApiKey(
   return keyJson(updated);
 }
 
-export async function rotateApiKey(access: Access, organizationId: string, keyId: string) {
+export async function rotateApiKey(access: Access, tenantId: string, keyId: string) {
   access.requireHuman();
-  const key = await managed(access, organizationId, keyId);
+  const key = await managed(access, tenantId, keyId);
   const issued = issueApiKey();
   const updated = await guard(
-    prisma.organizationApiKey.update({
+    prisma.tenantApiKey.update({
       where: { id: key.id },
       data: {
         prefix: issued.prefix,
@@ -176,11 +176,11 @@ export async function rotateApiKey(access: Access, organizationId: string, keyId
   return keyJson(updated, issued.secret);
 }
 
-export async function revokeApiKey(access: Access, organizationId: string, keyId: string) {
+export async function revokeApiKey(access: Access, tenantId: string, keyId: string) {
   access.requireHuman();
-  const key = await managed(access, organizationId, keyId);
+  const key = await managed(access, tenantId, keyId);
   await guard(
-    prisma.organizationApiKey.update({
+    prisma.tenantApiKey.update({
       where: { id: key.id },
       data: { revokedAt: new Date() },
     }),

@@ -30,7 +30,7 @@ export function McpView({ origin, groups }: { origin: string; groups: McpToolGro
         <CardHeader>
           <CardTitle>Connect</CardTitle>
           <CardDescription>
-            MCP is Streamable HTTP at <span className="font-mono text-xs">/mcp</span>. Send the organization API key as{" "}
+            MCP is Streamable HTTP at <span className="font-mono text-xs">/mcp</span>. Send the tenant API key as{" "}
             <span className="font-mono text-xs">Authorization: Bearer</span> or <span className="font-mono text-xs">X-Api-Key</span>.
             A key needs <span className="font-mono text-xs">org:read</span> to list, <span className="font-mono text-xs">org:write</span> to
             change time and catalogs, and <span className="font-mono text-xs">org:admin</span> to manage people and settings.
@@ -55,7 +55,7 @@ export function McpView({ origin, groups }: { origin: string; groups: McpToolGro
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Auth, signup, password reset, the SuperAdmin user list, feedback moderation, and deleting an organization are not tools.
+            Auth, signup, password reset, the SuperAdmin user list, feedback moderation, and deleting an tenant are not tools.
             Production keys use the <span className="font-mono">cki_live_</span> prefix. Other environments use{" "}
             <span className="font-mono">cki_test_</span>.
           </p>

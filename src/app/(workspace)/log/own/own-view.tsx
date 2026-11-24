@@ -139,7 +139,7 @@ function TimerCard() {
               tagIds: next.tagIds,
               projectId: next.projectId,
               taskCategoryId: next.taskCategoryId,
-              departmentId: next.departmentId,
+              organizationId: next.organizationId,
             },
             {
               onSuccess: () => {

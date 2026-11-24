@@ -56,13 +56,13 @@ function projectTypeSample(samples: string[]) {
 }
 
 function accessTypeSample(samples: string[]) {
-  return majority(samples, (value) => /^(public|private|department)$/i.test(value));
+  return majority(samples, (value) => /^(public|private|organization)$/i.test(value));
 }
 
-export type ImportEntity = "people" | "departments" | "projects";
+export type ImportEntity = "people" | "organizations" | "projects";
 
-export function peopleFields(departmentLabel = "Department"): ImportField[] {
-  const department = departmentLabel.toLowerCase();
+export function peopleFields(organizationLabel = "Organization"): ImportField[] {
+  const organization = organizationLabel.toLowerCase();
   return [
     { key: "email", label: "Email", required: true, aliases: ["email", "e-mail", "email address"], matchesSample: emailSample },
     { key: "username", label: "Username", required: false, aliases: ["username", "user name", "login"] },
@@ -82,26 +82,26 @@ export function peopleFields(departmentLabel = "Department"): ImportField[] {
     },
     { key: "role", label: "Role", required: false, aliases: ["role"], matchesSample: roleSample },
     {
-      key: "primaryDepartment",
-      label: `Primary ${department}`,
+      key: "primaryOrganization",
+      label: `Primary ${organization}`,
       required: false,
-      aliases: ["primary group", "primary department", "group", "department", department],
+      aliases: ["primary group", "primary organization", "group", "organization", organization],
     },
   ];
 }
 
-export function departmentFields(departmentLabel = "Department"): ImportField[] {
+export function organizationFields(organizationLabel = "Organization"): ImportField[] {
   return [
     {
       key: "name",
       label: "Name",
       required: true,
-      aliases: ["name", "group", "department", "title", departmentLabel.toLowerCase()],
+      aliases: ["name", "group", "organization", "title", organizationLabel.toLowerCase()],
     },
   ];
 }
 
-export function projectFields(departmentLabel = "Department"): ImportField[] {
+export function projectFields(organizationLabel = "Organization"): ImportField[] {
   return [
     { key: "title", label: "Title", required: true, aliases: ["title", "name", "project", "project name"] },
     { key: "description", label: "Description", required: false, aliases: ["description", "details"] },
@@ -114,10 +114,10 @@ export function projectFields(departmentLabel = "Department"): ImportField[] {
       matchesSample: accessTypeSample,
     },
     {
-      key: "department",
-      label: departmentLabel,
+      key: "organization",
+      label: organizationLabel,
       required: false,
-      aliases: ["group", "department", departmentLabel.toLowerCase()],
+      aliases: ["group", "organization", organizationLabel.toLowerCase()],
     },
     { key: "startDate", label: "Start date", required: false, aliases: ["start", "start date"], matchesSample: dateSample },
     { key: "endDate", label: "End date", required: false, aliases: ["end", "end date"], matchesSample: dateSample },
@@ -125,14 +125,14 @@ export function projectFields(departmentLabel = "Department"): ImportField[] {
   ];
 }
 
-export function fieldsFor(entity: ImportEntity, departmentLabel = "Department") {
+export function fieldsFor(entity: ImportEntity, organizationLabel = "Organization") {
   if (entity === "people") {
-    return peopleFields(departmentLabel);
+    return peopleFields(organizationLabel);
   }
 
-  if (entity === "departments") {
-    return departmentFields(departmentLabel);
+  if (entity === "organizations") {
+    return organizationFields(organizationLabel);
   }
 
-  return projectFields(departmentLabel);
+  return projectFields(organizationLabel);
 }

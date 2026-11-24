@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { createOrganizationAction } from "@/app/actions/organizations";
+import { createTenantAction } from "@/app/actions/tenants";
 import { Field, FormMessage } from "@/components/field";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,9 +15,9 @@ type SaveStatus = {
   pending: boolean;
 };
 
-export function NewOrganizationView() {
-  const { organization } = useWorkspace();
-  const copy = labels(organization?.preferences);
+export function NewTenantView() {
+  const { tenant } = useWorkspace();
+  const copy = labels(tenant?.preferences);
   const [status, setStatus] = useState<SaveStatus>({ result: null, pending: false });
 
   return (
@@ -25,41 +25,41 @@ export function NewOrganizationView() {
       footer={
         <div
           role="group"
-          aria-label={`New ${copy.organization.toLowerCase()} actions`}
+          aria-label={`New ${copy.tenant.toLowerCase()} actions`}
           className="flex flex-col gap-3 rounded-xl bg-card px-4 py-3 ring-1 ring-foreground/10 sm:flex-row sm:items-center"
         >
           <div className="min-w-0 flex-1">
             <FormMessage result={status.result} />
           </div>
-          <SubmitButton form="new-organization-form" pending={status.pending} className="h-9 w-full sm:ml-auto sm:w-auto">
-            Create {copy.organization.toLowerCase()}
+          <SubmitButton form="new-tenant-form" pending={status.pending} className="h-9 w-full sm:ml-auto sm:w-auto">
+            Create {copy.tenant.toLowerCase()}
           </SubmitButton>
         </div>
       }
     >
-      <NewOrganizationForm onStatus={setStatus} />
+      <NewTenantForm onStatus={setStatus} />
     </EditorLayout>
   );
 }
 
-function NewOrganizationForm({ onStatus }: { onStatus: (status: SaveStatus) => void }) {
-  const { organization } = useWorkspace();
-  const copy = labels(organization?.preferences);
-  const [result, action, pending] = useActionState(createOrganizationAction, null);
+function NewTenantForm({ onStatus }: { onStatus: (status: SaveStatus) => void }) {
+  const { tenant } = useWorkspace();
+  const copy = labels(tenant?.preferences);
+  const [result, action, pending] = useActionState(createTenantAction, null);
 
   useEffect(() => {
     onStatus({ result, pending });
   }, [onStatus, pending, result]);
 
   return (
-    <form id="new-organization-form" action={action}>
+    <form id="new-tenant-form" action={action}>
       <Card>
         <CardHeader>
-          <CardTitle>New {copy.organization.toLowerCase()}</CardTitle>
-          <CardDescription>You will be its first admin. Switch between organizations any time from the top bar.</CardDescription>
+          <CardTitle>New {copy.tenant.toLowerCase()}</CardTitle>
+          <CardDescription>You will be its first admin. Switch between tenants any time from the top bar.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Field label={`${copy.organization} name`} htmlFor="name">
+          <Field label={`${copy.tenant} name`} htmlFor="name">
             <Input id="name" name="name" required maxLength={200} placeholder="Riverside Food Bank" className="h-9" autoFocus />
           </Field>
         </CardContent>

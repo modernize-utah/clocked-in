@@ -4,15 +4,15 @@ import { api } from "@/api/client";
 import { Button, ErrorText, Field, Muted, PageTitle, Screen, Section } from "@/ui";
 import { useWorkspace } from "@/workspace";
 
-export default function OrganizationScreen() {
-  const { organization, isAdmin } = useWorkspace();
+export default function TenantScreen() {
+  const { tenant, isAdmin } = useWorkspace();
   const client = useQueryClient();
-  const [name, setName] = useState(organization.name);
-  const [websiteUrl, setWebsiteUrl] = useState(organization.websiteUrl ?? "");
-  const [description, setDescription] = useState(organization.description ?? "");
+  const [name, setName] = useState(tenant.name);
+  const [websiteUrl, setWebsiteUrl] = useState(tenant.websiteUrl ?? "");
+  const [description, setDescription] = useState(tenant.description ?? "");
   const save = useMutation({
     mutationFn: () =>
-      api.updateOrganization(organization.id, {
+      api.updateTenant(tenant.id, {
         name: name.trim(),
         websiteUrl: websiteUrl.trim() || null,
         description: description.trim() || null,
@@ -22,9 +22,9 @@ export default function OrganizationScreen() {
 
   return (
     <Screen>
-      <PageTitle title={organization.name} />
+      <PageTitle title={tenant.name} />
       {isAdmin ? (
-        <Section title="Organization">
+        <Section title="Tenant">
           <Field label="Name" onChangeText={setName} value={name} />
           <Field keyboardType="url" label="Website" onChangeText={setWebsiteUrl} value={websiteUrl} />
           <Field label="Description" multiline onChangeText={setDescription} value={description} />
@@ -32,9 +32,9 @@ export default function OrganizationScreen() {
           <Button disabled={name.trim().length < 1} label="Save" onPress={() => save.mutate()} pending={save.isPending} />
         </Section>
       ) : (
-        <Section title="Organization">
-          <Muted>{organization.websiteUrl || "No website"}</Muted>
-          <Muted>{organization.description || "No description"}</Muted>
+        <Section title="Tenant">
+          <Muted>{tenant.websiteUrl || "No website"}</Muted>
+          <Muted>{tenant.description || "No description"}</Muted>
         </Section>
       )}
     </Screen>

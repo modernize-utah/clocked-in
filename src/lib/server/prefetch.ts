@@ -13,39 +13,39 @@ import {
 import { getEntries, getGroupSessions, getInvitations, getLookups, getMembers, getOpenPunch, getReport } from "@/lib/server/dal";
 import type { DateRange } from "@/lib/types";
 
-export function prefetchLookups(client: QueryClient, organizationId: string, userId: string) {
+export function prefetchLookups(client: QueryClient, tenantId: string, userId: string) {
   return client.prefetchQuery({
-    ...lookupsQuery(organizationId, userId),
-    queryFn: () => getLookups(organizationId),
+    ...lookupsQuery(tenantId, userId),
+    queryFn: () => getLookups(tenantId),
   });
 }
 
-export function prefetchMembers(client: QueryClient, organizationId: string) {
-  return client.prefetchQuery({ ...membersQuery(organizationId), queryFn: () => getMembers(organizationId) });
+export function prefetchMembers(client: QueryClient, tenantId: string) {
+  return client.prefetchQuery({ ...membersQuery(tenantId), queryFn: () => getMembers(tenantId) });
 }
 
-export function prefetchInvitations(client: QueryClient, organizationId: string) {
-  return client.prefetchQuery({ ...invitationsQuery(organizationId), queryFn: () => getInvitations(organizationId) });
+export function prefetchInvitations(client: QueryClient, tenantId: string) {
+  return client.prefetchQuery({ ...invitationsQuery(tenantId), queryFn: () => getInvitations(tenantId) });
 }
 
-export function prefetchEntries(client: QueryClient, organizationId: string, userId: string, range: DateRange) {
+export function prefetchEntries(client: QueryClient, tenantId: string, userId: string, range: DateRange) {
   return client.prefetchInfiniteQuery({
-    ...entriesQuery(organizationId, userId, range),
-    queryFn: ({ pageParam }) => getEntries(organizationId, userId, range, pageParam, entriesPageSize),
+    ...entriesQuery(tenantId, userId, range),
+    queryFn: ({ pageParam }) => getEntries(tenantId, userId, range, pageParam, entriesPageSize),
   });
 }
 
-export function prefetchGroupSessions(client: QueryClient, organizationId: string) {
+export function prefetchGroupSessions(client: QueryClient, tenantId: string) {
   return client.prefetchInfiniteQuery({
-    ...groupSessionsQuery(organizationId),
-    queryFn: ({ pageParam }) => getGroupSessions(organizationId, pageParam, entriesPageSize),
+    ...groupSessionsQuery(tenantId),
+    queryFn: ({ pageParam }) => getGroupSessions(tenantId, pageParam, entriesPageSize),
   });
 }
 
-export function prefetchReport(client: QueryClient, organizationId: string, range: DateRange) {
+export function prefetchReport(client: QueryClient, tenantId: string, range: DateRange) {
   return client.prefetchQuery({
-    ...reportQuery(organizationId, range),
-    queryFn: () => getReport(organizationId, range.from, range.to),
+    ...reportQuery(tenantId, range),
+    queryFn: () => getReport(tenantId, range.from, range.to),
   });
 }
 

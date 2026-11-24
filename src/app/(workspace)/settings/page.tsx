@@ -3,5 +3,5 @@ import { getWorkspace } from "@/lib/server/dal";
 
 export default async function SettingsIndex() {
   const workspace = await getWorkspace();
-  redirect(workspace.isAdmin ? "/settings/organization" : "/settings/lists");
+  redirect(workspace.isAdmin ? "/settings/tenant" : "/settings/lists");
 }

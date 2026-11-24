@@ -63,7 +63,7 @@ function assertFeedback(item, expected = {}) {
   assertKeys(item, [
     "id",
     "userId",
-    "organizationId",
+    "tenantId",
     "type",
     "priority",
     "area",
@@ -79,7 +79,7 @@ function assertFeedback(item, expected = {}) {
     "createdAt",
     "updatedAt",
     "user",
-    "organization",
+    "tenant",
     "actions",
   ]);
   assertUuid(item.id);
@@ -118,23 +118,23 @@ describe("feedback", suite, () => {
     ctx.notify = await signUp("fbnotify");
     await grantSuperAdmin(ctx.super.user.id);
     ctx.superNotifyCount = 0;
-    ctx.org = await createJson(ctx.admin.accessToken, "/organizations", { name: label("Feedback org") });
-    await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/invitations`, {
+    ctx.org = await createJson(ctx.admin.accessToken, "/tenants", { name: label("Feedback org") });
+    await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/invitations`, {
       email: ctx.member.email,
       role: "MEMBER",
     });
     await acceptInvite(ctx.member.accessToken, ctx.member.email);
-    await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/invitations`, {
+    await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/invitations`, {
       email: ctx.notify.email,
       role: "MEMBER",
     });
     await acceptInvite(ctx.notify.accessToken, ctx.notify.email);
-    await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/invitations`, {
+    await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/invitations`, {
       email: ctx.super.email,
       role: "MEMBER",
     });
     await acceptInvite(ctx.super.accessToken, ctx.super.email);
-    const saved = await callApi(`/organizations/${ctx.org.id}`, {
+    const saved = await callApi(`/tenants/${ctx.org.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
       body: {
@@ -148,18 +148,18 @@ describe("feedback", suite, () => {
     assert.deepEqual(saved.json.preferences.feedbackNotifyUserIds, [ctx.notify.user.id]);
   });
 
-  test("only members can send feedback to an organization", async () => {
+  test("only members can send feedback to an tenant", async () => {
     const stranger = await signUp("fbstranger");
     const refused = await callApi("/feedback", {
       method: "POST",
       token: stranger.accessToken,
-      body: feedbackBody({ organizationId: ctx.org.id, title: label("Not a member") }),
+      body: feedbackBody({ tenantId: ctx.org.id, title: label("Not a member") }),
     });
     assertError(refused, 403, "forbidden", "Forbidden.");
   });
 
   test("members can create feedback and SuperAdmins can list it", async () => {
-    const body = feedbackBody({ organizationId: ctx.org.id, title: label("Clock out") });
+    const body = feedbackBody({ tenantId: ctx.org.id, title: label("Clock out") });
     const created = await createJson(ctx.member.accessToken, "/feedback", body);
     ctx.item = created;
     assertFeedback(created, {
@@ -169,8 +169,8 @@ describe("feedback", suite, () => {
       title: body.title,
       userId: ctx.member.user.id,
     });
-    assert.equal(created.organizationId, ctx.org.id);
-    assert.equal(created.organization.name, ctx.org.name);
+    assert.equal(created.tenantId, ctx.org.id);
+    assert.equal(created.tenant.name, ctx.org.name);
     assert.equal(created.actions.length, 0);
     const issue = await waitForLinearIssue(body.title);
     assert.equal(created.linearIssueId, issue.id);
@@ -214,7 +214,7 @@ describe("feedback", suite, () => {
     assert.match(superMail.at(-1).text, /Review it at/);
     ctx.superNotifyCount = superMail.length;
 
-    const withDuplicate = await callApi(`/organizations/${ctx.org.id}`, {
+    const withDuplicate = await callApi(`/tenants/${ctx.org.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
       body: {
@@ -225,7 +225,7 @@ describe("feedback", suite, () => {
       },
     });
     assert.equal(withDuplicate.status, 200);
-    await createJson(ctx.member.accessToken, "/feedback", feedbackBody({ organizationId: ctx.org.id }));
+    await createJson(ctx.member.accessToken, "/feedback", feedbackBody({ tenantId: ctx.org.id }));
     const afterDedup = await waitForMatchingEmails(ctx.super.email, /New bug:/i, ctx.superNotifyCount + 1);
     assert.equal(afterDedup.length, ctx.superNotifyCount + 1);
     ctx.superNotifyCount = afterDedup.length;
@@ -233,9 +233,9 @@ describe("feedback", suite, () => {
 
   test("notify list rejects inactive or outsider users", async () => {
     const outsider = await signUp("fbout");
-    const memberships = await callApi(`/organizations/${ctx.org.id}/memberships`, { token: ctx.admin.accessToken });
+    const memberships = await callApi(`/tenants/${ctx.org.id}/memberships`, { token: ctx.admin.accessToken });
     const row = memberships.json.items.find((item) => item.userId === ctx.notify.user.id);
-    const deactivated = await callApi(`/organizations/${ctx.org.id}/memberships/${row.id}`, {
+    const deactivated = await callApi(`/tenants/${ctx.org.id}/memberships/${row.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
       body: { isActive: false, rateType: "Volunteer" },
@@ -243,14 +243,14 @@ describe("feedback", suite, () => {
     assert.equal(deactivated.status, 200);
 
     const notifyBefore = (await waitForMatchingEmails(ctx.notify.email, /New bug:/i)).length;
-    await createJson(ctx.member.accessToken, "/feedback", feedbackBody({ organizationId: ctx.org.id }));
+    await createJson(ctx.member.accessToken, "/feedback", feedbackBody({ tenantId: ctx.org.id }));
     await waitForMatchingEmails(ctx.super.email, /New bug:/i, ctx.superNotifyCount + 1);
     ctx.superNotifyCount += 1;
     await new Promise((resolve) => setTimeout(resolve, 400));
     const notifyAfter = await waitForMatchingEmails(ctx.notify.email, /New bug:/i);
     assert.equal(notifyAfter.length, notifyBefore);
 
-    const bad = await callApi(`/organizations/${ctx.org.id}`, {
+    const bad = await callApi(`/tenants/${ctx.org.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
       body: {
@@ -260,8 +260,8 @@ describe("feedback", suite, () => {
         },
       },
     });
-    assertError(bad, 400, "validation_error", "feedbackNotifyUserIds must be active users in this organization.");
-    const alsoInactive = await callApi(`/organizations/${ctx.org.id}`, {
+    assertError(bad, 400, "validation_error", "feedbackNotifyUserIds must be active users in this tenant.");
+    const alsoInactive = await callApi(`/tenants/${ctx.org.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
       body: {
@@ -275,10 +275,10 @@ describe("feedback", suite, () => {
       alsoInactive,
       400,
       "validation_error",
-      "feedbackNotifyUserIds must be active users in this organization.",
+      "feedbackNotifyUserIds must be active users in this tenant.",
     );
 
-    await callApi(`/organizations/${ctx.org.id}/memberships/${row.id}`, {
+    await callApi(`/tenants/${ctx.org.id}/memberships/${row.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
       body: { isActive: true, rateType: "Volunteer" },
@@ -359,7 +359,7 @@ describe("feedback", suite, () => {
     assert.match(completed.at(-1).text, /completed the work/i);
     const completedCount = completed.length;
 
-    const archived = await createJson(ctx.member.accessToken, "/feedback", feedbackBody({ organizationId: ctx.org.id }));
+    const archived = await createJson(ctx.member.accessToken, "/feedback", feedbackBody({ tenantId: ctx.org.id }));
     const archivedUpdate = await callApi(`/feedback/${archived.id}`, {
       method: "PATCH",
       token: ctx.super.accessToken,
@@ -391,7 +391,7 @@ describe("feedback", suite, () => {
     const item = await createJson(
       ctx.member.accessToken,
       "/feedback",
-      feedbackBody({ organizationId: ctx.org.id, title: label("Linear sync") }),
+      feedbackBody({ tenantId: ctx.org.id, title: label("Linear sync") }),
     );
     const issue = await waitForLinearIssue(item.title);
     assert.equal(item.linearIssueId, issue.id);
@@ -494,7 +494,7 @@ describe("feedback", suite, () => {
     const removable = await createJson(
       ctx.member.accessToken,
       "/feedback",
-      feedbackBody({ organizationId: ctx.org.id, title: label("Linear remove") }),
+      feedbackBody({ tenantId: ctx.org.id, title: label("Linear remove") }),
     );
     const removableIssue = await waitForLinearIssue(removable.title);
     const removedWebhook = await postLinearWebhook({

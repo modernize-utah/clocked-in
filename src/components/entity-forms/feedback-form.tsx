@@ -93,7 +93,7 @@ function FeedbackForm({
   onCreated: () => void;
   onCancel: () => void;
 }) {
-  const { organization } = useWorkspace();
+  const { tenant } = useWorkspace();
   const queryClient = useQueryClient();
   const pathname = usePathname();
   const [type, setType] = useState("Bug");
@@ -203,7 +203,7 @@ function FeedbackForm({
         create.mutate(formData);
       }}
     >
-      {organization ? <input type="hidden" name="organizationId" value={organization.id} /> : null}
+      {tenant ? <input type="hidden" name="tenantId" value={tenant.id} /> : null}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Type" htmlFor={`${idPrefix}-type`}>
           <SelectField

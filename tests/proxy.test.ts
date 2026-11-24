@@ -52,7 +52,7 @@ test("local browser clients can call the API from another port", async () => {
 
 test("bearer API requests stay on Next even with an obsolete forwarding setting", async () => {
   const response = await proxy(
-    new NextRequest("http://example.test/organizations", {
+    new NextRequest("http://example.test/tenants", {
       headers: { authorization: "Bearer token" },
     }),
   );

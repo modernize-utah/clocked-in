@@ -1,6 +1,6 @@
 import { Prisma } from "@/generated/prisma/client";
 import { Access } from "@/lib/api/access";
-import { guard, lockOrganization, transaction } from "@/lib/api/db";
+import { guard, lockTenant, transaction } from "@/lib/api/db";
 import { conflict, notFound, validation } from "@/lib/api/errors";
 import { Body, has, list, page } from "@/lib/api/json";
 import { report } from "@/lib/api/features/reports";
@@ -10,7 +10,7 @@ import type { ReportFilters, ReportLayout } from "@/lib/report-layout";
 
 type ReportRow = {
   id: string;
-  organizationId: string;
+  tenantId: string;
   name: string;
   isDefault: boolean;
   isDashboard: boolean;
@@ -23,7 +23,7 @@ type ReportRow = {
 function savedReportJson(row: ReportRow) {
   return {
     id: row.id,
-    organizationId: row.organizationId,
+    tenantId: row.tenantId,
     name: row.name,
     isDefault: row.isDefault,
     isDashboard: row.isDashboard,
@@ -34,10 +34,10 @@ function savedReportJson(row: ReportRow) {
   };
 }
 
-async function ensureNameAvailable(organizationId: string, name: string, exceptId?: string) {
+async function ensureNameAvailable(tenantId: string, name: string, exceptId?: string) {
   const taken = await prisma.report.findFirst({
     where: {
-      organizationId,
+      tenantId,
       name: { equals: name, mode: "insensitive" },
       ...(exceptId ? { NOT: { id: exceptId } } : {}),
     },
@@ -48,11 +48,11 @@ async function ensureNameAvailable(organizationId: string, name: string, exceptI
   }
 }
 
-export async function listSavedReports(access: Access, organizationId: string, params: URLSearchParams) {
+export async function listSavedReports(access: Access, tenantId: string, params: URLSearchParams) {
   const paging = page(params);
-  await access.requireOrganization(organizationId, false);
+  await access.requireTenant(tenantId, false);
   const rows = await prisma.report.findMany({
-    where: { organizationId },
+    where: { tenantId },
     orderBy: [{ name: "asc" }, { createdAt: "asc" }],
     skip: paging.offset,
     take: paging.limit,
@@ -60,9 +60,9 @@ export async function listSavedReports(access: Access, organizationId: string, p
   return list(rows.map(savedReportJson), paging);
 }
 
-export async function getSavedReport(access: Access, organizationId: string, reportId: string) {
-  await access.requireOrganization(organizationId, false);
-  const row = await prisma.report.findFirst({ where: { id: reportId, organizationId } });
+export async function getSavedReport(access: Access, tenantId: string, reportId: string) {
+  await access.requireTenant(tenantId, false);
+  const row = await prisma.report.findFirst({ where: { id: reportId, tenantId } });
   if (!row) {
     notFound();
   }
@@ -70,8 +70,8 @@ export async function getSavedReport(access: Access, organizationId: string, rep
   return savedReportJson(row);
 }
 
-export async function createSavedReport(access: Access, organizationId: string, body: Body) {
-  await access.requireReportDesigner(organizationId);
+export async function createSavedReport(access: Access, tenantId: string, body: Body) {
+  await access.requireReportDesigner(tenantId);
   if (!has(body, "layout")) {
     validation("layout is required.");
   }
@@ -89,21 +89,21 @@ export async function createSavedReport(access: Access, organizationId: string, 
     validation("isDashboard must be a boolean.");
   }
 
-  await ensureNameAvailable(organizationId, name);
+  await ensureNameAvailable(tenantId, name);
   const now = new Date();
   const row = await transaction(async (tx) => {
     if (isDefault || isDashboard) {
-      await lockOrganization(tx, organizationId);
+      await lockTenant(tx, tenantId);
     }
     if (isDefault) {
       await tx.report.updateMany({
-        where: { organizationId, isDefault: true },
+        where: { tenantId, isDefault: true },
         data: { isDefault: false, updatedAt: now },
       });
     }
     if (isDashboard) {
       await tx.report.updateMany({
-        where: { organizationId, isDashboard: true },
+        where: { tenantId, isDashboard: true },
         data: { isDashboard: false, updatedAt: now },
       });
     }
@@ -111,7 +111,7 @@ export async function createSavedReport(access: Access, organizationId: string, 
     return tx.report.create({
       data: {
         id: crypto.randomUUID(),
-        organizationId,
+        tenantId,
         name,
         isDefault,
         isDashboard,
@@ -125,9 +125,9 @@ export async function createSavedReport(access: Access, organizationId: string, 
   return savedReportJson(row);
 }
 
-export async function updateSavedReport(access: Access, organizationId: string, reportId: string, body: Body) {
-  await access.requireReportDesigner(organizationId);
-  const current = await prisma.report.findFirst({ where: { id: reportId, organizationId } });
+export async function updateSavedReport(access: Access, tenantId: string, reportId: string, body: Body) {
+  await access.requireReportDesigner(tenantId);
+  const current = await prisma.report.findFirst({ where: { id: reportId, tenantId } });
   if (!current) {
     notFound();
   }
@@ -154,23 +154,23 @@ export async function updateSavedReport(access: Access, organizationId: string, 
   }
 
   if (has(body, "name")) {
-    await ensureNameAvailable(organizationId, name, reportId);
+    await ensureNameAvailable(tenantId, name, reportId);
   }
 
   const now = new Date();
   const row = await transaction(async (tx) => {
     if (isDefault || isDashboard) {
-      await lockOrganization(tx, organizationId);
+      await lockTenant(tx, tenantId);
     }
     if (isDefault) {
       await tx.report.updateMany({
-        where: { organizationId, isDefault: true, NOT: { id: reportId } },
+        where: { tenantId, isDefault: true, NOT: { id: reportId } },
         data: { isDefault: false, updatedAt: now },
       });
     }
     if (isDashboard) {
       await tx.report.updateMany({
-        where: { organizationId, isDashboard: true, NOT: { id: reportId } },
+        where: { tenantId, isDashboard: true, NOT: { id: reportId } },
         data: { isDashboard: false, updatedAt: now },
       });
     }
@@ -183,9 +183,9 @@ export async function updateSavedReport(access: Access, organizationId: string, 
   return savedReportJson(row);
 }
 
-export async function deleteSavedReport(access: Access, organizationId: string, reportId: string) {
-  await access.requireReportDesigner(organizationId);
-  const current = await prisma.report.findFirst({ where: { id: reportId, organizationId }, select: { id: true } });
+export async function deleteSavedReport(access: Access, tenantId: string, reportId: string) {
+  await access.requireReportDesigner(tenantId);
+  const current = await prisma.report.findFirst({ where: { id: reportId, tenantId }, select: { id: true } });
   if (!current) {
     notFound();
   }
@@ -198,9 +198,9 @@ function queryText(params: URLSearchParams, key: string) {
   return value === null || value === "" ? undefined : value;
 }
 
-export async function savedReportData(access: Access, organizationId: string, reportId: string, params: URLSearchParams) {
-  await access.requireOrganization(organizationId, false);
-  const row = await prisma.report.findFirst({ where: { id: reportId, organizationId } });
+export async function savedReportData(access: Access, tenantId: string, reportId: string, params: URLSearchParams) {
+  await access.requireTenant(tenantId, false);
+  const row = await prisma.report.findFirst({ where: { id: reportId, tenantId } });
   if (!row) {
     notFound();
   }
@@ -218,7 +218,7 @@ export async function savedReportData(access: Access, organizationId: string, re
       query.set(key, text);
     }
   };
-  set("departmentId", stored.departmentId);
+  set("organizationId", stored.organizationId);
   set("taskCategoryId", stored.taskCategoryId);
   set("projectId", stored.projectId);
   set("userId", stored.userId);
@@ -226,12 +226,12 @@ export async function savedReportData(access: Access, organizationId: string, re
   const to = queryText(params, "to");
   set("from", clearDates === "true" ? from : from ?? stored.from);
   set("to", clearDates === "true" ? to : to ?? stored.to);
-  return report(access, organizationId, query);
+  return report(access, tenantId, query);
 }
 
 export type SavedReport = {
   id: string;
-  organizationId: string;
+  tenantId: string;
   name: string;
   isDefault: boolean;
   isDashboard: boolean;

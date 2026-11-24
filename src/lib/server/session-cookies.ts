@@ -5,7 +5,7 @@ import {
   refreshCookieSeconds,
 } from "@/lib/api/security";
 
-export const organizationCookie = "clocked-in-org";
+export const tenantCookie = "clocked-in-org";
 
 type CookieWriter = {
   set(name: string, value: string, options: Record<string, unknown>): unknown;
@@ -31,6 +31,6 @@ export function eraseSession(store: CookieWriter) {
   store.delete(refreshCookie);
 }
 
-export function writeOrganization(store: CookieWriter, organizationId: string) {
-  store.set(organizationCookie, organizationId, { ...base, maxAge: 60 * 60 * 24 * 365 });
+export function writeTenant(store: CookieWriter, tenantId: string) {
+  store.set(tenantCookie, tenantId, { ...base, maxAge: 60 * 60 * 24 * 365 });
 }

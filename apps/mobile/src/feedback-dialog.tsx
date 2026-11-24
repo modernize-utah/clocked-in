@@ -26,7 +26,7 @@ const areas = [
 ];
 
 export function FeedbackButton() {
-  const { organization } = useWorkspace();
+  const { tenant } = useWorkspace();
   const [open, setOpen] = useState(false);
   const [type, setType] = useState("Bug");
   const [priority, setPriority] = useState("Medium");
@@ -75,7 +75,7 @@ export function FeedbackButton() {
             setError(null);
             api
               .createFeedback(
-                { type, priority, area, title: title.trim(), description: description.trim(), organizationId: organization.id },
+                { type, priority, area, title: title.trim(), description: description.trim(), tenantId: tenant.id },
                 files,
               )
               .then(() => {

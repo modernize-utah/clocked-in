@@ -7,7 +7,7 @@ import { acceptCodeFromNext, invitationAccount } from "@/lib/api/features/invita
 import { clientIp } from "@/lib/api/rate-limit";
 import { portalName } from "@/lib/portal";
 import { safeNext } from "@/lib/server/action";
-import { requirePinnedOrganizationOrApex } from "@/lib/server/tenant";
+import { requirePinnedTenantOrApex } from "@/lib/server/tenant";
 import { AuthCard, AuthFormSkeleton } from "../auth-card";
 import { SignupForm } from "./signup-form";
 
@@ -17,7 +17,7 @@ export default function SignupPage({ searchParams }: PageProps<"/signup">) {
   return (
     <Suspense
       fallback={
-        <AuthCard title="Create your account" description="Start tracking hours for your organization in a minute.">
+        <AuthCard title="Create your account" description="Start tracking hours for your tenant in a minute.">
           <AuthFormSkeleton fields={5} />
         </AuthCard>
       }
@@ -28,10 +28,10 @@ export default function SignupPage({ searchParams }: PageProps<"/signup">) {
 }
 
 async function SignupContent({ searchParams }: { searchParams: PageProps<"/signup">["searchParams"] }) {
-  const [search, pinned] = await Promise.all([searchParams, requirePinnedOrganizationOrApex()]);
+  const [search, pinned] = await Promise.all([searchParams, requirePinnedTenantOrApex()]);
   const next = safeNext(typeof search.next === "string" ? search.next : "");
   const code = acceptCodeFromNext(next);
-  const invite = code ? await invitationAccount(code, pinned.organization?.id, { ip: clientIp(await headers()) }) : null;
+  const invite = code ? await invitationAccount(code, pinned.tenant?.id, { ip: clientIp(await headers()) }) : null;
   if (invite?.userExists) {
     redirect(`/login?next=${encodeURIComponent(next)}`);
   }
@@ -48,12 +48,12 @@ async function SignupContent({ searchParams }: { searchParams: PageProps<"/signu
       description={
         invitedEmail
           ? `Create a ${portalName()} account for the email this invitation was sent to.`
-          : "Start tracking hours for your organization in a minute."
+          : "Start tracking hours for your tenant in a minute."
       }
       footer={
         <>
           Already have an account?
-          <Link href={signInHref} className="font-medium text-primary hover:underline">
+          <Link href={signInHref} className="font-medium">
             Sign in
           </Link>
         </>

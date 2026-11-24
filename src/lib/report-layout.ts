@@ -27,7 +27,7 @@ export type ListSortKey = (typeof listSortKeys)[number];
 export const listSortDirs = ["asc", "desc"] as const;
 export type ListSortDir = (typeof listSortDirs)[number];
 
-export const entriesScopes = ["mine", "organization"] as const;
+export const entriesScopes = ["mine", "tenant"] as const;
 export type EntriesScope = (typeof entriesScopes)[number];
 
 export const entriesLimitMax = 20;
@@ -104,7 +104,7 @@ export type ReportLayout = {
 };
 
 export type ReportFilters = {
-  departmentId?: string[];
+  organizationId?: string[];
   taskCategoryId?: string[];
   projectId?: string[];
   userId?: string[];
@@ -361,7 +361,7 @@ export function normalizeLayout(value: unknown): ReportLayout {
   return { version: 1, cards };
 }
 
-export const reportIdFilterKeys = ["departmentId", "taskCategoryId", "projectId", "userId"] as const;
+export const reportIdFilterKeys = ["organizationId", "taskCategoryId", "projectId", "userId"] as const;
 export type ReportIdFilterKey = (typeof reportIdFilterKeys)[number];
 export const reportFilterKeys = [...reportIdFilterKeys, "from", "to"] as const;
 
@@ -511,7 +511,7 @@ function templateId(slot: number) {
   return `00000000-0000-4000-8000-${slot.toString(16).padStart(12, "0")}`;
 }
 
-type TemplateCopy = { department: string; taskCategory: string; project: string };
+type TemplateCopy = { organization: string; taskCategory: string; project: string };
 
 function valueCard(
   slot: number,
@@ -580,7 +580,7 @@ export function reportTemplate(id: ReportTemplateId, copy: TemplateCopy): Report
 
 function summaryTemplate(copy: TemplateCopy): ReportLayout {
   const charts = [
-    chartCard(5, 0, { title: `Hours by ${copy.department.toLowerCase()}`, accessor: "user.byDepartment", chartType: "column", valueKey: "hours", format: "hours" }),
+    chartCard(5, 0, { title: `Hours by ${copy.organization.toLowerCase()}`, accessor: "user.byOrganization", chartType: "column", valueKey: "hours", format: "hours" }),
     chartCard(6, 1, { title: `Hours by ${copy.taskCategory.toLowerCase()}`, accessor: "user.byCategory", chartType: "column", valueKey: "hours", format: "hours" }),
     chartCard(7, 2, { title: "In-kind by month", accessor: "user.byMonth", chartType: "column", valueKey: "inKind", format: "currency" }),
     chartCard(8, 3, { title: "Hours by volunteer", accessor: "user.byVolunteer", chartType: "bar", valueKey: "hours", format: "hours" }),
@@ -598,7 +598,7 @@ function peopleTemplate(copy: TemplateCopy): ReportLayout {
       ...volunteerTotals(20),
       listCard(24, { column: 1, row: 2 }, { title: `By ${copy.project.toLowerCase()}`, accessor: "user.byProject", visibleColumns: ["name", "type", "hours", "share", "people", "inKind"] }),
       listCard(25, { column: 7, row: 2 }, { title: "By person", accessor: "user.byPerson", visibleColumns: measure }),
-      listCard(26, { column: 1, row: 7 }, { title: `By ${copy.department.toLowerCase()}`, accessor: "user.byDepartment", visibleColumns: ["name", "hours", "share", "people", "inKind"] }),
+      listCard(26, { column: 1, row: 7 }, { title: `By ${copy.organization.toLowerCase()}`, accessor: "user.byOrganization", visibleColumns: ["name", "hours", "share", "people", "inKind"] }),
       listCard(27, { column: 7, row: 7 }, { title: `By ${copy.taskCategory.toLowerCase()}`, accessor: "user.byCategory", visibleColumns: ["name", "hours", "share", "people", "inKind"] }),
     ],
   };
@@ -613,7 +613,7 @@ function groupsTemplate(copy: TemplateCopy): ReportLayout {
       valueCard(31, 5, { title: "In-kind value", accessor: "collective.inKind", color: "success", format: "currency", icon: "hand-coins", columns: 4 }),
       valueCard(32, 9, { title: "Sessions", accessor: "collective.entries", color: "accent", format: "number", icon: "list-checks", columns: 4 }),
       listCard(33, { column: 1, row: 2 }, { title: `By ${copy.project.toLowerCase()}`, accessor: "collective.byProject", visibleColumns: ["name", "type", "hours", "share", "inKind"] }),
-      listCard(34, { column: 7, row: 2 }, { title: `By ${copy.department.toLowerCase()}`, accessor: "collective.byDepartment", visibleColumns: measure }),
+      listCard(34, { column: 7, row: 2 }, { title: `By ${copy.organization.toLowerCase()}`, accessor: "collective.byOrganization", visibleColumns: measure }),
       listCard(35, { column: 1, row: 7 }, { title: `By ${copy.taskCategory.toLowerCase()}`, accessor: "collective.byCategory", visibleColumns: measure }),
     ],
   };
@@ -628,7 +628,7 @@ function staffTemplate(copy: TemplateCopy): ReportLayout {
       valueCard(41, 4, { title: "In-kind value", accessor: "staff.inKind", color: "success", format: "currency", icon: "hand-coins" }),
       valueCard(42, 7, { title: "Staff", accessor: "staff.volunteers", color: "highlight", format: "number", icon: "users" }),
       valueCard(43, 10, { title: "Entries", accessor: "staff.entries", color: "accent", format: "number", icon: "list-checks" }),
-      listCard(44, { column: 1, row: 2 }, { title: `By ${copy.department.toLowerCase()}`, accessor: "staff.byDepartment", visibleColumns: measure }),
+      listCard(44, { column: 1, row: 2 }, { title: `By ${copy.organization.toLowerCase()}`, accessor: "staff.byOrganization", visibleColumns: measure }),
       listCard(45, { column: 7, row: 2 }, { title: `By ${copy.project.toLowerCase()}`, accessor: "staff.byProject", visibleColumns: ["name", "type", "hours", "share", "inKind"] }),
       listCard(46, { column: 1, row: 7 }, { title: "By person", accessor: "staff.byPerson", visibleColumns: measure }),
     ],
@@ -745,9 +745,9 @@ export function dashboardLayout(): ReportLayout {
       {
         id: templateId(55),
         kind: "chart",
-        title: "Hours by department",
+        title: "Hours by organization",
         description: "",
-        accessor: "user.byDepartment",
+        accessor: "user.byOrganization",
         chartType: "bar",
         palette: "single",
         valueKey: "hours",

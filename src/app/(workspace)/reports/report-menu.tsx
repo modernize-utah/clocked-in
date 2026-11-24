@@ -16,7 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useOrganization, useWorkspace } from "@/hooks/use-workspace";
+import { useTenant, useWorkspace } from "@/hooks/use-workspace";
 import type { SavedReport } from "@/lib/api/features/saved-reports";
 import { downloadTextFile } from "@/lib/download";
 import { csvUrl, keys, payrollCsvUrl, summaryCsvUrl } from "@/lib/queries";
@@ -47,7 +47,7 @@ export function ReportMenu({
   templateKey?: string | null;
 }) {
   const router = useRouter();
-  const organization = useOrganization();
+  const tenant = useTenant();
   const queryClient = useQueryClient();
   const { isAdmin, permissions } = useWorkspace();
   const canDesign = isAdmin || permissions.includes("design_reports");
@@ -62,38 +62,38 @@ export function ReportMenu({
   async function saveFilters() {
     if (!saved) return;
     setSaving(true);
-    const result = await updateReportAction(organization.id, saved.id, { filters });
+    const result = await updateReportAction(tenant.id, saved.id, { filters });
     setSaving(false);
     if (!result.ok) {
       toast.error(result.error);
       return;
     }
-    await queryClient.invalidateQueries({ queryKey: keys.savedReports(organization.id) });
-    await queryClient.invalidateQueries({ queryKey: keys.savedReport(organization.id, saved.id) });
+    await queryClient.invalidateQueries({ queryKey: keys.savedReports(tenant.id) });
+    await queryClient.invalidateQueries({ queryKey: keys.savedReport(tenant.id, saved.id) });
     toast.success("Filters saved.");
   }
 
   async function deleteReport() {
     if (!saved || deleting) return;
     setDeleting(true);
-    const result = await deleteReportAction(organization.id, saved.id);
+    const result = await deleteReportAction(tenant.id, saved.id);
     setDeleting(false);
     if (!result.ok) {
       toast.error(result.error);
       return;
     }
     try {
-      window.localStorage.removeItem(lastReportStorageKey(organization.id));
+      window.localStorage.removeItem(lastReportStorageKey(tenant.id));
     } catch {
       // Ignore storage access errors
     }
     const remaining =
       queryClient
-        .getQueryData<SavedReport[]>(keys.savedReports(organization.id))
+        .getQueryData<SavedReport[]>(keys.savedReports(tenant.id))
         ?.filter((item) => item.id !== saved.id) ?? [];
-    queryClient.setQueryData<SavedReport[]>(keys.savedReports(organization.id), remaining);
-    queryClient.removeQueries({ queryKey: keys.savedReport(organization.id, saved.id) });
-    await queryClient.invalidateQueries({ queryKey: keys.savedReports(organization.id) });
+    queryClient.setQueryData<SavedReport[]>(keys.savedReports(tenant.id), remaining);
+    queryClient.removeQueries({ queryKey: keys.savedReport(tenant.id, saved.id) });
+    await queryClient.invalidateQueries({ queryKey: keys.savedReports(tenant.id) });
     const nextDefault = remaining.find((item) => item.isDefault);
     router.replace(reportPath(nextDefault ? slugForSavedReport(nextDefault.name) : "summary"), { scroll: false });
     toast.success("Report deleted.");
@@ -107,7 +107,7 @@ export function ReportMenu({
       await downloadReportPdf({
         title,
         slug: active ?? "report",
-        organization,
+        tenant,
         filters,
         filterSummary,
         cards,
@@ -154,14 +154,14 @@ export function ReportMenu({
             </DropdownMenuItem>
           ) : null}
           <DropdownMenuSeparator />
-          <DropdownMenuItem render={<a href={csvUrl(organization.id, filters)} download="volunteer-log.csv" />}>
+          <DropdownMenuItem render={<a href={csvUrl(tenant.id, filters)} download="volunteer-log.csv" />}>
             Download Full Volunteer Log
           </DropdownMenuItem>
-          <DropdownMenuItem render={<a href={summaryCsvUrl(organization.id, filters)} download="summary.csv" />}>
+          <DropdownMenuItem render={<a href={summaryCsvUrl(tenant.id, filters)} download="summary.csv" />}>
             Download Full Summary
           </DropdownMenuItem>
           {canViewPayroll && active === "payroll" ? (
-            <DropdownMenuItem render={<a href={payrollCsvUrl(organization.id, filters)} download="payroll.csv" />}>
+            <DropdownMenuItem render={<a href={payrollCsvUrl(tenant.id, filters)} download="payroll.csv" />}>
               Download payroll
             </DropdownMenuItem>
           ) : null}

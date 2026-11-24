@@ -35,7 +35,7 @@ function personJson(user: ConnectionRow["userA"]) {
 function connectionJson(connection: ConnectionRow) {
   return {
     id: connection.id,
-    organizationId: connection.organizationId,
+    tenantId: connection.tenantId,
     userAId: connection.userAId,
     userBId: connection.userBId,
     relationship: connection.relationship,
@@ -91,17 +91,17 @@ export function parseUpdateConnection(body: Body): UpdateConnectionRequest {
   };
 }
 
-async function assertActiveMember(db: Db, organizationId: string, userId: string) {
-  const member = await db.organizationMembership.count({ where: { organizationId, userId, isActive: true } });
+async function assertActiveMember(db: Db, tenantId: string, userId: string) {
+  const member = await db.tenantMembership.count({ where: { tenantId, userId, isActive: true } });
   if (member === 0) {
-    validation("Both people must be active members of this organization.");
+    validation("Both people must be active members of this tenant.");
   }
 }
 
 export async function insertConnection(
   db: Db,
   input: {
-    organizationId: string;
+    tenantId: string;
     fromUserId: string;
     toUserId: string;
     relationship: MemberRelationship;
@@ -114,7 +114,7 @@ export async function insertConnection(
   }
 
   const existing = await db.memberConnection.findFirst({
-    where: { organizationId: input.organizationId, userAId: canonical.userAId, userBId: canonical.userBId },
+    where: { tenantId: input.tenantId, userAId: canonical.userAId, userBId: canonical.userBId },
     select: { id: true },
   });
   if (existing) {
@@ -124,7 +124,7 @@ export async function insertConnection(
   return db.memberConnection.create({
     data: {
       id: crypto.randomUUID(),
-      organizationId: input.organizationId,
+      tenantId: input.tenantId,
       userAId: canonical.userAId,
       userBId: canonical.userBId,
       relationship: canonical.relationship,
@@ -134,24 +134,24 @@ export async function insertConnection(
   });
 }
 
-export async function volunteerConnectedTo(access: Access, organizationId: string, otherUserId: string) {
+export async function volunteerConnectedTo(access: Access, tenantId: string, otherUserId: string) {
   if (access.isApiKey || access.isSuperAdmin || access.actorUserId === otherUserId) {
     return false;
   }
 
-  if (!(await access.isOrgVolunteer(organizationId))) {
+  if (!(await access.isOrgVolunteer(tenantId))) {
     return false;
   }
 
   const { userAId, userBId } = orderPair(access.actorUserId, otherUserId);
   return (
     (await prisma.memberConnection.count({
-      where: { organizationId, userAId, userBId },
+      where: { tenantId, userAId, userBId },
     })) > 0
   );
 }
 
-export async function volunteerConnectedOrganizationIds(access: Access, otherUserId: string) {
+export async function volunteerConnectedTenantIds(access: Access, otherUserId: string) {
   if (access.isApiKey || access.isSuperAdmin || access.actorUserId === otherUserId) {
     return [];
   }
@@ -163,12 +163,12 @@ export async function volunteerConnectedOrganizationIds(access: Access, otherUse
         { userAId: otherUserId, userBId: access.actorUserId },
       ],
     },
-    select: { organizationId: true },
+    select: { tenantId: true },
   });
   const ids: string[] = [];
   for (const row of rows) {
-    if (await access.isOrgVolunteer(row.organizationId)) {
-      ids.push(row.organizationId);
+    if (await access.isOrgVolunteer(row.tenantId)) {
+      ids.push(row.tenantId);
     }
   }
 
@@ -179,15 +179,15 @@ function orderPair(left: string, right: string) {
   return left < right ? { userAId: left, userBId: right } : { userAId: right, userBId: left };
 }
 
-export async function listConnections(access: Access, organizationId: string, params: URLSearchParams) {
+export async function listConnections(access: Access, tenantId: string, params: URLSearchParams) {
   const paging = page(params);
-  await access.requireOrganization(organizationId, false);
-  const admin = access.isSuperAdmin || (await access.isOrgAdmin(organizationId));
+  await access.requireTenant(tenantId, false);
+  const admin = access.isSuperAdmin || (await access.isOrgAdmin(tenantId));
   const connections = await prisma.memberConnection.findMany({
     where: admin
-      ? { organizationId }
+      ? { tenantId }
       : {
-          organizationId,
+          tenantId,
           OR: [{ userAId: access.actorUserId }, { userBId: access.actorUserId }],
         },
     include: connectionInclude,
@@ -198,13 +198,13 @@ export async function listConnections(access: Access, organizationId: string, pa
   return list(connections.map(connectionJson), paging);
 }
 
-export async function createConnection(access: Access, organizationId: string, request: CreateConnectionRequest) {
-  await access.requireOrganizationAdmin(organizationId);
+export async function createConnection(access: Access, tenantId: string, request: CreateConnectionRequest) {
+  await access.requireTenantAdmin(tenantId);
   return transaction(async (tx) => {
-    await assertActiveMember(tx, organizationId, request.userId);
-    await assertActiveMember(tx, organizationId, request.connectedUserId);
+    await assertActiveMember(tx, tenantId, request.userId);
+    await assertActiveMember(tx, tenantId, request.connectedUserId);
     const saved = await insertConnection(tx, {
-      organizationId,
+      tenantId,
       fromUserId: request.userId,
       toUserId: request.connectedUserId,
       relationship: request.relationship,
@@ -216,12 +216,12 @@ export async function createConnection(access: Access, organizationId: string, r
 
 export async function updateConnection(
   access: Access,
-  organizationId: string,
+  tenantId: string,
   connectionId: string,
   request: UpdateConnectionRequest,
 ) {
-  await access.requireOrganizationAdmin(organizationId);
-  const connection = await prisma.memberConnection.findFirst({ where: { id: connectionId, organizationId } });
+  await access.requireTenantAdmin(tenantId);
+  const connection = await prisma.memberConnection.findFirst({ where: { id: connectionId, tenantId } });
   if (!connection) {
     notFound();
   }
@@ -244,10 +244,10 @@ export async function updateConnection(
   return connectionJson(saved);
 }
 
-export async function deleteConnection(access: Access, organizationId: string, connectionId: string) {
-  await access.requireOrganizationAdmin(organizationId);
+export async function deleteConnection(access: Access, tenantId: string, connectionId: string) {
+  await access.requireTenantAdmin(tenantId);
   const connection = await prisma.memberConnection.findFirst({
-    where: { id: connectionId, organizationId },
+    where: { id: connectionId, tenantId },
     select: { id: true },
   });
   if (!connection) {

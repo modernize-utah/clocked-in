@@ -1,5 +1,5 @@
 import type { Access } from "@/lib/api/access";
-import { listDepartments } from "@/lib/api/features/departments";
+import { listOrganizations } from "@/lib/api/features/organizations";
 import { listHourlyRates } from "@/lib/api/features/hourly-rates";
 import { listProjects } from "@/lib/api/features/projects";
 import { listTags } from "@/lib/api/features/tags";
@@ -10,16 +10,16 @@ function limit(extra?: Record<string, string>) {
   return new URLSearchParams({ limit: "100", ...extra });
 }
 
-export async function loadLookups(access: Access, organizationId: string): Promise<Lookups> {
-  const [departments, projects, categories, tags, hourlyRates] = await Promise.all([
-    listDepartments(access, organizationId, limit()),
-    listProjects(access, organizationId, limit({ includeInactive: "true" })),
-    listTaskCategories(access, organizationId, limit()),
-    listTags(access, organizationId, limit({ includeArchived: "true" })),
-    listHourlyRates(access, organizationId, limit()),
+export async function loadLookups(access: Access, tenantId: string): Promise<Lookups> {
+  const [organizations, projects, categories, tags, hourlyRates] = await Promise.all([
+    listOrganizations(access, tenantId, limit()),
+    listProjects(access, tenantId, limit({ includeInactive: "true" })),
+    listTaskCategories(access, tenantId, limit()),
+    listTags(access, tenantId, limit({ includeArchived: "true" })),
+    listHourlyRates(access, tenantId, limit()),
   ]);
   return {
-    departments: departments.items,
+    organizations: organizations.items,
     projects: projects.items,
     categories: categories.items,
     tags: tags.items.filter((tag) => !("isArchived" in tag) || tag.isArchived !== true),

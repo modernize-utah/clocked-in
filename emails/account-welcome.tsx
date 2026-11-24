@@ -3,28 +3,28 @@ import { bodyText, EmailLayout, linkText, quietText } from "./components/layout"
 
 export const accountWelcome = {
   id: "account-welcome",
-  subject: "Your account for {{organizationName}}",
-  variables: ["organizationName", "username", "password", "url"],
+  subject: "Your account for {{tenantName}}",
+  variables: ["tenantName", "username", "password", "url"],
 };
 
 export default function AccountWelcomeEmail({
-  organizationName = "Harbor Volunteers",
+  tenantName = "Harbor Volunteers",
   username = "ada",
   password = "temp-pass-1",
   url = "http://localhost:3025/login",
 }: {
-  organizationName?: string;
+  tenantName?: string;
   username?: string;
   password?: string;
   url?: string;
 }) {
   return (
     <EmailLayout
-      preview={`Your temporary password for ${organizationName} is inside.`}
+      preview={`Your temporary password for ${tenantName} is inside.`}
       title="Your account is ready"
     >
       <Text style={bodyText}>
-        An administrator created a VolunTime account for you at {organizationName}.
+        An administrator created a VolunTime account for you at {tenantName}.
       </Text>
       <Text style={bodyText}>Username: {username}</Text>
       <Text style={bodyText}>Temporary password: {password}</Text>

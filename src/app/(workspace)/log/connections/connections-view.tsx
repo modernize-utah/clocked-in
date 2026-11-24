@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useActionMutation } from "@/hooks/use-action-mutation";
 import { useClientRedirect } from "@/hooks/use-client-redirect";
-import { useOrganization, useWorkspace } from "@/hooks/use-workspace";
+import { useTenant, useWorkspace } from "@/hooks/use-workspace";
 import { connectionPersonName, memberRelationships, relationshipFor } from "@/lib/member-connection";
 import { connectionsQuery, keys } from "@/lib/queries";
 import { canLogConnectionTime } from "@/lib/roles";
@@ -26,17 +26,17 @@ const relationshipOptions = memberRelationships.map((relationship) => ({ value: 
 
 export function ConnectionsTimeView() {
   const { viewer, isAdmin, role } = useWorkspace();
-  const organization = useOrganization();
-  const connections = useQuery(connectionsQuery(organization.id));
+  const tenant = useTenant();
+  const connections = useQuery(connectionsQuery(tenant.id));
   const canLog = canLogConnectionTime({
     role,
     isAdmin,
-    allowVolunteersToAddVolunteers: organization.preferences.allowVolunteersToAddVolunteers,
+    allowVolunteersToAddVolunteers: tenant.preferences.allowVolunteersToAddVolunteers,
     connectionCount: connections.data?.length ?? 0,
   });
   useClientRedirect(!connections.isPending && !canLog, "/log/own");
   const [adding, setAdding] = useState(false);
-  const canAdd = role === "VOLUNTEER" && organization.preferences.allowVolunteersToAddVolunteers;
+  const canAdd = role === "VOLUNTEER" && tenant.preferences.allowVolunteersToAddVolunteers;
   if (!canLog && connections.isPending) return null;
   if (!canLog) return null;
 
@@ -90,10 +90,10 @@ export function ConnectionsTimeView() {
 }
 
 function AddVolunteerForm({ onCancel, onSaved }: { onCancel: () => void; onSaved: () => void }) {
-  const organization = useOrganization();
+  const tenant = useTenant();
   const [relationship, setRelationship] = useState<string>(memberRelationships[0]);
-  const create = useActionMutation((input: NewPerson) => createPersonAction(organization.id, input), {
-    invalidate: [keys.members(organization.id), keys.connections(organization.id)],
+  const create = useActionMutation((input: NewPerson) => createPersonAction(tenant.id, input), {
+    invalidate: [keys.members(tenant.id), keys.connections(tenant.id)],
     errorToast: false,
     onSuccess: onSaved,
   });

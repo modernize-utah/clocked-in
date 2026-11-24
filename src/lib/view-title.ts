@@ -3,16 +3,16 @@ export function welcomeTitle(name: string) {
   return first ? `Welcome back, ${first}` : "Welcome back";
 }
 
-export function viewTitle(pathname: string | null, name: string, organizationName?: string | null) {
+export function viewTitle(pathname: string | null, name: string, tenantName?: string | null) {
   if (!pathname) return "";
-  if (pathname === "/") return organizationName?.trim() || "Home";
+  if (pathname === "/") return tenantName?.trim() || "Home";
   if (pathname === "/dashboard/design") return "Edit dashboard";
   if (pathname.startsWith("/dashboard")) return welcomeTitle(name);
   if (pathname.startsWith("/log")) return "Log time";
   if (pathname.startsWith("/entries")) return "Entries";
   if (pathname.startsWith("/reports")) return "Reports";
-  if (pathname === "/organization/new") return "New organization";
-  if (pathname === "/organization") return organizationName?.trim() || "Organization";
+  if (pathname === "/tenant/new") return "New tenant";
+  if (pathname === "/tenant") return tenantName?.trim() || "Tenant";
   if (pathname.startsWith("/profile")) return "Profile";
   if (pathname.startsWith("/people")) return "People";
   if (pathname.startsWith("/settings")) return "Settings";

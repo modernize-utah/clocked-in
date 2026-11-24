@@ -7,27 +7,27 @@ describe("formats / reports and csv", suite, () => {
 
   before(async () => {
     ctx.admin = await signUp("formatadmin");
-    ctx.org = await createJson(ctx.admin.accessToken, "/organizations", { name: label("Format org") });
-    const patched = await callApi(`/organizations/${ctx.org.id}`, {
+    ctx.org = await createJson(ctx.admin.accessToken, "/tenants", { name: label("Format org") });
+    const patched = await callApi(`/tenants/${ctx.org.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
       body: { volunteerHourlyRate: 40 },
     });
     assert.equal(patched.status, 200);
-    ctx.project = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/projects`, {
+    ctx.project = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/projects`, {
       title: label("Format project"),
       accessType: "Public",
     });
-    ctx.category = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/task-categories`, {
+    ctx.category = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/task-categories`, {
       name: label("Format category"),
     });
-    ctx.lower = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/tags`, { name: label("beta") });
-    ctx.upper = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/tags`, { name: label("Alpha") });
+    ctx.lower = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/tags`, { name: label("beta") });
+    ctx.upper = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/tags`, { name: label("Alpha") });
   });
 
   test("csv rows use fixed number, time, and tag formats", async () => {
     await createJson(ctx.admin.accessToken, "/time/duration", {
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       startedAt: "2026-09-01T10:00:00Z",
@@ -38,13 +38,13 @@ describe("formats / reports and csv", suite, () => {
       tagIds: [ctx.lower.id, ctx.upper.id],
     });
     await createJson(ctx.admin.accessToken, "/time/total", {
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       durationMinutes: 90,
       occurredOn: "2026-09-02",
     });
-    const response = await callApi(`/organizations/${ctx.org.id}/time-entries.csv`, {
+    const response = await callApi(`/tenants/${ctx.org.id}/time-entries.csv`, {
       token: ctx.admin.accessToken,
       query: { from: "2026-09-01", to: "2026-09-02" },
     });
@@ -64,7 +64,7 @@ describe("formats / reports and csv", suite, () => {
 
   test("collective minutes round half up and in-kind is exact", async () => {
     const entry = await createJson(ctx.admin.accessToken, "/collective-time-entries", {
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       startedAt: "2026-09-03T10:00:00Z",
@@ -72,7 +72,7 @@ describe("formats / reports and csv", suite, () => {
       participantCount: 3,
     });
     assert.equal(entry.inKindValue, 1);
-    const response = await callApi(`/organizations/${ctx.org.id}/report`, {
+    const response = await callApi(`/tenants/${ctx.org.id}/report`, {
       token: ctx.admin.accessToken,
       query: { from: "2026-09-03", to: "2026-09-03" },
     });
@@ -93,22 +93,22 @@ describe("formats / reports and csv", suite, () => {
   });
 
   test("groups with equal hours sort by label using code units", async () => {
-    const apple = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/task-categories`, {
+    const apple = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/task-categories`, {
       name: label("apple"),
     });
-    const banana = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/task-categories`, {
+    const banana = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/task-categories`, {
       name: label("Banana"),
     });
     for (const category of [apple, banana]) {
       await createJson(ctx.admin.accessToken, "/time/total", {
-        organizationId: ctx.org.id,
+        tenantId: ctx.org.id,
         projectId: ctx.project.id,
         taskCategoryId: category.id,
         durationMinutes: 60,
         occurredOn: "2026-09-04",
       });
     }
-    const response = await callApi(`/organizations/${ctx.org.id}/report`, {
+    const response = await callApi(`/tenants/${ctx.org.id}/report`, {
       token: ctx.admin.accessToken,
       query: { from: "2026-09-04", to: "2026-09-04" },
     });
@@ -132,16 +132,16 @@ describe("formats / request handling order", suite, () => {
   test("a bad query is rejected before the access check", async () => {
     const owner = await signUp("orderowner");
     const outsider = await signUp("orderout");
-    const org = await createJson(owner.accessToken, "/organizations", { name: label("Order org") });
-    const forbidden = await callApi(`/organizations/${org.id}/projects`, {
+    const org = await createJson(owner.accessToken, "/tenants", { name: label("Order org") });
+    const forbidden = await callApi(`/tenants/${org.id}/projects`, {
       token: outsider.accessToken,
       query: { limit: 0 },
     });
-    const missing = await callApi(`/organizations/${missingId()}/tags`, {
+    const missing = await callApi(`/tenants/${missingId()}/tags`, {
       token: outsider.accessToken,
       query: { offset: -1 },
     });
-    const report = await callApi(`/organizations/${org.id}/report`, {
+    const report = await callApi(`/tenants/${org.id}/report`, {
       token: outsider.accessToken,
       query: { userId: "nope" },
     });

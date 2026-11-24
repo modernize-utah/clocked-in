@@ -18,7 +18,7 @@ function param(value: string | string[] | undefined) {
 }
 
 export default function EntriesScreen() {
-  const { organization, viewer, isAdmin, isCoordinator, labels } = useWorkspace();
+  const { tenant, viewer, isAdmin, isCoordinator, labels } = useWorkspace();
   const { lookups } = useLookups();
   const canSeeOthers = isAdmin || isCoordinator;
   const params = useLocalSearchParams<{
@@ -28,7 +28,7 @@ export default function EntriesScreen() {
     everyone?: string;
     projectId?: string;
     taskCategoryId?: string;
-    departmentId?: string;
+    organizationId?: string;
     unclassified?: string;
   }>();
   const range: DateRange = { from: param(params.from), to: param(params.to) };
@@ -36,13 +36,13 @@ export default function EntriesScreen() {
   const personId = showEveryone ? everyone : (param(params.person) ?? viewer.id);
   const projectId = param(params.projectId) ?? "";
   const taskCategoryId = param(params.taskCategoryId) ?? "";
-  const departmentId = param(params.departmentId) ?? "";
+  const organizationId = param(params.organizationId) ?? "";
   const unclassified = param(params.unclassified) === "1";
   const [limit, setLimit] = useState(pageSize);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const members = useQuery({
-    queryKey: ["members", organization.id],
-    queryFn: () => api.memberships(organization.id),
+    queryKey: ["members", tenant.id],
+    queryFn: () => api.memberships(tenant.id),
     enabled: canSeeOthers,
   });
   const query = {
@@ -51,26 +51,26 @@ export default function EntriesScreen() {
     to: range.to,
     projectId: projectId || undefined,
     taskCategoryId: taskCategoryId || undefined,
-    departmentId: departmentId || undefined,
+    organizationId: organizationId || undefined,
     unclassified: unclassified ? 1 : undefined,
   };
   const entries = useQuery({
     queryKey: [
       "own-entries",
       showEveryone ? everyone : personId,
-      organization.id,
+      tenant.id,
       limit,
       range.from ?? "",
       range.to ?? "",
       projectId,
       taskCategoryId,
-      departmentId,
+      organizationId,
       unclassified,
     ],
     queryFn: () =>
       showEveryone
-        ? api.orgEntries(organization.id, query)
-        : api.entries(personId, { organizationId: organization.id, ...query }),
+        ? api.orgEntries(tenant.id, query)
+        : api.entries(personId, { tenantId: tenant.id, ...query }),
     placeholderData: (previous) => previous,
   });
   const items = entries.data?.items ?? [];
@@ -84,7 +84,7 @@ export default function EntriesScreen() {
       .filter((member) => member.userId !== viewer.id)
       .map((member) => ({ value: member.userId, label: formatPersonName(member.user) })),
   ];
-  const filterCount = [range.from || range.to, projectId, taskCategoryId, departmentId, unclassified].filter(Boolean).length;
+  const filterCount = [range.from || range.to, projectId, taskCategoryId, organizationId, unclassified].filter(Boolean).length;
 
   function setFilters(patch: Record<string, string | undefined>) {
     setLimit(pageSize);
@@ -142,10 +142,10 @@ export default function EntriesScreen() {
           value={taskCategoryId || "any"}
         />
         <Select
-          label={labels.department}
-          onChange={(next) => setFilters({ departmentId: next === "any" ? undefined : next })}
-          options={[{ value: "any", label: "Any" }, ...lookups.departments.map((item) => ({ value: item.id, label: item.name }))]}
-          value={departmentId || "any"}
+          label={labels.organization}
+          onChange={(next) => setFilters({ organizationId: next === "any" ? undefined : next })}
+          options={[{ value: "any", label: "Any" }, ...lookups.organizations.map((item) => ({ value: item.id, label: item.name }))]}
+          value={organizationId || "any"}
         />
         <Button
           label={unclassified ? "Showing unclassified" : "Unclassified only"}
@@ -155,7 +155,7 @@ export default function EntriesScreen() {
         <Button
           label="Clear filters"
           onPress={() =>
-            setFilters({ from: undefined, to: undefined, projectId: undefined, taskCategoryId: undefined, departmentId: undefined, unclassified: undefined })
+            setFilters({ from: undefined, to: undefined, projectId: undefined, taskCategoryId: undefined, organizationId: undefined, unclassified: undefined })
           }
           variant="ghost"
         />

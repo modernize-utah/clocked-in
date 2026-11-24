@@ -22,7 +22,7 @@ export default function SignUpScreen() {
   const ready = firstName.trim() && lastName.trim() && email.includes("@") && username.trim().length >= 3 && password.length >= 8;
 
   return (
-    <AuthFrame description="Create an account, then join or start an organization." title="Sign up">
+    <AuthFrame description="Create an account, then join or start an tenant." title="Sign up">
       <Field autoCapitalize="words" label="First name" onChangeText={setFirstName} value={firstName} />
       <Field autoCapitalize="words" label="Last name" onChangeText={setLastName} value={lastName} />
       <Field autoComplete="email" keyboardType="email-address" label="Email" onChangeText={setEmail} value={email} />

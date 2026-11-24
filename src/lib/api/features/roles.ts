@@ -15,7 +15,7 @@ import { prisma } from "@/lib/prisma";
 
 const roleInclude = { permissions: true } as const;
 
-const scopeRank: Record<RoleScope, number> = { self: 0, assigned_groups: 1, organization: 2 };
+const scopeRank: Record<RoleScope, number> = { self: 0, assigned_groups: 1, tenant: 2 };
 
 /** A role's permissions: its stored rows, or the defaults for its code when it has none. */
 export function effectivePermissions(role: { code: string; permissions: { permission: string; allowed: boolean }[] }) {
@@ -25,33 +25,33 @@ export function effectivePermissions(role: { code: string; permissions: { permis
 }
 
 /**
- * Anyone but an organization admin may grant only permissions they hold, and no wider scope than their own,
+ * Anyone but an tenant admin may grant only permissions they hold, and no wider scope than their own,
  * so holding manage_roles, approve_access_requests, or import_people cannot become admin.
  */
 export async function assertCanGrant(
   access: Access,
-  organizationId: string,
+  tenantId: string,
   grant: { permissions: Iterable<Permission>; scope?: RoleScope | null },
 ) {
-  if (await access.isOrgAdmin(organizationId)) {
+  if (await access.isOrgAdmin(tenantId)) {
     return;
   }
 
-  const held = await access.permissionsFor(organizationId);
+  const held = await access.permissionsFor(tenantId);
   const missing = [...grant.permissions].find((permission) => !held.has(permission));
   if (missing) {
     throw new ApiError(403, "forbidden", `You can only grant permissions you have, and ${missing} is not one of them.`);
   }
 
-  if (grant.scope && scopeRank[grant.scope] > scopeRank[await access.roleScope(organizationId)]) {
+  if (grant.scope && scopeRank[grant.scope] > scopeRank[await access.roleScope(tenantId)]) {
     throw new ApiError(403, "forbidden", "You can only grant a scope as wide as your own.");
   }
 }
 
 function normalizeScope(value: string): RoleScope {
   const scope = value.trim();
-  if (scope !== "organization" && scope !== "assigned_groups" && scope !== "self") {
-    validation("scope must be organization, assigned_groups, or self.");
+  if (scope !== "tenant" && scope !== "assigned_groups" && scope !== "self") {
+    validation("scope must be tenant, assigned_groups, or self.");
   }
   return scope;
 }
@@ -70,7 +70,7 @@ function roleJson(role: {
   id: string;
   code: string;
   name: string;
-  organizationId: string | null;
+  tenantId: string | null;
   isSystem: boolean;
   scope: string;
   permissions: { permission: string; allowed: boolean }[];
@@ -80,18 +80,18 @@ function roleJson(role: {
     id: role.id,
     code: role.code,
     name: role.name,
-    organizationId: role.organizationId,
+    tenantId: role.tenantId,
     isSystem: role.isSystem,
     scope: role.scope,
     permissions: granted,
   };
 }
 
-export async function listOrganizationRoles(access: Access, organizationId: string, params: URLSearchParams) {
+export async function listTenantRoles(access: Access, tenantId: string, params: URLSearchParams) {
   const paging = page(params);
-  await access.requireOrganization(organizationId, false);
+  await access.requireTenant(tenantId, false);
   const roles = await prisma.role.findMany({
-    where: { OR: [{ organizationId: null }, { organizationId }] },
+    where: { OR: [{ tenantId: null }, { tenantId }] },
     include: roleInclude,
     orderBy: [{ isSystem: "desc" }, { name: "asc" }],
     skip: paging.offset,
@@ -154,15 +154,17 @@ function parsePermissions(body: Body) {
   return unique as Permission[];
 }
 
-export async function createOrganizationRole(
+export async function createTenantRole(
   access: Access,
-  organizationId: string,
+  tenantId: string,
   request: ReturnType<typeof parseCreateRole>,
 ) {
-  await access.requirePermission(organizationId, "manage_roles");
-  await assertCanGrant(access, organizationId, { permissions: request.permissions, scope: request.scope });
+  const { assertPeopleRolesMutable } = await import("@/lib/api/features/external-sync");
+  await assertPeopleRolesMutable(tenantId);
+  await access.requirePermission(tenantId, "manage_roles");
+  await assertCanGrant(access, tenantId, { permissions: request.permissions, scope: request.scope });
   const existing = await prisma.role.findFirst({
-    where: { code: request.code, OR: [{ organizationId: null }, { organizationId }] },
+    where: { code: request.code, OR: [{ tenantId: null }, { tenantId }] },
   });
   if (existing) {
     conflict("A role with that code already exists.");
@@ -173,7 +175,7 @@ export async function createOrganizationRole(
         id: randomUUID(),
         code: request.code,
         name: request.name,
-        organizationId,
+        tenantId,
         isSystem: false,
         scope: request.scope,
         permissions: {
@@ -186,15 +188,17 @@ export async function createOrganizationRole(
   return roleJson(role);
 }
 
-export async function updateOrganizationRole(
+export async function updateTenantRole(
   access: Access,
-  organizationId: string,
+  tenantId: string,
   roleId: string,
   request: ReturnType<typeof parseUpdateRole>,
 ) {
-  await access.requirePermission(organizationId, "manage_roles");
+  const { assertPeopleRolesMutable } = await import("@/lib/api/features/external-sync");
+  await assertPeopleRolesMutable(tenantId);
+  await access.requirePermission(tenantId, "manage_roles");
   const role = await prisma.role.findFirst({
-    where: { id: roleId, OR: [{ organizationId: null }, { organizationId }] },
+    where: { id: roleId, OR: [{ tenantId: null }, { tenantId }] },
     include: roleInclude,
   });
   if (!role) notFound();
@@ -202,7 +206,7 @@ export async function updateOrganizationRole(
     forbidden();
   }
   const current = new Set(effectivePermissions(role));
-  await assertCanGrant(access, organizationId, {
+  await assertCanGrant(access, tenantId, {
     permissions: (request.permissions ?? []).filter((permission) => !current.has(permission)),
     scope: request.scope && request.scope !== role.scope ? request.scope : null,
   });
@@ -237,16 +241,18 @@ export async function updateOrganizationRole(
   return roleJson(updated);
 }
 
-export async function deleteOrganizationRole(access: Access, organizationId: string, roleId: string) {
-  await access.requirePermission(organizationId, "manage_roles");
-  const role = await prisma.role.findFirst({ where: { id: roleId, organizationId } });
+export async function deleteTenantRole(access: Access, tenantId: string, roleId: string) {
+  const { assertPeopleRolesMutable } = await import("@/lib/api/features/external-sync");
+  await assertPeopleRolesMutable(tenantId);
+  await access.requirePermission(tenantId, "manage_roles");
+  const role = await prisma.role.findFirst({ where: { id: roleId, tenantId } });
   if (!role) notFound();
   if (role.isSystem) {
     validation("System roles cannot be deleted.");
   }
   const assigned =
-    (await prisma.organizationMembership.count({ where: { roleId } })) +
-    (await prisma.departmentMembership.count({ where: { roleId } })) +
+    (await prisma.tenantMembership.count({ where: { roleId } })) +
+    (await prisma.tenantMembership.count({ where: { roleId } })) +
     (await prisma.invitation.count({ where: { roleId, acceptedAt: null, revokedAt: null } }));
   if (assigned > 0) {
     conflict("This role is still assigned.");

@@ -39,7 +39,7 @@ export const booleanEmailSettingKeys = [
 
 export type BooleanEmailSettingKey = (typeof booleanEmailSettingKeys)[number];
 
-export type OrganizationEmailSettings = {
+export type TenantEmailSettings = {
   LoggedTime: TimeEmailFrequency;
   UnclassifiedEntry: TimeEmailFrequency;
   FeedbackReceived: boolean;
@@ -52,7 +52,7 @@ export type OrganizationEmailSettings = {
   VolunteerMessage: boolean;
 };
 
-export const defaultEmailSettings: OrganizationEmailSettings = {
+export const defaultEmailSettings: TenantEmailSettings = {
   LoggedTime: "immediate",
   UnclassifiedEntry: "immediate",
   FeedbackReceived: true,
@@ -65,7 +65,7 @@ export const defaultEmailSettings: OrganizationEmailSettings = {
   VolunteerMessage: true,
 };
 
-export function readEmailSettings(value: unknown): OrganizationEmailSettings {
+export function readEmailSettings(value: unknown): TenantEmailSettings {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return { ...defaultEmailSettings };
   }
@@ -97,7 +97,7 @@ export function readEmailSettings(value: unknown): OrganizationEmailSettings {
   };
 }
 
-export function shouldSendEmailImmediate(settings: OrganizationEmailSettings, kind: EmailTemplateFor): boolean {
+export function shouldSendEmailImmediate(settings: TenantEmailSettings, kind: EmailTemplateFor): boolean {
   if (kind === "Invite" || kind === "Welcome" || kind === "PasswordReset") {
     return true;
   }
@@ -110,7 +110,7 @@ export function shouldSendEmailImmediate(settings: OrganizationEmailSettings, ki
 export function emailTemplateBadge(
   kind: EmailTemplateFor,
   isEnabled: boolean,
-  settings: OrganizationEmailSettings,
+  settings: TenantEmailSettings,
 ): { label: string; variant: "secondary" | "outline" } {
   if (kind === "Invite" || kind === "Welcome" || kind === "PasswordReset") {
     return { label: "Always on", variant: "secondary" };
@@ -146,8 +146,8 @@ export const emailForLabels: Record<EmailTemplateFor, string> = {
 /** Placeholders each mail may use, with the sample value shown in the editor preview. */
 export const emailTemplateFields: Record<EmailTemplateFor, Record<string, string>> = {
   Invite: {
-    "organization.name": "Harbor Volunteers",
-    "invite.targetKind": "Organization",
+    "tenant.name": "Harbor Volunteers",
+    "invite.targetKind": "Tenant",
     "invite.targetName": "Harbor Volunteers",
     "invite.roleName": "Staff",
     "user.username": "jsmith",
@@ -155,7 +155,7 @@ export const emailTemplateFields: Record<EmailTemplateFor, Record<string, string
     "invite.url": "https://voluntime.app/accept?code=482913",
   },
   Welcome: {
-    "organization.name": "Harbor Volunteers",
+    "tenant.name": "Harbor Volunteers",
     "user.username": "jsmith",
     "user.password": "Temp-Pass-42",
     "account.url": "https://voluntime.app/login",
@@ -166,7 +166,7 @@ export const emailTemplateFields: Record<EmailTemplateFor, Record<string, string
   },
   LoggedTime: {
     "user.firstName": "Jamie",
-    "organization.name": "Harbor Volunteers",
+    "tenant.name": "Harbor Volunteers",
     "entry.hours": "2.5",
     "entry.date": "Tue, Oct 27, 2026",
     "entry.url": "https://voluntime.app/log",
@@ -197,21 +197,21 @@ export const emailTemplateFields: Record<EmailTemplateFor, Record<string, string
     "feedback.note": "October now appears in every export.",
   },
   AccessRequestReceived: {
-    "organization.name": "Harbor Volunteers",
+    "tenant.name": "Harbor Volunteers",
     "request.requesterEmail": "jamie@example.org",
   },
   AccessRequestDecided: {
-    "organization.name": "Harbor Volunteers",
+    "tenant.name": "Harbor Volunteers",
     "request.decision": "approved",
     "user.name": "Jamie",
   },
   NeedSubmitted: {
-    "organization.name": "Harbor Volunteers",
+    "tenant.name": "Harbor Volunteers",
     "need.name": "Saturday food drive",
     "need.managerName": "Alex",
   },
   NeedDecided: {
-    "organization.name": "Harbor Volunteers",
+    "tenant.name": "Harbor Volunteers",
     "need.name": "Saturday food drive",
     "need.decision": "published",
   },

@@ -2,7 +2,7 @@
 
 import { useActionState, useRef, useState } from "react";
 import { XIcon } from "lucide-react";
-import { updateOrganizationSettingsAction, updateOrganizationSlugAction } from "@/app/actions/organizations";
+import { updateTenantSettingsAction, updateTenantSlugAction } from "@/app/actions/tenants";
 import { Field, FormMessage } from "@/components/field";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,14 +11,14 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLabels } from "@/hooks/use-labels";
 import { useMembers } from "@/hooks/use-members";
-import { useOrganization, useWorkspace } from "@/hooks/use-workspace";
+import { useTenant, useWorkspace } from "@/hooks/use-workspace";
 import type { Membership } from "@/lib/types";
 import { HourlyRatesCard } from "./hourly-rates-card";
 import { formatPersonName } from "@/lib/format";
 import { tenantAddress } from "@/lib/portal";
 
-export function OrganizationForm() {
-  const organization = useOrganization();
+export function TenantForm() {
+  const tenant = useTenant();
   return (
     <Tabs defaultValue="general">
       <TabsList variant="line">
@@ -27,10 +27,10 @@ export function OrganizationForm() {
         <TabsTrigger value="rates">Hourly rates</TabsTrigger>
       </TabsList>
       <TabsContent value="general" className="mt-4">
-        <OrganizationFields key={`${organization.id}:${JSON.stringify(organization.preferences)}`} />
+        <TenantFields key={`${tenant.id}:${JSON.stringify(tenant.preferences)}`} />
       </TabsContent>
       <TabsContent value="address" className="mt-4">
-        <LaunchCard key={`${organization.id}:${organization.slug ?? ""}`} />
+        <LaunchCard key={`${tenant.id}:${tenant.slug ?? ""}`} />
       </TabsContent>
       <TabsContent value="rates" className="mt-4">
         <HourlyRatesCard />
@@ -48,21 +48,21 @@ function originHost(origin: string) {
 }
 
 function LaunchCard() {
-  const organization = useOrganization();
+  const tenant = useTenant();
   const { isTenantHost, appOrigin = "" } = useWorkspace();
-  const [slug, setSlug] = useState(organization.slug ?? "");
-  const [result, action] = useActionState(updateOrganizationSlugAction.bind(null, organization.id), null);
+  const [slug, setSlug] = useState(tenant.slug ?? "");
+  const [result, action] = useActionState(updateTenantSlugAction.bind(null, tenant.id), null);
   const previewSlug = slug.trim().toLowerCase();
   const hostLabel = originHost(appOrigin);
 
   if (isTenantHost) {
-    const currentSlug = organization.slug ?? previewSlug;
+    const currentSlug = tenant.slug ?? previewSlug;
     return (
       <Card>
         <CardHeader>
           <CardTitle>White-label address</CardTitle>
           <CardDescription>
-            This organization is launched on its own address. Manage subdomain settings from the main {hostLabel} workspace.
+            This tenant is launched on its own address. Manage subdomain settings from the main {hostLabel} workspace.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -77,7 +77,7 @@ function LaunchCard() {
       <CardHeader>
         <CardTitle>Launch white-label address</CardTitle>
         <CardDescription>
-          Choose a subdomain so volunteers and staff can sign in directly at your organization&apos;s address. Leave blank to unpublish.
+          Choose a subdomain so volunteers and staff can sign in directly at your tenant&apos;s address. Leave blank to unpublish.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -88,7 +88,7 @@ function LaunchCard() {
             hint={
               previewSlug
                 ? `Preview: ${tenantAddress(appOrigin, previewSlug)}`
-                : `Your organization will only be accessible from ${appOrigin}.`
+                : `Your tenant will only be accessible from ${appOrigin}.`
             }
           >
             <Input
@@ -110,53 +110,53 @@ function LaunchCard() {
   );
 }
 
-function OrganizationFields() {
-  const organization = useOrganization();
+function TenantFields() {
+  const tenant = useTenant();
   const copy = useLabels();
-  const [result, action] = useActionState(updateOrganizationSettingsAction.bind(null, organization.id), null);
-  const labels = organization.preferences.entityLabels;
+  const [result, action] = useActionState(updateTenantSettingsAction.bind(null, tenant.id), null);
+  const labels = tenant.preferences.entityLabels;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{copy.organization}</CardTitle>
+        <CardTitle>{copy.tenant}</CardTitle>
         <CardDescription>
           Time editing, volunteer connections, and what to call {copy.projects.toLowerCase()} and{" "}
-          {copy.departments.toLowerCase()} are saved together.
+          {copy.organizations.toLowerCase()} are saved together.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form action={action} className="grid gap-4 sm:grid-cols-2">
           <label className="flex items-center gap-2 text-sm sm:col-span-2">
-            <Checkbox name="allowTimeEntryEditing" value="on" defaultChecked={organization.preferences.allowTimeEntryEditing} />
+            <Checkbox name="allowTimeEntryEditing" value="on" defaultChecked={tenant.preferences.allowTimeEntryEditing} />
             Allow time entry editing
           </label>
           <p className="text-sm text-muted-foreground sm:col-span-2">
             When this is off, saved entries keep their start, end, and duration. {copy.project}, {copy.taskCategory.toLowerCase()}, and notes can still change.
           </p>
           <label className="flex items-center gap-2 text-sm sm:col-span-2">
-            <Checkbox name="allowVolunteersToAddVolunteers" value="on" defaultChecked={organization.preferences.allowVolunteersToAddVolunteers} />
+            <Checkbox name="allowVolunteersToAddVolunteers" value="on" defaultChecked={tenant.preferences.allowVolunteersToAddVolunteers} />
             Allow volunteers to add volunteers
           </label>
           <p className="text-sm text-muted-foreground sm:col-span-2">
             When this is on, a volunteer can create another volunteer and record how they are related. Volunteers can log time for people they are connected to.
           </p>
-          <Field label={`${copy.organization} label`} htmlFor="labelOrganization">
-            <Input id="labelOrganization" name="labelOrganization" required defaultValue={labels.organization} className="h-9" />
+          <Field label={`${copy.tenant} label`} htmlFor="labelTenant">
+            <Input id="labelTenant" name="labelTenant" required defaultValue={labels.tenant} className="h-9" />
           </Field>
           <Field label={`${copy.project} label`} htmlFor="labelProject">
             <Input id="labelProject" name="labelProject" required defaultValue={labels.project} className="h-9" />
           </Field>
-          <Field label={`${copy.department} label`} htmlFor="labelDepartment">
-            <Input id="labelDepartment" name="labelDepartment" required defaultValue={labels.department} className="h-9" />
+          <Field label={`${copy.organization} label`} htmlFor="labelOrganization">
+            <Input id="labelOrganization" name="labelOrganization" required defaultValue={labels.organization} className="h-9" />
           </Field>
           <Field label={`${copy.taskCategory} label`} htmlFor="labelTaskCategory">
             <Input id="labelTaskCategory" name="labelTaskCategory" required defaultValue={labels.taskCategory} className="h-9" />
           </Field>
           <Field label="Public openings slug" htmlFor="publicSlug" hint="Share /openings/{slug} on your website.">
-            <Input id="publicSlug" name="publicSlug" defaultValue={organization.publicSlug ?? ""} className="h-9" />
+            <Input id="publicSlug" name="publicSlug" defaultValue={tenant.publicSlug ?? ""} className="h-9" />
           </Field>
-          <FeedbackNotifyField defaultIds={organization.preferences.feedbackNotifyUserIds ?? []} />
+          <FeedbackNotifyField defaultIds={tenant.preferences.feedbackNotifyUserIds ?? []} />
           <div className="flex items-end justify-between gap-3 sm:col-span-2">
             <FormMessage result={result} />
             <SubmitButton className="h-9 ml-auto">Save settings</SubmitButton>
@@ -212,7 +212,7 @@ function FeedbackNotifyField({ defaultIds }: { defaultIds: string[] }) {
   return (
     <Field
       label="Who receives feedback"
-      hint="These people are emailed when someone in this organization sends feedback."
+      hint="These people are emailed when someone in this tenant sends feedback."
       className="sm:col-span-2"
     >
       <input type="hidden" name="feedbackNotifyUserIds" value={selected.join(",")} />

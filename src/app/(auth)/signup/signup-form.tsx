@@ -37,7 +37,7 @@ export function SignupForm({
             required
             defaultValue={firstName}
             readOnly={Boolean(firstName)}
-            className={firstName ? "h-10 bg-muted" : "h-10"}
+            className={firstName ? "bg-muted" : undefined}
           />
         </Field>
         <Field label="Last name" htmlFor="lastName">
@@ -48,7 +48,7 @@ export function SignupForm({
             required
             defaultValue={lastName}
             readOnly={Boolean(lastName)}
-            className={lastName ? "h-10 bg-muted" : "h-10"}
+            className={lastName ? "bg-muted" : undefined}
           />
         </Field>
       </div>
@@ -60,7 +60,7 @@ export function SignupForm({
           required
           defaultValue={username}
           readOnly={Boolean(username)}
-          className={username ? "h-10 bg-muted" : "h-10"}
+          className={username ? "bg-muted" : undefined}
         />
       </Field>
       <Field
@@ -76,14 +76,14 @@ export function SignupForm({
           required
           defaultValue={email}
           readOnly={Boolean(email)}
-          className={email ? "h-10 bg-muted" : "h-10"}
+          className={email ? "bg-muted" : undefined}
         />
       </Field>
       <Field label="Password" htmlFor="password">
-        <Input id="password" name="password" type="password" autoComplete="new-password" required className="h-10" />
+        <Input id="password" name="password" type="password" autoComplete="new-password" required />
       </Field>
       <FormMessage result={result} />
-      <SubmitButton className="h-10 w-full">Create account</SubmitButton>
+      <SubmitButton className="w-full">Create account</SubmitButton>
     </form>
   );
 }

@@ -1,11 +1,11 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { OrganizationHome } from "@/components/organization-home";
+import { TenantHome } from "@/components/tenant-home";
 import { ShellSkeleton } from "@/components/shell/app-shell";
 import { WorkspaceShell } from "@/components/shell/workspace-shell";
 import { buttonVariants } from "@/components/ui/button";
 import { getAccess } from "@/lib/server/session";
-import { requirePinnedOrganizationOrApex } from "@/lib/server/tenant";
+import { requirePinnedTenantOrApex } from "@/lib/server/tenant";
 import { cn } from "cn";
 
 export default function Home() {
@@ -17,31 +17,31 @@ export default function Home() {
 }
 
 async function HomePage() {
-  const [access, pinned] = await Promise.all([getAccess(), requirePinnedOrganizationOrApex()]);
+  const [access, pinned] = await Promise.all([getAccess(), requirePinnedTenantOrApex()]);
   if (!access) {
-    return <MarketingHome isTenantHost={pinned.pinned} organizationName={pinned.organization?.name ?? null} />;
+    return <MarketingHome isTenantHost={pinned.pinned} tenantName={pinned.tenant?.name ?? null} />;
   }
 
   return (
     <WorkspaceShell>
-      <OrganizationHome />
+      <TenantHome />
     </WorkspaceShell>
   );
 }
 
 function MarketingHome({
   isTenantHost,
-  organizationName,
+  tenantName,
 }: {
   isTenantHost: boolean;
-  organizationName: string | null;
+  tenantName: string | null;
 }) {
   return (
     <main className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center gap-6 px-6">
-      <p className="text-xs font-semibold uppercase tracking-widest">{organizationName || "VolunTime"}</p>
+      <p className="text-xs font-semibold uppercase tracking-widest">{tenantName || "VolunTime"}</p>
       <h1 className="text-4xl font-semibold tracking-tight">Track volunteer time</h1>
       <p className="text-muted-foreground">
-        Log hours, value them for grants, and let each organization bring its own colors and marks.
+        Log hours, value them for grants, and let each tenant bring its own colors and marks.
       </p>
       <div className="flex gap-3">
         <Link href="/login" className={cn(buttonVariants())}>

@@ -14,39 +14,39 @@ function imageForm(kind = "mark") {
   return form;
 }
 
-describe("organization brand", suite, () => {
+describe("tenant brand", suite, () => {
   const ctx = {};
 
   before(async () => {
     ctx.admin = await signUp("brandadmin");
     ctx.member = await signUp("brandmember");
-    ctx.org = await createJson(ctx.admin.accessToken, "/organizations", { name: label("Brand org") });
-    await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/invitations`, {
+    ctx.org = await createJson(ctx.admin.accessToken, "/tenants", { name: label("Brand org") });
+    await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/invitations`, {
       email: ctx.member.email,
       role: "MEMBER",
     });
   });
 
-  test("an organization cannot point its brand at another organization's file", async () => {
-    const other = await createJson(ctx.admin.accessToken, "/organizations", { name: label("Other brand org") });
+  test("an tenant cannot point its brand at another tenant's file", async () => {
+    const other = await createJson(ctx.admin.accessToken, "/tenants", { name: label("Other brand org") });
     for (const markUrl of [
       `orgs/${other.id}/mark.webp`,
       `https://abc123.private.blob.vercel-storage.com/orgs/${other.id}/mark.webp`,
     ]) {
-      const response = await callApi(`/organizations/${ctx.org.id}`, {
+      const response = await callApi(`/tenants/${ctx.org.id}`, {
         method: "PATCH",
         token: ctx.admin.accessToken,
         body: { markUrl },
       });
-      assertError(response, 400, "validation_error", "markUrl must be an image uploaded for this organization.");
+      assertError(response, 400, "validation_error", "markUrl must be an image uploaded for this tenant.");
     }
-    const own = await callApi(`/organizations/${ctx.org.id}`, {
+    const own = await callApi(`/tenants/${ctx.org.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
       body: { markUrl: `orgs/${ctx.org.id}/mark.webp` },
     });
     assert.equal(own.status, 200, own.text);
-    const reset = await callApi(`/organizations/${ctx.org.id}`, {
+    const reset = await callApi(`/tenants/${ctx.org.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
       body: { markUrl: null },
@@ -57,29 +57,29 @@ describe("organization brand", suite, () => {
   test("rejects a missing image, a bad kind, and a non-admin", async () => {
     const empty = new FormData();
     empty.set("kind", "mark");
-    const missingFile = await callForm(`/organizations/${ctx.org.id}/brand`, {
+    const missingFile = await callForm(`/tenants/${ctx.org.id}/brand`, {
       token: ctx.admin.accessToken,
       form: empty,
     });
     assertError(missingFile, 400, "validation_error", "Choose an image to upload.");
-    const badKind = await callForm(`/organizations/${ctx.org.id}/brand`, {
+    const badKind = await callForm(`/tenants/${ctx.org.id}/brand`, {
       token: ctx.admin.accessToken,
       form: imageForm("logo"),
     });
     assertError(badKind, 400, "validation_error", "kind must be mark, wordmark, or wordmarkOnLight.");
-    const unauthenticated = await callForm(`/organizations/${ctx.org.id}/brand`, { form: imageForm() });
+    const unauthenticated = await callForm(`/tenants/${ctx.org.id}/brand`, { form: imageForm() });
     assertError(unauthenticated, 401, "unauthorized", "Authentication is required.");
-    const forbidden = await callForm(`/organizations/${ctx.org.id}/brand`, {
+    const forbidden = await callForm(`/tenants/${ctx.org.id}/brand`, {
       token: ctx.member.accessToken,
       form: imageForm(),
     });
     assertError(forbidden, 403, "forbidden", "Forbidden.");
-    const removed = await callApi(`/organizations/${ctx.org.id}/brand/not-a-kind`, {
+    const removed = await callApi(`/tenants/${ctx.org.id}/brand/not-a-kind`, {
       method: "DELETE",
       token: ctx.admin.accessToken,
     });
     assertError(removed, 400, "validation_error", "kind must be mark, wordmark, or wordmarkOnLight.");
-    const missing = await callApi(`/organizations/${missingId()}/brand/mark`, {
+    const missing = await callApi(`/tenants/${missingId()}/brand/mark`, {
       method: "DELETE",
       token: ctx.admin.accessToken,
     });
@@ -87,7 +87,7 @@ describe("organization brand", suite, () => {
   });
 
   test("clears a brand image and uploads one when blob storage is configured", async () => {
-    const cleared = await callApi(`/organizations/${ctx.org.id}/brand/mark`, {
+    const cleared = await callApi(`/tenants/${ctx.org.id}/brand/mark`, {
       method: "DELETE",
       token: ctx.admin.accessToken,
     });
@@ -98,13 +98,13 @@ describe("organization brand", suite, () => {
       return;
     }
 
-    const uploaded = await callForm(`/organizations/${ctx.org.id}/brand`, {
+    const uploaded = await callForm(`/tenants/${ctx.org.id}/brand`, {
       token: ctx.admin.accessToken,
       form: imageForm("wordmark"),
     });
     assert.equal(uploaded.status, 200, uploaded.text.slice(0, 400));
     assert.equal(typeof uploaded.json.wordmarkUrl, "string");
-    const again = await callApi(`/organizations/${ctx.org.id}/brand/wordmark`, {
+    const again = await callApi(`/tenants/${ctx.org.id}/brand/wordmark`, {
       method: "DELETE",
       token: ctx.admin.accessToken,
     });

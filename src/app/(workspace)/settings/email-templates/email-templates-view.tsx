@@ -8,22 +8,22 @@ import { PageSkeleton } from "@/components/skeletons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useOrganization } from "@/hooks/use-workspace";
+import { useTenant } from "@/hooks/use-workspace";
 import { emailForLabels } from "@/lib/email/templates";
 import { emailTemplatesQuery } from "@/lib/queries";
 
 const updatedFormat = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" });
 
 export function EmailTemplatesView() {
-  const organization = useOrganization();
-  const { data, isPending, isError, refetch } = useQuery(emailTemplatesQuery(organization.id));
+  const tenant = useTenant();
+  const { data, isPending, isError, refetch } = useQuery(emailTemplatesQuery(tenant.id));
   if (isPending) return <PageSkeleton rows={6} />;
   if (isError || !data || data.length === 0) {
     return (
       <EmptyState
         icon={MailIcon}
         title="Email templates did not load"
-        description="Every organization starts with a full set. Try again in a moment."
+        description="Every tenant starts with a full set. Try again in a moment."
         action={
           <Button type="button" variant="outline" onClick={() => refetch()}>
             Retry
@@ -38,7 +38,7 @@ export function EmailTemplatesView() {
       <CardHeader>
         <CardTitle>Email Templates</CardTitle>
         <CardDescription>
-          Every email {organization.name} sends. Edit the wording; the VolunTime header and footer stay the same.
+          Every email {tenant.name} sends. Edit the wording; the VolunTime header and footer stay the same.
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">

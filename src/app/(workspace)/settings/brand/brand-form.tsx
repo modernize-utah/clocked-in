@@ -1,11 +1,11 @@
 "use client";
 
-import { removeOrganizationBrandAction, uploadOrganizationBrandAction } from "@/app/actions/organizations";
+import { removeTenantBrandAction, uploadTenantBrandAction } from "@/app/actions/tenants";
 import { ImageUploader, imageUploaderHint } from "@/components/image-uploader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useActionMutation } from "@/hooks/use-action-mutation";
-import { useOrganization } from "@/hooks/use-workspace";
+import { useTenant } from "@/hooks/use-workspace";
 import { brandAssetSrc, brandField, type BrandKind } from "@/lib/brand";
 
 const copy: Record<
@@ -85,19 +85,19 @@ function BrandAssetCard({ kind }: { kind: BrandKind }) {
 }
 
 function BrandAssetFields({ kind }: { kind: BrandKind }) {
-  const organization = useOrganization();
-  const storedUrl = organization[brandField(kind)];
+  const tenant = useTenant();
+  const storedUrl = tenant[brandField(kind)];
   const src = brandAssetSrc(kind, storedUrl);
   const labels = copy[kind];
   const upload = useActionMutation(
     (file: File) => {
       const formData = new FormData();
       formData.set("file", file);
-      return uploadOrganizationBrandAction(organization.id, kind, formData);
+      return uploadTenantBrandAction(tenant.id, kind, formData);
     },
     { errorToast: false },
   );
-  const remove = useActionMutation<void>(() => removeOrganizationBrandAction(organization.id, kind), {
+  const remove = useActionMutation<void>(() => removeTenantBrandAction(tenant.id, kind), {
     errorToast: false,
   });
 

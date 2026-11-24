@@ -35,17 +35,17 @@ export function registerTimeTools(server: McpServer) {
   tool(
     server,
     "list_time_entries",
-    "List a user's time entries. Optional organizationId, departmentId, from, to, limit, offset.",
+    "List a user's time entries. Optional tenantId, organizationId, from, to, limit, offset.",
     {
       userId: guid,
+      tenantId: z.string().nullable(),
       organizationId: z.string().nullable(),
-      departmentId: z.string().nullable(),
       from: z.string().nullable(),
       to: z.string().nullable(),
       ...page,
     },
-    ({ userId, organizationId, departmentId, from, to, limit, offset }) =>
-      listTimeEntries(mcpAccess(), userId, query({ organizationId, departmentId, from, to, limit, offset })),
+    ({ userId, tenantId, organizationId, from, to, limit, offset }) =>
+      listTimeEntries(mcpAccess(), userId, query({ tenantId, organizationId, from, to, limit, offset })),
   );
 
   tool(server, "get_time_entry", "Get a time entry by id.", { timeEntryId: guid }, ({ timeEntryId }) =>
@@ -55,7 +55,7 @@ export function registerTimeTools(server: McpServer) {
   tool(
     server,
     "create_time_entry",
-    "Create a time entry for a user. Pass JSON with mode (Punch, Duration, Total), organizationId, optional projectId, optional taskCategoryId, and time fields.",
+    "Create a time entry for a user. Pass JSON with mode (Punch, Duration, Total), tenantId, optional projectId, optional taskCategoryId, and time fields.",
     { userId: guid, body: z.string() },
     ({ userId, body }) => createTimeEntry(mcpAccess(), userId, parseCreateTimeEntry(jsonBody(body))),
   );
@@ -76,7 +76,7 @@ export function registerTimeTools(server: McpServer) {
   tool(
     server,
     "clock_in",
-    "Clock in a user. userId is required for organization API keys. Pass JSON with organizationId, projectId, taskCategoryId, optional departmentId, tagIds, hourlyRateId.",
+    "Clock in a user. userId is required for tenant API keys. Pass JSON with tenantId, projectId, taskCategoryId, optional organizationId, tagIds, hourlyRateId.",
     { userId: guid, body: z.string() },
     ({ userId, body }) => {
       const json = jsonBody(body);
@@ -88,7 +88,7 @@ export function registerTimeTools(server: McpServer) {
   tool(
     server,
     "clock_out",
-    "Clock out a user. userId is required for organization API keys.",
+    "Clock out a user. userId is required for tenant API keys.",
     { userId: guid, description: z.string().nullable(), tagIds: z.array(guid).nullable() },
     ({ userId, description, tagIds }) => {
       const body: Record<string, unknown> = { userId };
@@ -102,22 +102,22 @@ export function registerTimeTools(server: McpServer) {
     },
   );
 
-  tool(server, "cancel_clock", "Discard a user's running timer without saving it. userId is required for organization API keys.", { userId: guid }, async ({ userId }) => {
+  tool(server, "cancel_clock", "Discard a user's running timer without saving it. userId is required for tenant API keys.", { userId: guid }, async ({ userId }) => {
     await cancelClock(mcpAccess(), parseClockTarget({ userId }));
     return "cancelled";
   });
 
-  tool(server, "reset_clock", "Restart a user's running timer from now. The time so far is not saved. userId is required for organization API keys.", { userId: guid }, ({ userId }) =>
+  tool(server, "reset_clock", "Restart a user's running timer from now. The time so far is not saved. userId is required for tenant API keys.", { userId: guid }, ({ userId }) =>
     resetClock(mcpAccess(), parseClockTarget({ userId })),
   );
 
   tool(
     server,
     "list_collective_entries",
-    "List collective time entries. Optional organizationId, departmentId, limit, offset.",
-    { organizationId: z.string().nullable(), departmentId: z.string().nullable(), ...page },
-    ({ organizationId, departmentId, limit, offset }) =>
-      listCollective(mcpAccess(), query({ organizationId, departmentId, limit, offset })),
+    "List collective time entries. Optional tenantId, organizationId, limit, offset.",
+    { tenantId: z.string().nullable(), organizationId: z.string().nullable(), ...page },
+    ({ tenantId, organizationId, limit, offset }) =>
+      listCollective(mcpAccess(), query({ tenantId, organizationId, limit, offset })),
   );
 
   tool(server, "get_collective_entry", "Get a collective time entry.", { collectiveEntryId: guid }, ({ collectiveEntryId }) =>
@@ -127,7 +127,7 @@ export function registerTimeTools(server: McpServer) {
   tool(
     server,
     "create_collective_entry",
-    "Create a collective time entry. Pass JSON with organizationId, projectId, taskCategoryId, startedAt, endedAt, participantCount.",
+    "Create a collective time entry. Pass JSON with tenantId, projectId, taskCategoryId, startedAt, endedAt, participantCount.",
     { body: z.string() },
     ({ body }) => createCollective(mcpAccess(), parseCreateCollective(jsonBody(body))),
   );

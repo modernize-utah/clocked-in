@@ -21,7 +21,7 @@ export function Field({
   return (
     <div className={cn("flex min-w-0 flex-col gap-2", className)}>
       <div className="flex min-h-5 items-center justify-between gap-2">
-        <Label htmlFor={htmlFor} className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        <Label htmlFor={htmlFor}>
           {label}
         </Label>
         {action}

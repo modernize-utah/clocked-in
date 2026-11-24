@@ -1,8 +1,8 @@
 # Docs
 
-VolunTime is one multi-tenant deployment. Each community, including CASWJ and any sister organization, is a tenant at `{slug}.{APP_HOST}`. CASWJ does not own the deployment and does not need a path on wjarts.org. See the [portal runbook](ops/caswj-portal.md).
+VolunTime is one multi-tenant deployment. Each community, including CASWJ and any sister tenant, is a tenant at `{slug}.{APP_HOST}`. CASWJ does not own the deployment and does not need a path on wjarts.org. See the [portal runbook](ops/caswj-portal.md).
 
-Handwritten duration and total hours require a project and a task category. The timer may stay unclassified. Paid rates are gross pay with zero in-kind and an admin-only payroll report. The Staff role stays available to every organization. Public needs stay at `/openings/{publicSlug}`.
+Handwritten duration and total hours require a project and a task category. The timer may stay unclassified. Paid rates are gross pay with zero in-kind and an admin-only payroll report. The Staff role stays available to every tenant. Public needs stay at `/openings/{publicSlug}`.
 
 - [VolunTime review for Dillon](voluntime-review-october-2026.md) — shareable score against the Oct 15 brief and the Oct 27 letter, including answers to the five questions. Hosting and paid time in that note were updated on 5 November 2026.
 - [VolunTime Feedback for Jason — resolved](base/VolunTime%20Feedback%20for%20Jason%20%E2%80%94%20resolved.pdf) — Dillon’s Oct 27 letter with how each item was resolved and the five questions answered. HTML source: [voluntime-feedback-resolved.html](voluntime-feedback-resolved.html).

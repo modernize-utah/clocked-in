@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { Prisma } from "@/generated/prisma/client";
 import { Access } from "@/lib/api/access";
-import { lockOrganization, transaction } from "@/lib/api/db";
+import { lockTenant, transaction } from "@/lib/api/db";
 import { ApiError, validation } from "@/lib/api/errors";
 import { assertCanGrant, effectivePermissions } from "@/lib/api/features/roles";
 import { linkGuest } from "@/lib/api/features/volunteer-needs";
@@ -172,9 +172,9 @@ async function importRows(rows: unknown[], importRow: (row: Body) => Promise<Row
   return result;
 }
 
-async function departmentByName(tx: Prisma.TransactionClient, organizationId: string, name: string) {
-  return tx.department.findFirst({
-    where: { organizationId, name: { equals: name, mode: "insensitive" } },
+async function organizationByName(tx: Prisma.TransactionClient, tenantId: string, name: string) {
+  return tx.tenant.findFirst({
+    where: { tenantId, name: { equals: name, mode: "insensitive" } },
     select: { id: true },
   });
 }
@@ -209,25 +209,27 @@ async function allocateUsername(
   validation("username is already in use.");
 }
 
-export async function importPeople(access: Access, organizationId: string, rows: unknown[], emailUsers = false) {
-  await access.requirePermission(organizationId, "import_people");
-  const organization = await prisma.organization.findUnique({
-    where: { id: organizationId },
+export async function importPeople(access: Access, tenantId: string, rows: unknown[], emailUsers = false) {
+  const { assertPeopleRolesMutable } = await import("@/lib/api/features/external-sync");
+  await assertPeopleRolesMutable(tenantId);
+  await access.requirePermission(tenantId, "import_people");
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
     select: { defaultRateType: true },
   });
-  if (!organization) {
-    validation("Organization was not found.");
+  if (!tenant) {
+    validation("Tenant was not found.");
   }
 
   const roleRows = await prisma.role.findMany({
-    where: { code: { in: ["MEMBER", "VOLUNTEER", "ADMIN"] }, organizationId: null },
+    where: { code: { in: ["MEMBER", "VOLUNTEER", "ADMIN"] }, tenantId: null },
     include: { permissions: true },
   });
   const roleIds = new Map(roleRows.map((role) => [role.code, role.id]));
   // An importer receives each new account's password, so they may only create roles they could grant.
   const importableRoles = new Set<string>();
   for (const role of roleRows) {
-    const allowed = await assertCanGrant(access, organizationId, {
+    const allowed = await assertCanGrant(access, tenantId, {
       permissions: effectivePermissions(role),
       scope: isRoleScope(role.scope) ? role.scope : null,
     }).then(
@@ -240,7 +242,7 @@ export async function importPeople(access: Access, organizationId: string, rows:
   const seenUsernames = new Set<string>();
   const result = await importRows(rows, async (row) => {
     const outcome = await transaction(async (tx) => {
-      await lockOrganization(tx, organizationId);
+      await lockTenant(tx, tenantId);
       const email = normalizeEmail(requiredText(row, "email"));
       const action = String(row._action ?? "").toLowerCase();
       const existing = await tx.user.findUnique({ where: { email }, select: { id: true } });
@@ -250,20 +252,20 @@ export async function importPeople(access: Access, organizationId: string, rows:
       if (action === "merge") {
         const firstName = personName(requiredText(row, "firstName"), "firstName");
         const lastName = personName(requiredText(row, "lastName"), "lastName");
-        // Merge only updates people already in this organization, and only accounts no other organization shares.
+        // Merge only updates people already in this tenant, and only accounts no other tenant shares.
         const match = await tx.user.findFirst({
           where: {
             ...(existing ? { id: existing.id } : { profile: { firstName, lastName } }),
-            organizationMemberships: { some: { organizationId } },
+            tenantMemberships: { some: { tenantId } },
           },
           select: {
             id: true,
             isSuperAdmin: true,
             profile: { select: { id: true } },
-            _count: { select: { organizationMemberships: { where: { organizationId: { not: organizationId } } } } },
+            _count: { select: { tenantMemberships: { where: { tenantId: { not: tenantId } } } } },
           },
         });
-        if (match?.profile && !match.isSuperAdmin && match._count.organizationMemberships === 0) {
+        if (match?.profile && !match.isSuperAdmin && match._count.tenantMemberships === 0) {
           await tx.userProfile.update({
             where: { userId: match.id },
             data: { firstName, lastName },
@@ -291,10 +293,10 @@ export async function importPeople(access: Access, organizationId: string, rows:
         validation(`You cannot import people with the ${role} role.`);
       }
 
-      const departmentName = text(row, "primaryDepartment");
-      const department = departmentName ? await departmentByName(tx, organizationId, requireName(departmentName, "primaryDepartment")) : null;
-      if (departmentName && !department) {
-        validation("primaryDepartment was not found.");
+      const organizationName = text(row, "primaryOrganization");
+      const organization = organizationName ? await organizationByName(tx, tenantId, requireName(organizationName, "primaryOrganization")) : null;
+      if (organizationName && !organization) {
+        validation("primaryOrganization was not found.");
       }
 
       const username = await allocateUsername(tx, firstName, lastName, text(row, "username"), seenUsernames);
@@ -320,20 +322,20 @@ export async function importPeople(access: Access, organizationId: string, rows:
         select: { id: true },
       });
       await linkGuest(tx, email, user.id);
-      await tx.organizationMembership.create({
+      await tx.tenantMembership.create({
         data: {
           userId: user.id,
-          organizationId,
+          tenantId,
           roleId,
-          rateType: organization.defaultRateType,
+          rateType: tenant.defaultRateType,
           isActive: true,
-          primaryDepartmentId: department?.id ?? null,
+          primaryOrganizationId: organization?.id ?? null,
           notes,
         },
       });
-      if (department) {
-        await tx.departmentMembership.create({
-          data: { userId: user.id, departmentId: department.id, roleId: memberRoleId },
+      if (organization) {
+        await tx.tenantMembership.create({
+          data: { userId: user.id, organizationId: organization.id, roleId: memberRoleId },
         });
       }
 
@@ -356,15 +358,15 @@ export async function importPeople(access: Access, organizationId: string, rows:
   });
   if (emailUsers) {
 
-    const org = await prisma.organization.findUnique({ where: { id: organizationId }, select: { name: true, slug: true } });
-    const organizationName = org?.name ?? "VolunTime";
+    const org = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true, slug: true } });
+    const tenantName = org?.name ?? "VolunTime";
     for (const item of result.passwords ?? []) {
       await sendEmail({
         to: item.email,
-        organizationId,
+        tenantId,
         for: "Welcome",
         context: {
-          organization: { name: organizationName },
+          tenant: { name: tenantName },
           user: { username: item.username, password: item.temporaryPassword },
           account: { url: appUrl("/login", org?.slug) },
         },
@@ -374,19 +376,21 @@ export async function importPeople(access: Access, organizationId: string, rows:
   return { ...result, passwords: result.passwords ?? [] };
 }
 
-export async function importDepartments(access: Access, organizationId: string, rows: unknown[]) {
-  await access.requireOrganizationAdmin(organizationId);
+export async function importOrganizations(access: Access, tenantId: string, rows: unknown[]) {
+  const { assertTenantGroupsMutable } = await import("@/lib/api/features/external-sync");
+  await assertTenantGroupsMutable(tenantId);
+  await access.requireTenantAdmin(tenantId);
   const seen = new Set<string>();
   const result = await importRows(rows, async (row) => {
     const outcome = await transaction(async (tx) => {
-      await lockOrganization(tx, organizationId);
+      await lockTenant(tx, tenantId);
       const name = requireName(requiredText(row, "name"));
       const key = name.toLowerCase();
-      if (seen.has(key) || (await departmentByName(tx, organizationId, name))) {
+      if (seen.has(key) || (await organizationByName(tx, tenantId, name))) {
         return { kind: "skip", name: key } as const;
       }
 
-      await tx.department.create({ data: { organizationId, name } });
+      await tx.tenant.create({ data: { tenantId, name } });
       return { kind: "created", name: key } as const;
     });
     if (outcome.name) {
@@ -398,17 +402,17 @@ export async function importDepartments(access: Access, organizationId: string, 
   return { created: result.created, skipped: result.skipped, errors: result.errors };
 }
 
-export async function importProjects(access: Access, organizationId: string, rows: unknown[]) {
-  await access.requireOrganizationAdmin(organizationId);
+export async function importProjects(access: Access, tenantId: string, rows: unknown[]) {
+  await access.requireTenantAdmin(tenantId);
   const ownerUserId = access.actorUserId;
   const seen = new Set<string>();
   const result = await importRows(rows, async (row) => {
     const outcome = await transaction(async (tx) => {
-      await lockOrganization(tx, organizationId);
+      await lockTenant(tx, tenantId);
       const title = requireName(requiredText(row, "title"), "title");
       const key = title.toLowerCase();
       const existing = await tx.project.findFirst({
-        where: { organizationId, title: { equals: title, mode: "insensitive" } },
+        where: { tenantId, title: { equals: title, mode: "insensitive" } },
         select: { id: true },
       });
       if (seen.has(key) || existing) {
@@ -419,18 +423,18 @@ export async function importProjects(access: Access, organizationId: string, row
       const projectType: ProjectType = text(row, "projectType")
         ? normalizeProjectType(enumWord(text(row, "projectType") ?? ""))
         : "Project";
-      const departmentName = text(row, "department");
-      if (accessType === "Department" && !departmentName) {
-        validation("department is required when accessType is Department.");
+      const organizationName = text(row, "organization");
+      if (accessType === "Organization" && !organizationName) {
+        validation("organization is required when accessType is Organization.");
       }
 
-      if (accessType !== "Department" && departmentName) {
-        validation("department must be empty when accessType is Public or Private.");
+      if (accessType !== "Organization" && organizationName) {
+        validation("organization must be empty when accessType is Public or Private.");
       }
 
-      const department = departmentName ? await departmentByName(tx, organizationId, requireName(departmentName, "department")) : null;
-      if (departmentName && !department) {
-        validation("department was not found.");
+      const organization = organizationName ? await organizationByName(tx, tenantId, requireName(organizationName, "organization")) : null;
+      if (organizationName && !organization) {
+        validation("organization was not found.");
       }
 
       const startText = text(row, "startDate");
@@ -444,8 +448,8 @@ export async function importProjects(access: Access, organizationId: string, row
       const activeText = text(row, "isActive");
       await tx.project.create({
         data: {
-          organizationId,
-          departmentId: department?.id ?? null,
+          tenantId,
+          organizationId: organization?.id ?? null,
           ownerUserId,
           title,
           description: description(text(row, "description")),

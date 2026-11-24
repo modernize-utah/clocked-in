@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { requestAccessAction } from "@/app/actions/access-requests";
 import { useActionMutation } from "@/hooks/use-action-mutation";
 import { useLookups } from "@/hooks/use-lookups";
-import { useOrganization, useWorkspace } from "@/hooks/use-workspace";
+import { useTenant, useWorkspace } from "@/hooks/use-workspace";
 import { keys } from "@/lib/queries";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SelectField } from "@/components/select-field";
@@ -239,7 +239,7 @@ function AboutForm({ user, onStatus }: { user: EditableProfile; onStatus: (statu
             <Field
               label='Notes'
               htmlFor='notes'
-              hint='Visible to you and organization admins.'
+              hint='Visible to you and tenant admins.'
               className='sm:col-span-2'
             >
               <Textarea
@@ -344,17 +344,17 @@ function PasswordForm({ onStatus }: { onStatus: (status: SaveStatus) => void }) 
 }
 
 function RequestAccessCard() {
-  const organization = useOrganization();
+  const tenant = useTenant();
   const { isAdmin, isCoordinator } = useWorkspace();
   const { lookups } = useLookups();
   const [message, setMessage] = useState("");
   const [requestedRole, setRequestedRole] = useState("GROUP_MANAGER");
-  const [departmentIds, setDepartmentIds] = useState<string[]>([]);
+  const [organizationIds, setOrganizationIds] = useState<string[]>([]);
   const request = useActionMutation(() =>
-    requestAccessAction(organization.id, {
+    requestAccessAction(tenant.id, {
       message,
       requestedRole,
-      requestedDepartmentIds: requestedRole === "GROUP_MANAGER" ? departmentIds : [],
+      requestedOrganizationIds: requestedRole === "GROUP_MANAGER" ? organizationIds : [],
     }),
   );
   if (isAdmin || isCoordinator) return null;
@@ -376,20 +376,20 @@ function RequestAccessCard() {
             className='h-9'
           />
         </Field>
-        {requestedRole === "GROUP_MANAGER" && lookups.departments.length > 0 ? (
+        {requestedRole === "GROUP_MANAGER" && lookups.organizations.length > 0 ? (
           <div className='grid gap-2'>
             <p className='text-sm font-medium'>Groups</p>
-            {lookups.departments.map((department) => (
-              <label key={department.id} className='flex items-center gap-2 text-sm'>
+            {lookups.organizations.map((organization) => (
+              <label key={organization.id} className='flex items-center gap-2 text-sm'>
                 <Checkbox
-                  checked={departmentIds.includes(department.id)}
+                  checked={organizationIds.includes(organization.id)}
                   onCheckedChange={(next) => {
-                    setDepartmentIds((current) =>
-                      next === true ? [...current, department.id] : current.filter((id) => id !== department.id),
+                    setOrganizationIds((current) =>
+                      next === true ? [...current, organization.id] : current.filter((id) => id !== organization.id),
                     );
                   }}
                 />
-                {department.name}
+                {organization.name}
               </label>
             ))}
           </div>

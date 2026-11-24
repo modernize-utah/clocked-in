@@ -36,8 +36,8 @@ function isMissingBlob(error: unknown) {
   return error instanceof BlobError && /\b(401|403)\b/.test(error.message);
 }
 
-function pathnameFor(organizationId: string, kind: BrandKind) {
-  return `orgs/${organizationId}/${kind}.webp`;
+function pathnameFor(tenantId: string, kind: BrandKind) {
+  return `orgs/${tenantId}/${kind}.webp`;
 }
 
 export async function resizeBrandImage(file: File, kind: BrandKind) {
@@ -78,8 +78,8 @@ export async function resizeBrandImage(file: File, kind: BrandKind) {
   }
 }
 
-export async function putBrandAsset(organizationId: string, kind: BrandKind, buffer: Buffer) {
-  return put(pathnameFor(organizationId, kind), buffer, {
+export async function putBrandAsset(tenantId: string, kind: BrandKind, buffer: Buffer) {
+  return put(pathnameFor(tenantId, kind), buffer, {
     access: blobAccess(),
     addRandomSuffix: false,
     allowOverwrite: true,
@@ -105,8 +105,8 @@ export async function readBrandAsset(storedUrl: string) {
   }
 }
 
-export async function deleteBrandAsset(organizationId: string, storedUrl: string | null) {
-  if (!storedUrl || !isOwnedBrandBlob(organizationId, storedUrl)) {
+export async function deleteBrandAsset(tenantId: string, storedUrl: string | null) {
+  if (!storedUrl || !isOwnedBrandBlob(tenantId, storedUrl)) {
     return;
   }
 
@@ -122,8 +122,8 @@ export async function deleteBrandAsset(organizationId: string, storedUrl: string
 }
 
 export function storedBrandUrl(
-  organization: { markUrl: string | null; wordmarkUrl: string | null; wordmarkOnLightUrl: string | null },
+  tenant: { markUrl: string | null; wordmarkUrl: string | null; wordmarkOnLightUrl: string | null },
   kind: BrandKind,
 ) {
-  return organization[brandField(kind)];
+  return tenant[brandField(kind)];
 }

@@ -28,7 +28,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useIsBelowLarge } from "@/hooks/use-mobile";
-import { useOrganization, useWorkspace } from "@/hooks/use-workspace";
+import { useTenant, useWorkspace } from "@/hooks/use-workspace";
 import { useSavedReports } from "@/hooks/use-saved-reports";
 import type { ReportTemplate } from "@/lib/api/features/report-templates";
 import type { SavedReport } from "@/lib/api/features/saved-reports";
@@ -120,7 +120,7 @@ function ArrangeCanvas({
   template?: ReportTemplate;
   dashboard?: boolean;
 }) {
-  const organization = useOrganization();
+  const tenant = useTenant();
   const { isAdmin, viewer } = useWorkspace();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -153,7 +153,7 @@ function ArrangeCanvas({
 
       if (mode === "report") {
         if (!reportIdRef.current) {
-          const result = await createReportAction(organization.id, {
+          const result = await createReportAction(tenant.id, {
             name: report?.name || "Dashboard",
             isDashboard: dashboard,
             layout: nextLayout,
@@ -161,33 +161,33 @@ function ArrangeCanvas({
           });
           if (!result.ok || !result.data) throw new Error(result.ok ? "The report could not be saved." : result.error);
           reportIdRef.current = result.data.id;
-          await queryClient.invalidateQueries({ queryKey: keys.savedReports(organization.id) });
-          await queryClient.invalidateQueries({ queryKey: keys.savedReport(organization.id, result.data.id) });
+          await queryClient.invalidateQueries({ queryKey: keys.savedReports(tenant.id) });
+          await queryClient.invalidateQueries({ queryKey: keys.savedReport(tenant.id, result.data.id) });
         } else {
-          const result = await updateReportAction(organization.id, reportIdRef.current, reportLayoutAutosave(nextLayout));
+          const result = await updateReportAction(tenant.id, reportIdRef.current, reportLayoutAutosave(nextLayout));
           if (!result.ok) throw new Error(result.error);
-          await queryClient.invalidateQueries({ queryKey: keys.savedReports(organization.id) });
-          await queryClient.invalidateQueries({ queryKey: keys.savedReport(organization.id, reportIdRef.current) });
+          await queryClient.invalidateQueries({ queryKey: keys.savedReports(tenant.id) });
+          await queryClient.invalidateQueries({ queryKey: keys.savedReport(tenant.id, reportIdRef.current) });
         }
       } else if (template!.scope === "global" && !viewer.isSuperAdmin) {
-        const result = await createReportTemplateAction(organization.id, {
+        const result = await createReportTemplateAction(tenant.id, {
           name: template!.name,
           layout: nextLayout,
           baseTemplateId: template!.id,
         });
         if (!result.ok || !result.data) throw new Error(result.ok ? "The template could not be saved." : result.error);
-        await queryClient.invalidateQueries({ queryKey: keys.reportTemplates(organization.id) });
+        await queryClient.invalidateQueries({ queryKey: keys.reportTemplates(tenant.id) });
         router.replace(`/reports/templates/${result.data.id}/design`);
       } else {
-        const result = await updateReportTemplateAction(organization.id, template!.id, { layout: nextLayout });
+        const result = await updateReportTemplateAction(tenant.id, template!.id, { layout: nextLayout });
         if (!result.ok) throw new Error(result.error);
-        await queryClient.invalidateQueries({ queryKey: keys.reportTemplates(organization.id) });
-        await queryClient.invalidateQueries({ queryKey: keys.reportTemplate(organization.id, template!.id) });
+        await queryClient.invalidateQueries({ queryKey: keys.reportTemplates(tenant.id) });
+        await queryClient.invalidateQueries({ queryKey: keys.reportTemplate(tenant.id, template!.id) });
       }
 
       setError(null);
     },
-    [dashboard, mode, organization.id, queryClient, report, router, template, viewer.isSuperAdmin],
+    [dashboard, mode, tenant.id, queryClient, report, router, template, viewer.isSuperAdmin],
   );
 
   useArrangeSave(true, layout, persist);
@@ -227,16 +227,16 @@ function ArrangeCanvas({
   const previewData = withEntries(preview.data, entries);
   const selected = layout.cards.find((card) => card.id === selectedId) ?? null;
   const paths = selected?.kind === "value" ? scalarAccessors : seriesAccessors;
-  const organizationVersion = templates.data?.find((item) => item.baseTemplateId === template?.id);
+  const tenantVersion = templates.data?.find((item) => item.baseTemplateId === template?.id);
   const saveTemplate = useMutation({
     mutationFn: async () => {
       const problem = layoutError(layout);
       if (problem) throw new Error(problem);
-      const result = await createReportTemplateAction(organization.id, { name: templateName, layout });
+      const result = await createReportTemplateAction(tenant.id, { name: templateName, layout });
       if (!result.ok) throw new Error(result.error);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: keys.reportTemplates(organization.id) });
+      await queryClient.invalidateQueries({ queryKey: keys.reportTemplates(tenant.id) });
       setSaveTemplateOpen(false);
       setTemplateName("");
       setError(null);
@@ -302,7 +302,7 @@ function ArrangeCanvas({
                 kind,
                 title: "Chart",
                 description: "",
-                accessor: "user.byDepartment",
+                accessor: "user.byOrganization",
                 chartType: "column",
                 palette: "single",
                 valueKey: "hours",
@@ -329,10 +329,10 @@ function ArrangeCanvas({
   const templateNote =
     mode === "template" && template
       ? template.scope === "override"
-        ? "This is your organization's version."
+        ? "This is your tenant's version."
         : template.scope === "global" && viewer.isSuperAdmin
           ? "Editing the global template."
-          : "Saving creates your organization's version of this template."
+          : "Saving creates your tenant's version of this template."
       : null;
 
   const editorBody = (
@@ -376,9 +376,9 @@ function ArrangeCanvas({
                 {dashboard ? "Dashboard" : "Reports"}
               </Link>
               {templateNote ? <p className="text-xs text-muted-foreground">{templateNote}</p> : null}
-              {mode === "template" && template?.scope === "global" && viewer.isSuperAdmin && organizationVersion ? (
-                <Link href={`/reports/templates/${organizationVersion.id}/design`} className="text-xs underline">
-                  Edit organization version
+              {mode === "template" && template?.scope === "global" && viewer.isSuperAdmin && tenantVersion ? (
+                <Link href={`/reports/templates/${tenantVersion.id}/design`} className="text-xs underline">
+                  Edit tenant version
                 </Link>
               ) : null}
               {mode === "template" && template?.scope === "override" && template.baseTemplateId && viewer.isSuperAdmin ? (
@@ -478,8 +478,8 @@ function ArrangeCanvas({
           <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto text-sm">
             <p><span className="font-medium">Layout. </span>Drag a card to move it. Drag the top, right, bottom, or left edge to resize it. Cards cannot overlap.</p>
             <p><span className="font-medium">Cards. </span>The header icons add a value, chart, or list card. Reset replaces every card with Blank or a template after confirmation. Click a card to select it and open the card editor. The editor edits title, description, data, and format, plus color and icon for a value, chart type, palette, and value for a chart, or columns for a list. Delete removes the selected card. The close icon hides the editor; clicking a card opens it again.</p>
-            <p><span className="font-medium">Preview. </span>Zoom with the header controls, the percentage (resets to 100%), or Ctrl/Cmd + scroll over the preview. The preview uses all-time organization data and shows Updating while data reloads. Date range and other filters live on the report page.</p>
-            <p><span className="font-medium">Report. </span>Name, default, and the starting layout are chosen before the preview opens. Card and layout changes save automatically. An organization admin can save the layout as an organization template. A SuperAdmin edits a global template. An organization admin who saves a global template creates an override that replaces it for this organization.</p>
+            <p><span className="font-medium">Preview. </span>Zoom with the header controls, the percentage (resets to 100%), or Ctrl/Cmd + scroll over the preview. The preview uses all-time tenant data and shows Updating while data reloads. Date range and other filters live on the report page.</p>
+            <p><span className="font-medium">Report. </span>Name, default, and the starting layout are chosen before the preview opens. Card and layout changes save automatically. An tenant admin can save the layout as an tenant template. A SuperAdmin edits a global template. An tenant admin who saves a global template creates an override that replaces it for this tenant.</p>
           </div>
           <DialogFooter showCloseButton />
         </DialogContent>
@@ -502,7 +502,7 @@ function ArrangeCanvas({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Save as template</DialogTitle>
-            <DialogDescription>This layout is saved for your organization. Reports that already use a copy do not change.</DialogDescription>
+            <DialogDescription>This layout is saved for your tenant. Reports that already use a copy do not change.</DialogDescription>
           </DialogHeader>
           <Field label="Name" htmlFor="template-name">
             <Input id="template-name" value={templateName} maxLength={80} onChange={(event) => setTemplateName(event.target.value)} />
@@ -529,7 +529,7 @@ function ArrangeCanvas({
 }
 
 export function ReportDesigner({ reportSlug, dashboard = false }: { reportSlug?: string; dashboard?: boolean }) {
-  const organization = useOrganization();
+  const tenant = useTenant();
   const router = useRouter();
   const { reports, isPending } = useSavedReports();
   const listed = reports.find(
@@ -537,7 +537,7 @@ export function ReportDesigner({ reportSlug, dashboard = false }: { reportSlug?:
   );
   const lookupById = designerLookupById(reportSlug, Boolean(listed));
   const existing = useQuery({
-    ...savedReportQuery(organization.id, reportSlug ?? ""),
+    ...savedReportQuery(tenant.id, reportSlug ?? ""),
     enabled: lookupById && !isPending,
   });
   const report = listed ?? existing.data ?? null;
@@ -559,7 +559,7 @@ export function ReportDesigner({ reportSlug, dashboard = false }: { reportSlug?:
         dashboard
         report={{
           id: "",
-          organizationId: organization.id,
+          tenantId: tenant.id,
           name: "Dashboard",
           isDefault: false,
           isDashboard: true,
@@ -591,8 +591,8 @@ export function ReportDesigner({ reportSlug, dashboard = false }: { reportSlug?:
 }
 
 export function TemplateDesigner({ templateId }: { templateId: string }) {
-  const organization = useOrganization();
-  const existing = useQuery(reportTemplateQuery(organization.id, templateId));
+  const tenant = useTenant();
+  const existing = useQuery(reportTemplateQuery(tenant.id, templateId));
 
   if (existing.isPending) return <DesignerSkeleton />;
   if (existing.isError || !existing.data) {

@@ -15,11 +15,11 @@ function asStringArray(value: unknown) {
   return value.filter((item): item is string => typeof item === "string");
 }
 
-/** The ids that are departments of this organization. */
-async function departmentsIn(organizationId: string, departmentIds: string[]) {
-  if (departmentIds.length === 0) return [];
-  const rows = await prisma.department.findMany({
-    where: { organizationId, id: { in: departmentIds.map(parseGuid).filter((id): id is string => id !== null) } },
+/** The ids that are organizations of this tenant. */
+async function organizationsIn(tenantId: string, organizationIds: string[]) {
+  if (organizationIds.length === 0) return [];
+  const rows = await prisma.tenant.findMany({
+    where: { tenantId, id: { in: organizationIds.map(parseGuid).filter((id): id is string => id !== null) } },
     select: { id: true },
   });
   return rows.map((row) => row.id);
@@ -27,11 +27,11 @@ async function departmentsIn(organizationId: string, departmentIds: string[]) {
 
 function requestJson(row: {
   id: string;
-  organizationId: string;
+  tenantId: string;
   userId: string | null;
   guestId: string | null;
   requestedRoleId: string | null;
-  requestedDepartmentIds: unknown;
+  requestedOrganizationIds: unknown;
   message: string | null;
   status: string;
   reviewedByUserId: string | null;
@@ -53,7 +53,7 @@ function requestJson(row: {
     "Unknown";
   return {
     id: row.id,
-    organizationId: row.organizationId,
+    tenantId: row.tenantId,
     userId: row.userId,
     guestId: row.guestId,
     email: row.user?.email ?? row.guest?.email ?? "",
@@ -61,10 +61,10 @@ function requestJson(row: {
     requestedRoleId: row.requestedRoleId,
     requestedRole: row.requestedRole
       ? { code: row.requestedRole.code, name: row.requestedRole.name }
-      : asStringArray(row.requestedDepartmentIds).length > 0
+      : asStringArray(row.requestedOrganizationIds).length > 0
         ? { code: "GROUP_MANAGER", name: "Group manager" }
         : null,
-    requestedDepartmentIds: asStringArray(row.requestedDepartmentIds),
+    requestedOrganizationIds: asStringArray(row.requestedOrganizationIds),
     message: row.message,
     status: row.status,
     reviewedByUserId: row.reviewedByUserId,
@@ -84,7 +84,7 @@ export function parseCreateAccessRequest(body: Body) {
   return {
     message: has(body, "message") ? requireString(body, "message").trim().slice(0, 2000) : null,
     requestedRole: has(body, "requestedRole") ? requireString(body, "requestedRole") : "GROUP_MANAGER",
-    requestedDepartmentIds: [...new Set(ids(body, "requestedDepartmentIds", true))],
+    requestedOrganizationIds: [...new Set(ids(body, "requestedOrganizationIds", true))],
     email: has(body, "email") ? normalizeEmail(requireString(body, "email")) : null,
     name: has(body, "name") ? requireString(body, "name").trim() : null,
     volunteerNeedId: optionalUuid(body, "volunteerNeedId"),
@@ -92,12 +92,12 @@ export function parseCreateAccessRequest(body: Body) {
   };
 }
 
-export async function listAccessRequests(access: Access, organizationId: string, params: URLSearchParams) {
+export async function listAccessRequests(access: Access, tenantId: string, params: URLSearchParams) {
   const paging = page(params);
-  await access.requirePermission(organizationId, "approve_access_requests");
+  await access.requirePermission(tenantId, "approve_access_requests");
   const status = params.get("status")?.trim();
   const rows = await prisma.accessRequest.findMany({
-    where: { organizationId, ...(status ? { status } : {}) },
+    where: { tenantId, ...(status ? { status } : {}) },
     include: requestInclude,
     orderBy: { createdAt: "desc" },
     skip: paging.offset,
@@ -108,51 +108,51 @@ export async function listAccessRequests(access: Access, organizationId: string,
 
 export async function createAccessRequest(
   access: Access,
-  organizationId: string,
+  tenantId: string,
   request: ReturnType<typeof parseCreateAccessRequest>,
 ) {
-  await access.requireOrganization(organizationId, false);
-  const organization = await prisma.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { name: true } });
+  await access.requireTenant(tenantId, false);
+  const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { name: true } });
   const role =
-    request.requestedRole === "GROUP_MANAGER" ? null : await resolveRole(request.requestedRole, organizationId);
+    request.requestedRole === "GROUP_MANAGER" ? null : await resolveRole(request.requestedRole, tenantId);
   const existing = await prisma.accessRequest.findFirst({
-    where: { organizationId, userId: access.actorUserId, status: "pending" },
+    where: { tenantId, userId: access.actorUserId, status: "pending" },
   });
   if (existing) {
     conflict("You already have a pending access request.");
   }
 
-  const departments = await departmentsIn(organizationId, request.requestedDepartmentIds);
-  if (departments.length !== request.requestedDepartmentIds.length) {
-    validation("requestedDepartmentIds must be departments of this organization.");
+  const organizations = await organizationsIn(tenantId, request.requestedOrganizationIds);
+  if (organizations.length !== request.requestedOrganizationIds.length) {
+    validation("requestedOrganizationIds must be organizations of this tenant.");
   }
 
   if (
     request.volunteerNeedId &&
-    !(await prisma.volunteerNeed.findFirst({ where: { id: request.volunteerNeedId, organizationId }, select: { id: true } }))
+    !(await prisma.volunteerNeed.findFirst({ where: { id: request.volunteerNeedId, tenantId }, select: { id: true } }))
   ) {
-    validation("volunteerNeedId must be a need of this organization.");
+    validation("volunteerNeedId must be a need of this tenant.");
   }
   const created = await guard(
     prisma.accessRequest.create({
       data: {
         id: randomUUID(),
-        organizationId,
+        tenantId,
         userId: access.actorUserId,
         requestedRoleId: role?.id ?? null,
-        requestedDepartmentIds: request.requestedDepartmentIds,
+        requestedOrganizationIds: request.requestedOrganizationIds,
         message: request.message,
         volunteerNeedId: request.volunteerNeedId,
       },
       include: requestInclude,
     }),
   );
-  await notifyAdmins(organizationId, organization.name, created.user?.email ?? access.caller.email);
+  await notifyAdmins(tenantId, tenant.name, created.user?.email ?? access.caller.email);
   return requestJson(created);
 }
 
 export async function createPublicAccessRequest(
-  organizationId: string,
+  tenantId: string,
   input: {
     email: string;
     name: string;
@@ -163,7 +163,7 @@ export async function createPublicAccessRequest(
 ) {
   const existing = await prisma.accessRequest.findFirst({
     where: {
-      organizationId,
+      tenantId,
       status: "pending",
       OR: [{ guestId: input.guestId ?? undefined }, { guest: { email: input.email } }],
     },
@@ -173,30 +173,30 @@ export async function createPublicAccessRequest(
   const created = await prisma.accessRequest.create({
     data: {
       id: randomUUID(),
-      organizationId,
+      tenantId,
       guestId: input.guestId ?? null,
       requestedRoleId: volunteerRole,
-      requestedDepartmentIds: [],
+      requestedOrganizationIds: [],
       message: input.message ?? `Requested access while signing up for a need.`,
       volunteerNeedId: input.volunteerNeedId ?? null,
     },
     include: requestInclude,
   });
-  const organization = await prisma.organization.findUnique({ where: { id: organizationId }, select: { name: true } });
-  await notifyAdmins(organizationId, organization?.name ?? "VolunTime", input.email);
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true } });
+  await notifyAdmins(tenantId, tenant?.name ?? "VolunTime", input.email);
   return requestJson(created);
 }
 
 export async function decideAccessRequest(
   access: Access,
-  organizationId: string,
+  tenantId: string,
   requestId: string,
   status: "approved" | "declined",
 ) {
-  await access.requirePermission(organizationId, "approve_access_requests");
+  await access.requirePermission(tenantId, "approve_access_requests");
   const row = await prisma.accessRequest.findFirst({
-    where: { id: requestId, organizationId },
-    include: { ...requestInclude, organization: { select: { name: true } } },
+    where: { id: requestId, tenantId },
+    include: { ...requestInclude, tenant: { select: { name: true } } },
   });
   if (!row) notFound();
   if (row.status !== "pending") {
@@ -217,10 +217,10 @@ export async function decideAccessRequest(
   if (email) {
     await sendEmail({
       to: email,
-      organizationId: row.organizationId,
+      tenantId: row.tenantId,
       for: "AccessRequestDecided",
       context: {
-        organization: { name: row.organization.name },
+        tenant: { name: row.tenant.name },
         request: { decision: status === "approved" ? "approved" : "declined" },
         user: { name: updated.user?.profile?.firstName || updated.guest?.name || "there" },
       },
@@ -233,9 +233,9 @@ async function approve(
   access: Access,
   row: {
     userId: string | null;
-    organizationId: string;
+    tenantId: string;
     requestedRoleId: string | null;
-    requestedDepartmentIds: unknown;
+    requestedOrganizationIds: unknown;
     requestedRole?: { code: string; name: string } | null;
   },
 ) {
@@ -245,46 +245,46 @@ async function approve(
   const userId = row.userId;
   if (row.requestedRoleId) {
     const role = await prisma.role.findUniqueOrThrow({ where: { id: row.requestedRoleId }, include: { permissions: true } });
-    await assertCanGrant(access, row.organizationId, {
+    await assertCanGrant(access, row.tenantId, {
       permissions: effectivePermissions(role),
       scope: isRoleScope(role.scope) ? role.scope : null,
     });
   }
-  // Requests stored before this check could name another organization's departments.
-  const departmentIds = await departmentsIn(row.organizationId, asStringArray(row.requestedDepartmentIds));
-  if (departmentIds.length > 0 && !(await access.isOrgAdmin(row.organizationId))) {
-    throw new ApiError(403, "forbidden", "Only an organization admin can make someone a group manager.");
+  // Requests stored before this check could name another tenant's organizations.
+  const organizationIds = await organizationsIn(row.tenantId, asStringArray(row.requestedOrganizationIds));
+  if (organizationIds.length > 0 && !(await access.isOrgAdmin(row.tenantId))) {
+    throw new ApiError(403, "forbidden", "Only an tenant admin can make someone a group manager.");
   }
   const adminRole = await roleId("ADMIN");
   await transaction(async (tx) => {
     if (row.requestedRoleId) {
-      await tx.organizationMembership.updateMany({
-        where: { userId, organizationId: row.organizationId },
+      await tx.tenantMembership.updateMany({
+        where: { userId, tenantId: row.tenantId },
         data: { roleId: row.requestedRoleId },
       });
     }
-    for (const departmentId of departmentIds) {
-      await tx.departmentMembership.upsert({
-        where: { userId_departmentId: { userId, departmentId } },
+    for (const organizationId of organizationIds) {
+      await tx.tenantMembership.upsert({
+        where: { userId_organizationId: { userId, organizationId } },
         update: { roleId: adminRole },
-        create: { userId, departmentId, roleId: adminRole },
+        create: { userId, organizationId, roleId: adminRole },
       });
     }
   });
 }
 
-async function notifyAdmins(organizationId: string, organizationName: string, requesterEmail: string) {
-  const admins = await prisma.organizationMembership.findMany({
-    where: { organizationId, isActive: true, role: { code: "ADMIN" } },
+async function notifyAdmins(tenantId: string, tenantName: string, requesterEmail: string) {
+  const admins = await prisma.tenantMembership.findMany({
+    where: { tenantId, isActive: true, role: { code: "ADMIN" } },
     include: { user: { select: { email: true } } },
   });
   await Promise.all(
     admins.map((admin) =>
       sendEmail({
         to: admin.user.email,
-        organizationId,
+        tenantId,
         for: "AccessRequestReceived",
-        context: { organization: { name: organizationName }, request: { requesterEmail } },
+        context: { tenant: { name: tenantName }, request: { requesterEmail } },
       }).catch(() => undefined),
     ),
   );

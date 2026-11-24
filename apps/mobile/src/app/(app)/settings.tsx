@@ -27,7 +27,7 @@ import {
 } from "@/ui";
 import { useLookups, useOrgQuery, useWorkspace } from "@/workspace";
 
-type SettingsView = "organization" | "departments" | "lists" | "theme" | "brand" | "email";
+type SettingsView = "tenant" | "organizations" | "lists" | "theme" | "brand" | "email";
 
 const themeKeys = [
   { key: "primary", label: "Primary" },
@@ -96,56 +96,56 @@ function AddRow({ placeholder, onAdd }: { placeholder: string; onAdd: (name: str
 
 export default function SettingsScreen() {
   const colors = useColors();
-  const { organization, labels, isAdmin, isCoordinator } = useWorkspace();
+  const { tenant, labels, isAdmin, isCoordinator } = useWorkspace();
   const { lookups } = useLookups();
   const client = useQueryClient();
-  const [view, setView] = useState<SettingsView>(isAdmin ? "organization" : "lists");
-  const departments = useOrgQuery("departments", (organizationId) => api.departments(organizationId), view === "departments" || view === "lists");
-  const categories = useOrgQuery("categories", (organizationId) => api.categories(organizationId), view === "lists");
-  const tags = useOrgQuery("tags", (organizationId) => api.tags(organizationId), view === "lists");
-  const projects = useOrgQuery("projects", (organizationId) => api.projects(organizationId), view === "lists");
-  const rates = useOrgQuery("rates", (organizationId) => api.hourlyRates(organizationId), view === "organization");
-  const themes = useOrgQuery("themes", (organizationId) => api.themes(organizationId), view === "theme");
-  const members = useOrgQuery("members", (organizationId) => api.memberships(organizationId), view === "organization");
-  const [name, setName] = useState(organization.name);
-  const [description, setDescription] = useState(organization.description ?? "");
-  const [websiteUrl, setWebsiteUrl] = useState(organization.websiteUrl ?? "");
-  const [slug, setSlug] = useState(organization.slug ?? "");
-  const [publicSlug, setPublicSlug] = useState(organization.publicSlug ?? "");
-  const [organizationLabel, setOrganizationLabel] = useState(labels.organization);
+  const [view, setView] = useState<SettingsView>(isAdmin ? "tenant" : "lists");
+  const organizations = useOrgQuery("organizations", (tenantId) => api.organizations(tenantId), view === "organizations" || view === "lists");
+  const categories = useOrgQuery("categories", (tenantId) => api.categories(tenantId), view === "lists");
+  const tags = useOrgQuery("tags", (tenantId) => api.tags(tenantId), view === "lists");
+  const projects = useOrgQuery("projects", (tenantId) => api.projects(tenantId), view === "lists");
+  const rates = useOrgQuery("rates", (tenantId) => api.hourlyRates(tenantId), view === "tenant");
+  const themes = useOrgQuery("themes", (tenantId) => api.themes(tenantId), view === "theme");
+  const members = useOrgQuery("members", (tenantId) => api.memberships(tenantId), view === "tenant");
+  const [name, setName] = useState(tenant.name);
+  const [description, setDescription] = useState(tenant.description ?? "");
+  const [websiteUrl, setWebsiteUrl] = useState(tenant.websiteUrl ?? "");
+  const [slug, setSlug] = useState(tenant.slug ?? "");
+  const [publicSlug, setPublicSlug] = useState(tenant.publicSlug ?? "");
+  const [tenantLabel, setTenantLabel] = useState(labels.tenant);
   const [projectLabel, setProjectLabel] = useState(labels.project);
-  const [departmentLabel, setDepartmentLabel] = useState(labels.department);
+  const [organizationLabel, setOrganizationLabel] = useState(labels.organization);
   const [categoryLabel, setCategoryLabel] = useState(labels.taskCategory);
-  const [notifyIds, setNotifyIds] = useState<string[]>(organization.preferences.feedbackNotifyUserIds ?? []);
-  const [theme, setTheme] = useState<ThemeColors>(() => Object.fromEntries(themeKeys.map(({ key }) => [key, organization.theme[key]])) as ThemeColors);
-  const [headingFont, setHeadingFont] = useState(organization.theme.headingFont);
-  const [bodyFont, setBodyFont] = useState(organization.theme.bodyFont);
-  const [categorical, setCategorical] = useState(organization.theme.categoricalPalette.join(", "));
-  const [sequentialFrom, setSequentialFrom] = useState(organization.theme.sequentialPalette[0] ?? "#e8eef5");
-  const [sequentialTo, setSequentialTo] = useState(organization.theme.sequentialPalette.at(-1) ?? organization.theme.primary);
-  const [sequential, setSequential] = useState(organization.theme.sequentialPalette.join(", "));
-  const [diverging, setDiverging] = useState(organization.theme.divergingPalette.join(", "));
+  const [notifyIds, setNotifyIds] = useState<string[]>(tenant.preferences.feedbackNotifyUserIds ?? []);
+  const [theme, setTheme] = useState<ThemeColors>(() => Object.fromEntries(themeKeys.map(({ key }) => [key, tenant.theme[key]])) as ThemeColors);
+  const [headingFont, setHeadingFont] = useState(tenant.theme.headingFont);
+  const [bodyFont, setBodyFont] = useState(tenant.theme.bodyFont);
+  const [categorical, setCategorical] = useState(tenant.theme.categoricalPalette.join(", "));
+  const [sequentialFrom, setSequentialFrom] = useState(tenant.theme.sequentialPalette[0] ?? "#e8eef5");
+  const [sequentialTo, setSequentialTo] = useState(tenant.theme.sequentialPalette.at(-1) ?? tenant.theme.primary);
+  const [sequential, setSequential] = useState(tenant.theme.sequentialPalette.join(", "));
+  const [diverging, setDiverging] = useState(tenant.theme.divergingPalette.join(", "));
   const [error, setError] = useState<unknown>(null);
   const [saved, setSaved] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
-  const [rename, setRename] = useState<{ kind: "department" | "category" | "tag"; id: string; name: string } | null>(null);
+  const [rename, setRename] = useState<{ kind: "organization" | "category" | "tag"; id: string; name: string } | null>(null);
   const [project, setProject] = useState<Project | null>(null);
-  const [confirmBulk, setConfirmBulk] = useState<null | { kind: "departments" | "categories" | "tags"; ids: string[] }>(null);
-  const email = organization.preferences.emailSettings ?? {};
+  const [confirmBulk, setConfirmBulk] = useState<null | { kind: "organizations" | "categories" | "tags"; ids: string[] }>(null);
+  const email = tenant.preferences.emailSettings ?? {};
 
   async function refresh(message = "") {
     setError(null);
     setSaved(message);
     await Promise.all(
-      ["departments", "categories", "tags", "projects", "lookups", "rates", "themes"].map((key) =>
-        client.invalidateQueries({ queryKey: [key, organization.id] }),
+      ["organizations", "categories", "tags", "projects", "lookups", "rates", "themes"].map((key) =>
+        client.invalidateQueries({ queryKey: [key, tenant.id] }),
       ),
     );
     await client.invalidateQueries({ queryKey: ["workspace"] });
   }
 
   const saveOrg = useMutation({
-    mutationFn: (body: Record<string, unknown>) => api.updateOrganization(organization.id, body),
+    mutationFn: (body: Record<string, unknown>) => api.updateTenant(tenant.id, body),
     onSuccess: () => refresh("Saved."),
     onError: setError,
   });
@@ -154,12 +154,12 @@ export default function SettingsScreen() {
 
   const saveTheme = useMutation({
     mutationFn: () =>
-      api.saveTheme(organization.id, organization.theme.id, organization.theme.organizationId === organization.id, {
-        name: organization.theme.name,
+      api.saveTheme(tenant.id, tenant.theme.id, tenant.theme.tenantId === tenant.id, {
+        name: tenant.theme.name,
         ...theme,
         chartColor: theme.primary,
-        headingFont: headingFont.trim() || organization.theme.headingFont,
-        bodyFont: bodyFont.trim() || organization.theme.bodyFont,
+        headingFont: headingFont.trim() || tenant.theme.headingFont,
+        bodyFont: bodyFont.trim() || tenant.theme.bodyFont,
         categoricalPalette: palette(categorical),
         sequentialPalette: palette(sequential),
         divergingPalette: palette(diverging),
@@ -168,11 +168,11 @@ export default function SettingsScreen() {
     onError: setError,
   });
 
-  const add = (create: (organizationId: string, name: string) => Promise<unknown>) => (value: string) =>
-    create(organization.id, value).then(() => refresh()).catch(setError);
+  const add = (create: (tenantId: string, name: string) => Promise<unknown>) => (value: string) =>
+    create(tenant.id, value).then(() => refresh()).catch(setError);
 
   function preferences(patch: Record<string, unknown>) {
-    return { preferences: { ...organization.preferences, ...patch } };
+    return { preferences: { ...tenant.preferences, ...patch } };
   }
 
   async function pickBrand(kind: "mark" | "wordmark" | "wordmarkOnLight") {
@@ -181,7 +181,7 @@ export default function SettingsScreen() {
     const asset = result.assets[0];
     setError(null);
     try {
-      await api.uploadBrand(organization.id, kind, {
+      await api.uploadBrand(tenant.id, kind, {
         uri: asset.uri,
         name: asset.fileName ?? `${kind}.png`,
         type: asset.mimeType ?? "image/png",
@@ -192,10 +192,10 @@ export default function SettingsScreen() {
     }
   }
 
-  async function removeMany(kind: "departments" | "categories" | "tags", ids: string[]) {
+  async function removeMany(kind: "organizations" | "categories" | "tags", ids: string[]) {
     await Promise.all(
       ids.map((id) =>
-        kind === "departments" ? api.deleteDepartment(id) : kind === "categories" ? api.deleteCategory(id) : api.deleteTag(id),
+        kind === "organizations" ? api.deleteOrganization(id) : kind === "categories" ? api.deleteCategory(id) : api.deleteTag(id),
       ),
     );
     setSelected([]);
@@ -210,8 +210,8 @@ export default function SettingsScreen() {
       <PageTitle title="Settings" />
       <SectionNav
         items={[
-          ...(isAdmin ? [{ id: "organization" as const, label: labels.organization, icon: BuildingIcon }] : []),
-          ...(isAdmin ? [{ id: "departments" as const, label: labels.departments, icon: NetworkIcon }] : []),
+          ...(isAdmin ? [{ id: "tenant" as const, label: labels.tenant, icon: BuildingIcon }] : []),
+          ...(isAdmin ? [{ id: "organizations" as const, label: labels.organizations, icon: NetworkIcon }] : []),
           { id: "lists" as const, label: `${labels.projects} & lists`, icon: ListTreeIcon },
           ...(isAdmin ? [{ id: "theme" as const, label: "Themes", icon: PaletteIcon }] : []),
           ...(isAdmin ? [{ id: "brand" as const, label: "Brand", icon: ImageIcon }] : []),
@@ -227,7 +227,7 @@ export default function SettingsScreen() {
       <ErrorText error={error} />
       {saved ? <Text style={{ color: colors.success, fontSize: 13 }}>{saved}</Text> : null}
 
-      {view === "organization" && isAdmin ? (
+      {view === "tenant" && isAdmin ? (
         <>
           <Section icon={BuildingIcon} title="General">
             <Field autoCapitalize="words" label="Name" onChangeText={setName} value={name} />
@@ -235,9 +235,9 @@ export default function SettingsScreen() {
             <Field keyboardType="url" label="Website" onChangeText={setWebsiteUrl} value={websiteUrl} />
             <Field autoCapitalize="none" label="White-label slug" onChangeText={setSlug} value={slug} />
             <Field autoCapitalize="none" label="Openings slug" onChangeText={setPublicSlug} value={publicSlug} />
-            <Field label={`${labels.organization} label`} onChangeText={setOrganizationLabel} value={organizationLabel} />
+            <Field label={`${labels.tenant} label`} onChangeText={setTenantLabel} value={tenantLabel} />
             <Field label={`${labels.project} label`} onChangeText={setProjectLabel} value={projectLabel} />
-            <Field label={`${labels.department} label`} onChangeText={setDepartmentLabel} value={departmentLabel} />
+            <Field label={`${labels.organization} label`} onChangeText={setOrganizationLabel} value={organizationLabel} />
             <Field label={`${labels.taskCategory} label`} onChangeText={setCategoryLabel} value={categoryLabel} />
             <Button
               label="Save"
@@ -250,9 +250,9 @@ export default function SettingsScreen() {
                   publicSlug: publicSlug.trim() || null,
                   ...preferences({
                     entityLabels: {
-                      organization: organizationLabel.trim(),
+                      tenant: tenantLabel.trim(),
                       project: projectLabel.trim(),
-                      department: departmentLabel.trim(),
+                      organization: organizationLabel.trim(),
                       taskCategory: categoryLabel.trim(),
                     },
                     feedbackNotifyUserIds: notifyIds,
@@ -266,13 +266,13 @@ export default function SettingsScreen() {
             description="Volunteers can change the date, start, and duration of their saved entries."
             label="Allow time entry editing"
             onChange={(allowTimeEntryEditing) => saveOrg.mutate(preferences({ allowTimeEntryEditing }))}
-            value={organization.preferences.allowTimeEntryEditing}
+            value={tenant.preferences.allowTimeEntryEditing}
           />
           <ToggleRow
             description="Volunteers can add people they are connected to."
             label="Volunteers can add volunteers"
             onChange={(allowVolunteersToAddVolunteers) => saveOrg.mutate(preferences({ allowVolunteersToAddVolunteers }))}
-            value={organization.preferences.allowVolunteersToAddVolunteers}
+            value={tenant.preferences.allowVolunteersToAddVolunteers}
           />
           <Panel>
             <PanelHeader description="These people are emailed when feedback arrives." title="Feedback recipients" />
@@ -290,7 +290,7 @@ export default function SettingsScreen() {
           </Panel>
           <Panel>
             <PanelHeader title="Hourly rates" />
-            <RateForm onCreate={(body) => api.createHourlyRate(organization.id, body).then(() => refresh())} />
+            <RateForm onCreate={(body) => api.createHourlyRate(tenant.id, body).then(() => refresh())} />
             {(rates.data?.items ?? lookups?.hourlyRates ?? []).map((rate) => (
               <ListRow
                 detail={`${rate.type} · ${rate.perHourRate}${rate.isDefault ? " · default" : ""}${rate.isArchived ? " · archived" : ""}`}
@@ -313,17 +313,17 @@ export default function SettingsScreen() {
         </>
       ) : null}
 
-      {view === "departments" && isAdmin ? (
+      {view === "organizations" && isAdmin ? (
         <NamedList
-          addPlaceholder={`New ${labels.department.toLowerCase()}`}
-          items={departments.data?.items ?? []}
-          onAdd={add((id, value) => api.createDepartment(id, value))}
-          onBulk={(ids) => setConfirmBulk({ kind: "departments", ids })}
-          onDelete={(id) => void api.deleteDepartment(id).then(() => refresh()).catch(setError)}
-          onRename={(id, current) => setRename({ kind: "department", id, name: current })}
+          addPlaceholder={`New ${labels.organization.toLowerCase()}`}
+          items={organizations.data?.items ?? []}
+          onAdd={add((id, value) => api.createOrganization(id, value))}
+          onBulk={(ids) => setConfirmBulk({ kind: "organizations", ids })}
+          onDelete={(id) => void api.deleteOrganization(id).then(() => refresh()).catch(setError)}
+          onRename={(id, current) => setRename({ kind: "organization", id, name: current })}
           selected={selected}
           setSelected={setSelected}
-          title={labels.departments}
+          title={labels.organizations}
         />
       ) : null}
 
@@ -369,7 +369,7 @@ export default function SettingsScreen() {
       ) : null}
 
       {view === "theme" && isAdmin ? (
-        <Section description="Eight colours, fonts, and chart palettes. The preview uses the colours you type." icon={PaletteIcon} title={organization.theme.name}>
+        <Section description="Eight colours, fonts, and chart palettes. The preview uses the colours you type." icon={PaletteIcon} title={tenant.theme.name}>
           <View style={{ padding: 16, borderRadius: 12, backgroundColor: /^#[0-9a-f]{6}$/i.test(theme.surface) ? theme.surface : colors.card, gap: 8 }}>
             <Text style={{ color: /^#[0-9a-f]{6}$/i.test(theme.foreground) ? theme.foreground : colors.foreground, fontSize: 18 }}>{headingFont || "Heading"}</Text>
             <Text style={{ color: /^#[0-9a-f]{6}$/i.test(theme.surfaceForeground) ? theme.surfaceForeground : colors.mutedForeground }}>Body preview</Text>
@@ -379,7 +379,7 @@ export default function SettingsScreen() {
           </View>
           {(themes.data?.items ?? []).map((item) => (
             <ListRow
-              detail={item.id === organization.theme.id ? "Applied" : item.organizationId ? "Custom" : "Built in"}
+              detail={item.id === tenant.theme.id ? "Applied" : item.tenantId ? "Custom" : "Built in"}
               key={item.id}
               onPress={() => void saveOrg.mutateAsync({ themeId: item.id }).then(() => refresh("Theme applied."))}
               title={item.name}
@@ -413,17 +413,17 @@ export default function SettingsScreen() {
           <Button
             label="Reset"
             onPress={() => {
-              setTheme(Object.fromEntries(themeKeys.map(({ key }) => [key, organization.theme[key]])) as ThemeColors);
-              setHeadingFont(organization.theme.headingFont);
-              setBodyFont(organization.theme.bodyFont);
-              setCategorical(organization.theme.categoricalPalette.join(", "));
-              setSequential(organization.theme.sequentialPalette.join(", "));
-              setDiverging(organization.theme.divergingPalette.join(", "));
+              setTheme(Object.fromEntries(themeKeys.map(({ key }) => [key, tenant.theme[key]])) as ThemeColors);
+              setHeadingFont(tenant.theme.headingFont);
+              setBodyFont(tenant.theme.bodyFont);
+              setCategorical(tenant.theme.categoricalPalette.join(", "));
+              setSequential(tenant.theme.sequentialPalette.join(", "));
+              setDiverging(tenant.theme.divergingPalette.join(", "));
             }}
             variant="outline"
           />
-          {organization.theme.organizationId === organization.id ? (
-            <Button label="Delete theme" onPress={() => void api.deleteTheme(organization.id, organization.theme.id).then(() => refresh("Theme deleted.")).catch(setError)} variant="ghost" />
+          {tenant.theme.tenantId === tenant.id ? (
+            <Button label="Delete theme" onPress={() => void api.deleteTheme(tenant.id, tenant.theme.id).then(() => refresh("Theme deleted.")).catch(setError)} variant="ghost" />
           ) : null}
         </Section>
       ) : null}
@@ -433,8 +433,8 @@ export default function SettingsScreen() {
           <Button label="Upload favicon" onPress={() => void pickBrand("mark")} />
           <Button label="Upload logo" onPress={() => void pickBrand("wordmark")} variant="outline" />
           <Button label="Upload logo for light backgrounds" onPress={() => void pickBrand("wordmarkOnLight")} variant="outline" />
-          <Button label="Remove favicon" onPress={() => void api.deleteBrand(organization.id, "mark").then(() => refresh()).catch(setError)} variant="ghost" />
-          <Button label="Remove logo" onPress={() => void api.deleteBrand(organization.id, "wordmark").then(() => refresh()).catch(setError)} variant="ghost" />
+          <Button label="Remove favicon" onPress={() => void api.deleteBrand(tenant.id, "mark").then(() => refresh()).catch(setError)} variant="ghost" />
+          <Button label="Remove logo" onPress={() => void api.deleteBrand(tenant.id, "wordmark").then(() => refresh()).catch(setError)} variant="ghost" />
         </Section>
       ) : null}
 
@@ -471,8 +471,8 @@ export default function SettingsScreen() {
           onPress={() => {
             if (!rename) return;
             const action =
-              rename.kind === "department"
-                ? api.updateDepartment(rename.id, rename.name.trim())
+              rename.kind === "organization"
+                ? api.updateOrganization(rename.id, rename.name.trim())
                 : rename.kind === "category"
                   ? api.updateCategory(rename.id, rename.name.trim())
                   : api.updateTag(rename.id, rename.name.trim());
@@ -483,7 +483,7 @@ export default function SettingsScreen() {
       {project ? (
         <ProjectEditor
           key={project.id}
-          departments={departments.data?.items ?? []}
+          organizations={organizations.data?.items ?? []}
           onClose={() => setProject(null)}
           onDelete={(id) => void api.deleteProject(id).then(() => { setProject(null); return refresh(); }).catch(setError)}
           onSave={(id, body) => void api.updateProject(id, body).then(() => { setProject(null); return refresh(); }).catch(setError)}
@@ -599,20 +599,20 @@ function RateForm({ onCreate }: { onCreate: (body: { name: string; type: string;
 
 function ProjectEditor({
   project,
-  departments,
+  organizations,
   onClose,
   onSave,
   onDelete,
 }: {
   project: Project;
-  departments: { id: string; name: string }[];
+  organizations: { id: string; name: string }[];
   onClose: () => void;
   onSave: (id: string, body: Record<string, unknown>) => void;
   onDelete: (id: string) => void;
 }) {
   const [title, setTitle] = useState(project.title);
   const [type, setType] = useState(project.projectType || "Project");
-  const [departmentId, setDepartmentId] = useState(project.departmentId ?? "");
+  const [organizationId, setOrganizationId] = useState(project.organizationId ?? "");
   const [startDate, setStartDate] = useState(project.startDate ?? "");
   const [endDate, setEndDate] = useState(project.endDate ?? "");
   return (
@@ -621,9 +621,9 @@ function ProjectEditor({
       <Select label="Type" onChange={setType} options={[{ value: "Project", label: "Project" }, { value: "Event", label: "Event" }]} value={type} />
       <Select
         label="Group"
-        onChange={setDepartmentId}
-        options={[{ value: "", label: "None" }, ...departments.map((item) => ({ value: item.id, label: item.name }))]}
-        value={departmentId}
+        onChange={setOrganizationId}
+        options={[{ value: "", label: "None" }, ...organizations.map((item) => ({ value: item.id, label: item.name }))]}
+        value={organizationId}
       />
       <Field label="Start date" onChangeText={setStartDate} placeholder="YYYY-MM-DD" value={startDate} />
       <Field label="End date" onChangeText={setEndDate} placeholder="YYYY-MM-DD" value={endDate} />
@@ -633,7 +633,7 @@ function ProjectEditor({
           onSave(project.id, {
             title: title.trim(),
             projectType: type,
-            departmentId: departmentId || null,
+            organizationId: organizationId || null,
             startDate: startDate || null,
             endDate: endDate || null,
           })

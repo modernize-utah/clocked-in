@@ -22,10 +22,10 @@ The original numeric acceptance test holds. The 2026 workbook sums to **14,609.4
 | -------------------------------------------------------------------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Replace Clockify + the Google Sheet                                                    | **Met**                               | Web app with live timer, manual entry, reports, and CSV.                                                                                             |
 | In-kind value for grants (hours × rate, default $35.47)                                | **Met, then extended**                | Default volunteer rate is $35.47. Catalog rates snapshot onto each entry. Professional rates exist as a catalog, not as paid-staff payroll.          |
-| CASWJ plus eight affiliates                                                            | **Met with a better model**           | One `Organization` (CASWJ) and eight `Department` groups. Spreadsheet Groups map to departments.                                                     |
+| CASWJ plus eight affiliates                                                            | **Met with a better model**           | One `Tenant` (CASWJ) and eight `Organization` groups. Spreadsheet Groups map to organizations.                                                     |
 | Accounts: invite by email **or** basic enrollment                                      | **Met**                               | Invite + accept, admin “Add person,” and public signup.                                                                                              |
-| Roles: volunteer and admin; no approval step                                           | **Met, then extended**                | `VOLUNTEER`, `MEMBER`, `ADMIN`, department admin, SuperAdmin. Entries are live on save.                                                              |
-| Admin settings: orgs, task categories, tags                                            | **Met, then extended**                | Also projects/events, departments, hourly rates, themes, brand marks, entity labels.                                                                 |
+| Roles: volunteer and admin; no approval step                                           | **Met, then extended**                | `VOLUNTEER`, `MEMBER`, `ADMIN`, organization admin, SuperAdmin. Entries are live on save.                                                              |
+| Admin settings: orgs, task categories, tags                                            | **Met, then extended**                | Also projects/events, organizations, hourly rates, themes, brand marks, entity labels.                                                                 |
 | Time entry: live timer, start/end, or total hours                                      | **Partial**                           | Timer and start/end/duration are first-class. `Total` exists in the API and seed, but the log form always creates `Duration` rows with a start time. |
 | Entry details: date, org, project/event, category, tags, notes, entered-by             | **Met**                               | `userId` vs `enteredByUserId` is explicit. Project and category are required.                                                                        |
 | Reports by org, category, person, date range                                           | **Met, then extended**                | Also project, month, volunteer (excluding Participant Hours), and collective sessions.                                                               |
@@ -37,7 +37,7 @@ The original numeric acceptance test holds. The 2026 workbook sums to **14,609.4
 | Per-role security (internship schema was wide open)                                    | **Exceeded**                          | Membership, volunteer scoping, project visibility, API keys, JWT sessions.                                                                           |
 | Keep real names/emails/zips out of development                                         | **Not met**                           | Local CASWJ seed uses real volunteer names. E2E comments say not to run that suite against production.                                               |
 | Production owned by a CASWJ account                                                    | **Not met**                           | Current hosting and env files are Jason’s.                                                                                                           |
-| Later: volunteer coordinator, admin staff, paid staff                                  | **Not in launch; partial primitives** | Department admin and `MEMBER` are close to coordinator/staff. Paid staff time is not modeled.                                                        |
+| Later: volunteer coordinator, admin staff, paid staff                                  | **Not in launch; partial primitives** | Organization admin and `MEMBER` are close to coordinator/staff. Paid staff time is not modeled.                                                        |
 
 ## What the original brief asked for
 
@@ -47,7 +47,7 @@ The brief is five pages. The load-bearing requirements are:
 2. Hours that become in-kind dollars for grant applications.
 3. Individual accounts for volunteers across CASWJ and eight affiliates, including board and committee members.
 4. Three ways to log: live timer, start and end, or a total for a period.
-5. Required organization and task category, so Clockify’s missing fields do not return.
+5. Required tenant and task category, so Clockify’s missing fields do not return.
 6. History import that matches **14,609** hours.
 7. CASWJ visual language from the Board Agenda Builder and brand guidelines.
 8. Hosting inside a future CASWJ portal, path or subdomain.
@@ -63,7 +63,7 @@ This is the strongest match to the original purpose.
 
 - `scripts/caswj-workbook.ts` reads the real workbook: Lists & Settings, Volunteers, Volunteer Log.
 - `scripts/seed-caswj.ts` creates CASWJ, the eight groups, categories, projects, people, tags, and 249 `Total` rows keyed by `caswj-log:<sheetRow>`.
-- Blank / `CASWJ` / `casWJ` group cells fold into the organization bucket instead of inventing a department named CASWJ.
+- Blank / `CASWJ` / `casWJ` group cells fold into the tenant bucket instead of inventing a organization named CASWJ.
 - Project aliases and “No Specific Project” keep log titles aligned with Lists & Settings.
 - Reports keep people totals separate from collective sessions.
 - `byVolunteer` copies the spreadsheet quirk: Participant Hours drop out of volunteer hours but stay in in-kind. The e2e suite documents this instead of “fixing” the product to match `byPerson`.
@@ -88,7 +88,7 @@ Four seeded affiliates have no 2026 hours yet: Literary Arts Society, West Jorda
 | Monthly dumps stored as fake start and end | `Total` mode: date + minutes (1–59,940, 999 hours). Seed uses it. API `POST /time/total` exists. |
 | Coordinators log for other people          | `userId` vs `enteredByUserId`. `/log/member` for admins.                                         |
 | Shared role accounts                       | Individual users. “Clockify Import” is a deactivated stand-in for historical entered-by.         |
-| Organization and category often missing    | Both required, plus project.                                                                     |
+| Tenant and category often missing    | Both required, plus project.                                                                     |
 | One 999-hour entry                         | Total cap is 999 hours. Duration/punch cap is 24 hours.                                          |
 | No approval step                           | Entries are live.                                                                                |
 
@@ -97,25 +97,25 @@ Four seeded affiliates have no 2026 hours yet: Literary Arts Society, West Jorda
 The brief’s person table mixed identity, org, rate, and activity. The schema splits those correctly:
 
 - `User` / `UserProfile` for the person.
-- `OrganizationMembership` for role, active flag, rate type, primary group.
-- `Department` for affiliates (labeled “Group” for CASWJ).
+- `TenantMembership` for role, active flag, rate type, primary group.
+- `Organization` for affiliates (labeled “Group” for CASWJ).
 - `HourlyRate` catalog with snapshots on every entry.
 - `Project` with `Project` vs `Event`.
 - `UserTimeEntry` vs `CollectiveTimeEntry`.
 
-That mapping is written into `docs/schema/domain.md` and is a better fit than nine separate organizations. Coordinators still need a first-class “my group only” story; see [Later-scope roles](#later-scope-roles).
+That mapping is written into `docs/schema/domain.md` and is a better fit than nine separate tenants. Coordinators still need a first-class “my group only” story; see [Later-scope roles](#later-scope-roles).
 
 ### Security and roles
 
 The internship `schema.sql` gave every signed-in user full access. VolunTime does not.
 
-- Organization admin, department admin, member, volunteer, SuperAdmin.
+- Tenant admin, organization admin, member, volunteer, SuperAdmin.
 - Volunteers are locked to the default volunteer rate and cannot read other people’s reports.
 - Inactive members lose access; history stays.
-- Private / public / department projects.
+- Private / public / organization projects.
 - JWT access + rotating refresh tokens, password-change gate, hashed invite and reset codes.
 - Profile privacy: phone, zip, and notes are hidden from ordinary peers.
-- Organization and platform API keys with scopes.
+- Tenant and platform API keys with scopes.
 - CSV formula neutralization (`=`, `+`, `-`, `@`).
 
 This is a genuine exceed of the brief, and the HTTP hardening suite treats it as load-bearing.
@@ -134,8 +134,8 @@ This is a genuine exceed of the brief, and the HTTP hardening suite treats it as
 
 The brief described one CASWJ tool. The app is a multi-tenant product:
 
-- Any signed-in user can create an organization and become its admin.
-- Themes, wordmarks, marks, and entity labels (`Group` vs `Department`, `Project / Event`).
+- Any signed-in user can create an tenant and become its admin.
+- Themes, wordmarks, marks, and entity labels (`Group` vs `Organization`, `Project / Event`).
 - One HTTP contract in `docs/api/http.md`, served by Next.js.
 - MCP tools for the same features.
 - Feedback inbox with optional GitHub issues.
@@ -193,11 +193,11 @@ That is the opposite of the brief’s development rule. It is also why the golde
 
 **5. Professional rates and person fields from the sheet**
 
-The brief’s person table included rate type, professional rate, zip, notes, and primary organization. Memberships support those fields. The seed sets everyone to Volunteer and the Utah Volunteer Rate ($35.47). Workbook rate columns are read and then ignored except as the snapshot amount on imported rows. If any 2026 rows used a professional rate, the catalog does not say so.
+The brief’s person table included rate type, professional rate, zip, notes, and primary tenant. Memberships support those fields. The seed sets everyone to Volunteer and the Utah Volunteer Rate ($35.47). Workbook rate columns are read and then ignored except as the snapshot amount on imported rows. If any 2026 rows used a professional rate, the catalog does not say so.
 
 **6. Open enrollment vs CASWJ enrollment**
 
-Signup is a general VolunTime account, then create-or-join an organization. That matches a platform. It is looser than “users sign up through a basic enrollment form” for one CASWJ portal, where an invite-only or domain-gated path may be what they want.
+Signup is a general VolunTime account, then create-or-join an tenant. That matches a platform. It is looser than “users sign up through a basic enrollment form” for one CASWJ portal, where an invite-only or domain-gated path may be what they want.
 
 ### Later-scope roles
 
@@ -205,11 +205,11 @@ The brief deferred three roles. We grew past two roles without finishing those t
 
 | Later item                                               | Closest primitive                                              | Still missing                                                                                                                                                                                                    |
 | -------------------------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Volunteer coordinator, limited to their own organization | Department admin; entity label “Group”                         | Coordinators are not limited to one affiliate unless someone makes them department admin and not org admin. Affiliates are departments, not organizations, so “their own organization” needs a product decision. |
+| Volunteer coordinator, limited to their own tenant | Organization admin; entity label “Group”                         | Coordinators are not limited to one affiliate unless someone makes them organization admin and not org admin. Affiliates are organizations, not tenants, so “their own tenant” needs a product decision. |
 | Admin staff role                                         | `MEMBER` (can choose rates, see others, cannot admin settings) | The brief’s staff role is unnamed in the UI. Volunteers vs members is easy to confuse.                                                                                                                           |
 | Paid staff time tracking                                 | `Professional` hourly rates for in-kind                        | No payroll, no “this is paid so exclude from volunteer in-kind,” no staff vs volunteer split in reports.                                                                                                         |
 
-If affiliates ever need their own branding, members, or grant packets, the one-org model will have to be revisited. Do that before building a coordinator role on top of departments.
+If affiliates ever need their own branding, members, or grant packets, the one-org model will have to be revisited. Do that before building a coordinator role on top of organizations.
 
 ### Implementation and doc drift
 
@@ -224,7 +224,7 @@ The HTTP contract suite is the best part of the quality story. The Playwright su
 
 Covered well:
 
-- Auth, users, orgs, departments, tags, categories, projects, memberships, invitations, time (punch / duration / total / batch), collective time, rates, reports, CSV formats, API keys, MCP, feedback, hardening.
+- Auth, users, orgs, organizations, tags, categories, projects, memberships, invitations, time (punch / duration / total / batch), collective time, rates, reports, CSV formats, API keys, MCP, feedback, hardening.
 - HTTP contract tests against Next.js.
 - Seeded 2026 report JSON, Summary UI, People tables, empty group-sessions tab, Volunteer Log CSV (249 rows, Total Hours, Utah Volunteer Rate, Volunteer ID), Summary CSV KPIs.
 - Admin add-person dialog (success + conflict).
@@ -266,7 +266,7 @@ Add a Playwright test that saves a Total row and one HTTP/UI test that a `VOLUNT
 Pick one:
 
 - **CASWJ portal install** — path or subdomain on wjarts.org, CASWJ-owned Vercel + database, seeded wordmark and flame, approved gradient on login / enrollment / empty states, invite-first enrollment.
-- **Multi-tenant VolunTime** — keep current branding as the default; CASWJ is a themed organization. Portal embedding can wait.
+- **Multi-tenant VolunTime** — keep current branding as the default; CASWJ is a themed tenant. Portal embedding can wait.
 
 The brief assumed the first. The code is already the second. That decision unblocks brand work and ownership transfer.
 
@@ -290,9 +290,9 @@ Minimum browser coverage that matches the brief:
 
 Before adding more role names:
 
-- Keep affiliates as departments if CASWJ files one grant packet.
-- Promote affiliates to organizations only if they need their own rates, themes, or memberships.
-- If coordinators stay at group level, give department admins a settings home that is not the full org admin surface.
+- Keep affiliates as organizations if CASWJ files one grant packet.
+- Promote affiliates to tenants only if they need their own rates, themes, or memberships.
+- If coordinators stay at group level, give organization admins a settings home that is not the full org admin surface.
 - Do not build paid staff tracking until someone asks to exclude staff hours from volunteer in-kind.
 
 ### 6. Repair the source-of-truth docs

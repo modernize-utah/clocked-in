@@ -4,22 +4,22 @@ import { bodyText, EmailLayout } from "./components/layout";
 export const needDecided = {
   id: "need-decided",
   subject: "Your need was {{decision}}: {{needName}}",
-  variables: ["organizationName", "needName", "decision"],
+  variables: ["tenantName", "needName", "decision"],
 };
 
 export default function NeedDecidedEmail({
-  organizationName = "Harbor Volunteers",
+  tenantName = "Harbor Volunteers",
   needName = "Ushers",
   decision = "published",
 }: {
-  organizationName?: string;
+  tenantName?: string;
   needName?: string;
   decision?: string;
 }) {
   return (
     <EmailLayout preview={`“${needName}” was ${decision}.`} title="Need update">
       <Text style={bodyText}>
-        Your need “{needName}” in {organizationName} was {decision}.
+        Your need “{needName}” in {tenantName} was {decision}.
       </Text>
     </EmailLayout>
   );

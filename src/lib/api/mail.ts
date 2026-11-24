@@ -23,30 +23,30 @@ export function emailTemplateDefault(kind: EmailTemplateFor) {
   return item;
 }
 
-/** The organization's saved copy, or the default when there is none. Null when an optional mail is off. */
+/** The tenant's saved copy, or the default when there is none. Null when an optional mail is off. */
 async function templateFor(
-  organizationId: string | null,
+  tenantId: string | null,
   kind: EmailTemplateFor,
   ignoreSchedule = false,
 ): Promise<EmailTemplateContent | null> {
   const fallback = emailTemplateDefault(kind);
   const content = { subject: fallback.subject, heading: fallback.heading, preview: fallback.preview, template: fallback.html };
-  if (!organizationId) {
+  if (!tenantId) {
     return content;
   }
 
-  const [organization, row] = await Promise.all([
-    prisma.organization.findUnique({
-      where: { id: organizationId },
+  const [tenant, row] = await Promise.all([
+    prisma.tenant.findUnique({
+      where: { id: tenantId },
       select: { preferences: true },
     }),
     prisma.emailTemplate.findUnique({
-      where: { organizationId_for: { organizationId, for: kind } },
+      where: { tenantId_for: { tenantId, for: kind } },
     }),
   ]);
   const prefs =
-    organization?.preferences && typeof organization.preferences === "object" && !Array.isArray(organization.preferences)
-      ? (organization.preferences as Record<string, unknown>)
+    tenant?.preferences && typeof tenant.preferences === "object" && !Array.isArray(tenant.preferences)
+      ? (tenant.preferences as Record<string, unknown>)
       : null;
   const emailSettings = readEmailSettings(prefs?.emailSettings);
   if (!ignoreSchedule && !shouldSendEmailImmediate(emailSettings, kind)) {
@@ -66,19 +66,19 @@ async function templateFor(
 
 export async function sendEmail({
   to,
-  organizationId,
+  tenantId,
   for: kind,
   context,
   ignoreSchedule = false,
 }: {
   to: string;
-  organizationId: string | null;
+  tenantId: string | null;
   for: EmailTemplateFor;
   context: EmailContext;
   /** Weekly digest sends the same templates after the immediate check has already declined them. */
   ignoreSchedule?: boolean;
 }) {
-  const content = await templateFor(organizationId, kind, ignoreSchedule);
+  const content = await templateFor(tenantId, kind, ignoreSchedule);
   if (!content) {
     return;
   }

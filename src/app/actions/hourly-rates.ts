@@ -19,10 +19,10 @@ export type HourlyRateInput = {
   source?: string | null;
 };
 
-export async function createHourlyRateAction(organizationId: string, input: HourlyRateInput) {
+export async function createHourlyRateAction(tenantId: string, input: HourlyRateInput) {
   return run(async () => {
     const access = await requireAccess();
-    return createHourlyRate(access, organizationId, parseCreateHourlyRate(body(input)));
+    return createHourlyRate(access, tenantId, parseCreateHourlyRate(body(input)));
   }, "Hourly rate added.");
 }
 

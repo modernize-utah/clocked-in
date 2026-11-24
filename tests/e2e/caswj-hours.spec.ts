@@ -3,7 +3,7 @@
  * - Spreadsheet Summary by volunteer does not match byPerson / log hours; it matches byVolunteer
  *   (Participant Hours are omitted from volunteer hours but still counted in in-kind).
  * - UI hours round to 2 decimals (formatNumber / formatCurrency); JSON keeps 5.
- * - Blank group, CASWJ, and the casWJ typo fold into the org bucket, not a department named CASWJ.
+ * - Blank group, CASWJ, and the casWJ typo fold into the org bucket, not a organization named CASWJ.
  * - The unnamed 25h row is an entry but not a unique volunteer.
  * - Seeded volunteer passwords are random; only jbaddley is a known login.
  * - Group sessions are unused; people totals stay separate from collective.
@@ -38,7 +38,7 @@ const volunteerLogHeader = [
   "Date",
   "Project / Event",
   "Volunteer",
-  "Group / Organization",
+  "Group / Tenant",
   "Task Category",
   "Entry Method",
   "Start Time",
@@ -76,14 +76,14 @@ test.afterEach(async ({ request }) => {
 });
 
 test("report JSON matches the seed mapping", async ({ page }) => {
-  const organization = await openReports(page);
-  const report = await getReport(page.request, organization.id);
+  const tenant = await openReports(page);
+  const report = await getReport(page.request, tenant.id);
   expect(expected.entries).toBe(249);
   expect(report.user.hours).toBe(expected.hours);
   expect(report.user.volunteers).toBe(expected.volunteers);
   expect(report.user.entries).toBe(expected.entries);
   expect(report.user.inKind).toBeCloseTo(expected.inKind, 2);
-  expectGroups(report.user.byDepartment, expected.byDepartment, { volunteers: true, id: "department" });
+  expectGroups(report.user.byOrganization, expected.byOrganization, { volunteers: true, id: "organization" });
   expectGroups(report.user.byCategory, expected.byCategory, { volunteers: true });
   expectGroups(report.user.byPerson, expected.byPerson);
   expectGroups(report.user.byVolunteer, expected.byVolunteer);
@@ -92,7 +92,7 @@ test("report JSON matches the seed mapping", async ({ page }) => {
   expect(report.collective.hours).toBe(0);
   expect(report.collective.inKind).toBe(0);
   expect(report.collective.entries).toBe(0);
-  expect(report.collective.byDepartment).toEqual([]);
+  expect(report.collective.byOrganization).toEqual([]);
   expect(report.collective.byCategory).toEqual([]);
   expect(report.collective.byProject).toEqual([]);
 
@@ -110,7 +110,7 @@ test("Summary tab shows seed totals, labels, and volunteer hours", async ({ page
   await expect(page.getByText(formatCurrency(expected.inKind), { exact: true }).first()).toBeVisible();
   await expect(page.getByText(String(expected.volunteers), { exact: true }).first()).toBeVisible();
   await expect(page.getByText(String(expected.entries), { exact: true }).first()).toBeVisible();
-  await expect(cardTitle(page, "Hours by department")).toBeVisible();
+  await expect(cardTitle(page, "Hours by organization")).toBeVisible();
   await expect(cardTitle(page, "Hours by task category")).toBeVisible();
   await expect(cardTitle(page, "Hours by volunteer")).toBeVisible();
   await expect(cardTitle(page, "Hours by project")).toBeVisible();
@@ -129,7 +129,7 @@ test("People tab tables match seed rollups by label", async ({ page }) => {
   await expect(cardTitle(page, "By person")).toBeVisible();
   await expectTable(page, "By project", expected.byProject, true);
   await expectTable(page, "By person", expected.byPerson, false);
-  await expectTable(page, "By department", expected.byDepartment, true);
+  await expectTable(page, "By organization", expected.byOrganization, true);
   await expectTable(page, "By task category", expected.byCategory, true);
 });
 
@@ -143,8 +143,8 @@ test("Group sessions tab is empty for the seed", async ({ page }) => {
 });
 
 test("Volunteer Log CSV matches labeled columns and 249 seed rows", async ({ page }) => {
-  const organization = await openReports(page);
-  const csv = parseCsv(await getCsv(page.request, organization.id, "log"));
+  const tenant = await openReports(page);
+  const csv = parseCsv(await getCsv(page.request, tenant.id, "log"));
   expect(csv[0]).toEqual(volunteerLogHeader);
   const rows = csv.slice(1);
   expect(rows).toHaveLength(expected.entries);
@@ -163,13 +163,13 @@ test("Volunteer Log CSV matches labeled columns and 249 seed rows", async ({ pag
 });
 
 test("Summary CSV KPIs and tables follow report rollups including byVolunteer", async ({ page }) => {
-  const organization = await openReports(page);
-  const csv = parseCsv(await getCsv(page.request, organization.id, "summary"));
+  const tenant = await openReports(page);
+  const csv = parseCsv(await getCsv(page.request, tenant.id, "summary"));
   expect(csv[0]).toEqual(["Total Volunteer Hours", hoursCell(Math.round(expected.hours * 60))]);
   expect(csv[1]).toEqual(["Total In-Kind Value", expected.inKind.toFixed(2)]);
   expect(csv[2]).toEqual(["Unique Volunteers", String(expected.volunteers)]);
   expect(csv[3]).toEqual(["Total Entries", String(expected.entries)]);
-  expectSummaryTable(csv, "Organization", "Volunteer Hours", expected.byDepartment);
+  expectSummaryTable(csv, "Tenant", "Volunteer Hours", expected.byOrganization);
   expectSummaryTable(csv, "Task Category", "Volunteer Hours", expected.byCategory);
   expectSummaryTable(csv, "Month", "Volunteer Hours", expected.byMonth);
   expectSummaryTable(csv, "Volunteer", "Total Hours", expected.byVolunteer);
@@ -177,8 +177,8 @@ test("Summary CSV KPIs and tables follow report rollups including byVolunteer", 
 });
 
 test("log form can add an e2e- Duration row that cleanup removes", async ({ page }) => {
-  const organization = await loginAsAdmin(page);
-  const before = await getReport(page.request, organization.id);
+  const tenant = await loginAsAdmin(page);
+  const before = await getReport(page.request, tenant.id);
   expect(before.user.entries).toBe(expected.entries);
   await page.goto("/log/own");
   await expect(page.getByRole("heading", { name: "Log time", exact: true })).toBeVisible();
@@ -204,9 +204,9 @@ test("log form can add an e2e- Duration row that cleanup removes", async ({ page
   await page.getByRole("tab", { name: "Entries" }).click();
   await expect(page.getByRole("listitem").filter({ hasText: extraNotes })).toBeVisible();
   await expect
-    .poll(async () => (await getReport(page.request, organization.id)).user.entries)
+    .poll(async () => (await getReport(page.request, tenant.id)).user.entries)
     .toBe(expected.entries + 1);
-  const after = await getReport(page.request, organization.id);
+  const after = await getReport(page.request, tenant.id);
   expect(after.user.hours).toBeGreaterThan(before.user.hours);
 });
 

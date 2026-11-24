@@ -6,13 +6,13 @@ import { Body, has, list, normalizeEmail, normalizeRole, normalizeUsername, page
 import { usernameFromName } from "@/lib/import/username";
 import { sendEmail } from "@/lib/api/mail";
 import {
-  departmentMembershipJson,
+  organizationMembershipJson,
   membershipInclude,
   orgMembershipJson,
   roleId,
   roleJson,
 } from "@/lib/api/features/memberships";
-import { readPreferences } from "@/lib/api/features/organizations";
+import { readPreferences } from "@/lib/api/features/tenants";
 import { labels } from "@/lib/labels";
 import { appUrl, hashCode, inviteCode, inviteMs, normalizeInviteCode } from "@/lib/api/security";
 import { assertUnderRateLimit, minute, recordRateLimitFailure, type RateLimitRule } from "@/lib/api/rate-limit";
@@ -25,8 +25,8 @@ function invitationJson(invitation: InvitationRow) {
   return {
     id: invitation.id,
     email: invitation.email,
+    tenantId: invitation.tenantId,
     organizationId: invitation.organizationId,
-    departmentId: invitation.departmentId,
     role: roleJson(invitation.role),
     invitedByUserId: invitation.invitedByUserId,
     expiresAt: invitation.expiresAt.toISOString(),
@@ -74,7 +74,7 @@ function inviteContext(
   code: string,
 ) {
   return {
-    organization: { name: target.targetName },
+    tenant: { name: target.targetName },
     invite: {
       targetKind: target.targetKind,
       targetName: target.targetName,
@@ -130,19 +130,19 @@ function lookupRule(ip: string | null | undefined): RateLimitRule | null {
 }
 
 function inviteTarget(
-  organization: { name: string; slug?: string | null; preferences?: Parameters<typeof readPreferences>[0] },
-  departmentName?: string,
+  tenant: { name: string; slug?: string | null; preferences?: Parameters<typeof readPreferences>[0] },
+  organizationName?: string,
 ) {
-  const copy = labels(readPreferences(organization.preferences));
-  return departmentName
-    ? { targetKind: copy.department, targetName: departmentName, slug: organization.slug ?? null }
-    : { targetKind: copy.organization, targetName: organization.name, slug: organization.slug ?? null };
+  const copy = labels(readPreferences(tenant.preferences));
+  return organizationName
+    ? { targetKind: copy.organization, targetName: organizationName, slug: tenant.slug ?? null }
+    : { targetKind: copy.tenant, targetName: tenant.name, slug: tenant.slug ?? null };
 }
 
 async function create(
   access: Access,
-  organizationId: string,
-  departmentId: string | null,
+  tenantId: string,
+  organizationId: string | null,
   target: { targetKind: string; targetName: string; slug?: string | null },
   request: CreateInvitationRequest,
 ) {
@@ -153,9 +153,9 @@ async function create(
     prisma.invitation.create({
       data: {
         email: request.email,
+        tenantId,
         organizationId,
-        departmentId,
-        roleId: await roleId(request.role, organizationId),
+        roleId: await roleId(request.role, tenantId),
         codeHash: inviteHash(code),
         invitedByUserId: access.actorUserId,
         expiresAt: new Date(now.getTime() + inviteMs),
@@ -170,7 +170,7 @@ async function create(
   try {
     await sendEmail({
       to: request.email,
-      organizationId,
+      tenantId,
       for: "Invite",
       context: inviteContext(target, invitation.role.name, username, code),
     });
@@ -218,31 +218,35 @@ async function revoke(where: Prisma.InvitationWhereInput) {
   );
 }
 
-export async function createOrganizationInvitation(
+export async function createTenantInvitation(
   access: Access,
-  organizationId: string,
+  tenantId: string,
   request: CreateInvitationRequest,
 ) {
-  const organization = await access.requireOrganizationAdmin(organizationId);
-  return create(access, organization.id, null, inviteTarget(organization), request);
+  const { assertInvitationsMutable } = await import("@/lib/api/features/external-sync");
+  await assertInvitationsMutable(tenantId);
+  const tenant = await access.requireTenantAdmin(tenantId);
+  return create(access, tenant.id, null, inviteTarget(tenant), request);
 }
 
-export async function createDepartmentInvitation(access: Access, departmentId: string, request: CreateInvitationRequest) {
-  const department = await access.requireDepartmentManager(departmentId);
-  const organization = await access.requireOrganization(department.organizationId, false);
-  return create(access, department.organizationId, department.id, inviteTarget(organization, department.name), request);
+export async function createOrganizationInvitation(access: Access, organizationId: string, request: CreateInvitationRequest) {
+  const organization = await access.requireOrganizationManager(organizationId);
+  const { assertInvitationsMutable } = await import("@/lib/api/features/external-sync");
+  await assertInvitationsMutable(organization.tenantId);
+  const tenant = await access.requireTenant(organization.tenantId, false);
+  return create(access, organization.tenantId, organization.id, inviteTarget(tenant, organization.name), request);
+}
+
+export async function listTenantInvitations(access: Access, tenantId: string, params: URLSearchParams) {
+  const paging = page(params);
+  await access.requireTenantAdmin(tenantId);
+  return listWhere({ tenantId, organizationId: null }, paging);
 }
 
 export async function listOrganizationInvitations(access: Access, organizationId: string, params: URLSearchParams) {
   const paging = page(params);
-  await access.requireOrganizationAdmin(organizationId);
-  return listWhere({ organizationId, departmentId: null }, paging);
-}
-
-export async function listDepartmentInvitations(access: Access, departmentId: string, params: URLSearchParams) {
-  const paging = page(params);
-  await access.requireDepartmentManager(departmentId);
-  return listWhere({ departmentId }, paging);
+  await access.requireOrganizationManager(organizationId);
+  return listWhere({ organizationId }, paging);
 }
 
 async function resend(
@@ -282,7 +286,7 @@ async function resend(
   try {
     await sendEmail({
       to: invitation.email,
-      organizationId: invitation.organizationId,
+      tenantId: invitation.tenantId,
       for: "Invite",
       context: inviteContext(target, invitation.role.name, invitation.username ?? "", code),
     });
@@ -294,19 +298,19 @@ async function resend(
   return invitationJson({ ...invitation, expiresAt: new Date(now.getTime() + inviteMs), createdAt: now });
 }
 
-export async function resendOrganizationInvitation(access: Access, organizationId: string, invitationId: string) {
-  const organization = await access.requireOrganizationAdmin(organizationId);
-  return resend({ id: invitationId, organizationId, departmentId: null }, inviteTarget(organization));
+export async function resendTenantInvitation(access: Access, tenantId: string, invitationId: string) {
+  const tenant = await access.requireTenantAdmin(tenantId);
+  return resend({ id: invitationId, tenantId, organizationId: null }, inviteTarget(tenant));
+}
+
+export async function revokeTenantInvitation(access: Access, tenantId: string, invitationId: string) {
+  await access.requireTenantAdmin(tenantId);
+  return revoke({ id: invitationId, tenantId, organizationId: null });
 }
 
 export async function revokeOrganizationInvitation(access: Access, organizationId: string, invitationId: string) {
-  await access.requireOrganizationAdmin(organizationId);
-  return revoke({ id: invitationId, organizationId, departmentId: null });
-}
-
-export async function revokeDepartmentInvitation(access: Access, departmentId: string, invitationId: string) {
-  await access.requireDepartmentManager(departmentId);
-  return revoke({ id: invitationId, departmentId });
+  await access.requireOrganizationManager(organizationId);
+  return revoke({ id: invitationId, organizationId });
 }
 
 function usable(invitation: { acceptedAt: Date | null; revokedAt: Date | null; expiresAt: Date }, now: Date) {
@@ -331,7 +335,7 @@ export function acceptAuthRedirect(code: string, userExists: boolean) {
   return `${userExists ? "/login" : "/signup"}?next=${encodeURIComponent(next)}`;
 }
 
-export async function invitationAccount(code: string, pinnedOrganizationId?: string | null, options?: { ip?: string | null }) {
+export async function invitationAccount(code: string, pinnedTenantId?: string | null, options?: { ip?: string | null }) {
   const trimmed = code.trim();
   if (!trimmed) {
     return null;
@@ -350,14 +354,14 @@ export async function invitationAccount(code: string, pinnedOrganizationId?: str
     return null;
   }
 
-  if (pinnedOrganizationId && found.organizationId !== pinnedOrganizationId) {
+  if (pinnedTenantId && found.tenantId !== pinnedTenantId) {
     return null;
   }
 
   const user = await prisma.user.findUnique({ where: { email: found.email }, select: { id: true } });
   return {
     email: found.email,
-    organizationId: found.organizationId,
+    tenantId: found.tenantId,
     userExists: user !== null,
     firstName: found.firstName,
     lastName: found.lastName,
@@ -374,7 +378,7 @@ export async function acceptInvitation(access: Access, request: AcceptInvitation
     await assertUnderRateLimit(rule);
   }
 
-  const pinned = await access.pinnedOrganization();
+  const pinned = await access.pinnedTenant();
   const now = new Date();
   const found = await prisma.invitation.findUnique({ where: { codeHash: inviteHash(request.code) } });
   if (!found || !usable(found, now)) {
@@ -384,8 +388,8 @@ export async function acceptInvitation(access: Access, request: AcceptInvitation
     validation("The code is not valid.");
   }
 
-  if (pinned && found.organizationId !== pinned.id) {
-    throw new ApiError(403, "forbidden", "This invite belongs to another organization.");
+  if (pinned && found.tenantId !== pinned.id) {
+    throw new ApiError(403, "forbidden", "This invite belongs to another tenant.");
   }
 
   if (found.email !== caller.email) {
@@ -400,21 +404,21 @@ export async function acceptInvitation(access: Access, request: AcceptInvitation
       validation("The code is not valid.");
     }
 
-    const memberOfOrganization =
-      (await tx.organizationMembership.count({
-        where: { userId: caller.id, organizationId: invitation.organizationId },
+    const memberOfTenant =
+      (await tx.tenantMembership.count({
+        where: { userId: caller.id, tenantId: invitation.tenantId },
       })) > 0;
-    const newOrganizationMembership = async (membershipRoleId: string) => {
-      const organization = await tx.organization.findUniqueOrThrow({
-        where: { id: invitation.organizationId },
+    const newTenantMembership = async (membershipRoleId: string) => {
+      const tenant = await tx.tenant.findUniqueOrThrow({
+        where: { id: invitation.tenantId },
         select: { defaultRateType: true },
       });
-      return tx.organizationMembership.create({
+      return tx.tenantMembership.create({
         data: {
           userId: caller.id,
-          organizationId: invitation.organizationId,
+          tenantId: invitation.tenantId,
           roleId: membershipRoleId,
-          rateType: organization.defaultRateType,
+          rateType: tenant.defaultRateType,
           isActive: true,
           joinedAt: now,
         },
@@ -422,31 +426,31 @@ export async function acceptInvitation(access: Access, request: AcceptInvitation
       });
     };
 
+    let tenantMembership = null;
     let organizationMembership = null;
-    let departmentMembership = null;
-    if (invitation.departmentId) {
-      const alreadyInDepartment =
-        (await tx.departmentMembership.count({
-          where: { userId: caller.id, departmentId: invitation.departmentId },
+    if (invitation.organizationId) {
+      const alreadyInOrganization =
+        (await tx.tenantMembership.count({
+          where: { userId: caller.id, organizationId: invitation.organizationId },
         })) > 0;
-      if (alreadyInDepartment) {
+      if (alreadyInOrganization) {
         conflict("You are already a member.");
       }
 
-      if (!memberOfOrganization) {
-        organizationMembership = await newOrganizationMembership(memberRoleId);
+      if (!memberOfTenant) {
+        tenantMembership = await newTenantMembership(memberRoleId);
       }
 
-      departmentMembership = await tx.departmentMembership.create({
-        data: { userId: caller.id, departmentId: invitation.departmentId, roleId: invitation.roleId, joinedAt: now },
+      organizationMembership = await tx.tenantMembership.create({
+        data: { userId: caller.id, organizationId: invitation.organizationId, roleId: invitation.roleId, joinedAt: now },
         include: membershipInclude,
       });
     } else {
-      if (memberOfOrganization) {
+      if (memberOfTenant) {
         conflict("You are already a member.");
       }
 
-      organizationMembership = await newOrganizationMembership(invitation.roleId);
+      tenantMembership = await newTenantMembership(invitation.roleId);
     }
 
     const saved = await tx.invitation.update({
@@ -454,19 +458,19 @@ export async function acceptInvitation(access: Access, request: AcceptInvitation
       data: { acceptedAt: now },
       include: invitationInclude,
     });
-    return { invitation: saved, organizationMembership, departmentMembership };
+    return { invitation: saved, tenantMembership, organizationMembership };
   });
 
   return {
     invitation: invitationJson(accepted.invitation),
-    organizationMembership: accepted.organizationMembership
+    tenantMembership: accepted.tenantMembership
       ? orgMembershipJson(
-          accepted.organizationMembership,
-          accepted.invitation.departmentId ? [accepted.invitation.departmentId] : [],
+          accepted.tenantMembership,
+          accepted.invitation.organizationId ? [accepted.invitation.organizationId] : [],
         )
       : null,
-    departmentMembership: accepted.departmentMembership
-      ? departmentMembershipJson(accepted.departmentMembership, accepted.invitation.organizationId)
+    organizationMembership: accepted.organizationMembership
+      ? organizationMembershipJson(accepted.organizationMembership, accepted.invitation.tenantId)
       : null,
   };
 }

@@ -23,8 +23,8 @@ const shellHeading: Record<string, RegExp | string> = {
   "/people/roles": "People",
   "/settings": "Settings",
   "/about-prototype": "Guide",
-  "/settings/organization": "Settings",
-  "/settings/departments": "Settings",
+  "/settings/tenant": "Settings",
+  "/settings/tenants": "Settings",
   "/settings/lists": "Settings",
   "/settings/theme": "Settings",
   "/settings/brand": "Settings",
@@ -50,8 +50,8 @@ const viewCopy: Record<string, RegExp | string> = {
   "/people/roles": "Roles",
   "/settings": "Hourly rates",
   "/about-prototype": "How this app works",
-  "/settings/organization": "Hourly rates",
-  "/settings/departments": /Teams or sites inside/,
+  "/settings/tenant": "Hourly rates",
+  "/settings/tenants": /Teams or sites inside/,
   "/settings/lists": /give it a start and end date/,
   "/settings/theme": /Chart palettes stay/,
   "/settings/brand": "Square mark for the browser tab",
@@ -75,8 +75,8 @@ const signedInPaths = [
   "/people/invites",
   "/people/connections",
   "/people/roles",
-  "/settings/organization",
-  "/settings/departments",
+  "/settings/tenant",
+  "/settings/tenants",
   "/settings/lists",
   "/settings/theme",
   "/settings/brand",
@@ -157,8 +157,8 @@ test("signed-in views rebuild a cache and open on the first click", async ({ pag
     "/people",
     "/people/invites",
     "/people/roles",
-    "/settings/organization",
-    "/settings/departments",
+    "/settings/tenant",
+    "/settings/tenants",
     "/settings/lists",
     "/settings/theme",
     "/settings/brand",
@@ -188,7 +188,7 @@ async function rebuild(page: Page, paths: string[]) {
 
 const redirects: Record<string, string> = {
   "/log": "/log/own",
-  "/settings": "/settings/organization",
+  "/settings": "/settings/tenant",
   "/settings/members": "/people",
   "/settings/roles": "/people/roles",
   "/groups": "/log/group",
@@ -198,7 +198,7 @@ async function showLink(page: Page, href: string) {
   const visible = () => page.locator(`a[href="${href}"]`).filter({ visible: true });
   if (await visible().count()) return;
 
-  if (href === "/profile" || href === "/accept" || href === "/organization") {
+  if (href === "/profile" || href === "/accept" || href === "/tenant") {
     await page.getByRole("button", { name: "Account menu" }).click();
     await expect(visible().first(), href).toBeVisible();
     return;
@@ -208,7 +208,7 @@ async function showLink(page: Page, href: string) {
   const host = nestedSetting
     ? nestedSetting
     : href.startsWith("/settings/")
-      ? "/settings/organization"
+      ? "/settings/tenant"
       : href.startsWith("/people/")
         ? "/people"
         : href.startsWith("/log/")

@@ -8,8 +8,8 @@ import { viewTitle } from "@/lib/view-title";
 
 export function HeaderTitle() {
   const pathname = usePathname();
-  const { viewer, organization } = useWorkspace();
-  const title = viewTitle(pathname ?? "", viewer.name, organization?.name);
+  const { viewer, tenant } = useWorkspace();
+  const title = viewTitle(pathname ?? "", viewer.name, tenant?.name);
   if (!title) return null;
 
   if (isReportViewerPath(pathname ?? "")) {

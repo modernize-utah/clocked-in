@@ -32,14 +32,14 @@ describe("saved reports", suite, () => {
     ctx.admin = await signUp("designadmin");
     ctx.member = await signUp("designmember");
     ctx.outsider = await signUp("designout");
-    ctx.org = await createJson(ctx.admin.accessToken, "/organizations", { name: label("Design org") });
-    ctx.department = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/departments`, {
-      name: label("Design department"),
+    ctx.org = await createJson(ctx.admin.accessToken, "/tenants", { name: label("Design org") });
+    ctx.tenant = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/tenants`, {
+      name: label("Design organization"),
     });
-    ctx.category = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/task-categories`, {
+    ctx.category = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/task-categories`, {
       name: label("Design category"),
     });
-    ctx.project = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/projects`, {
+    ctx.project = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/projects`, {
       title: label("Design project"),
       accessType: "Public",
     });
@@ -47,7 +47,7 @@ describe("saved reports", suite, () => {
   });
 
   test("an admin saves a named design and a member can read it", async () => {
-    const denied = await callApi(`/organizations/${ctx.org.id}/reports`, {
+    const denied = await callApi(`/tenants/${ctx.org.id}/reports`, {
       method: "POST",
       token: ctx.member.accessToken,
       body: { name: "Member report", layout: layout([valueCard()]) },
@@ -55,7 +55,7 @@ describe("saved reports", suite, () => {
     assertError(denied, 403, "forbidden", "Forbidden.");
 
     const name = label("Board");
-    const created = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/reports`, {
+    const created = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/reports`, {
       name: `  ${name}  `,
       isDefault: true,
       layout: layout([
@@ -89,7 +89,7 @@ describe("saved reports", suite, () => {
           visibleColumns: ["name", "hours", "share", "inKind"],
         },
       ]),
-      filters: { departmentId: ctx.department.id, from: "2026-11-01", to: "2026-11-30" },
+      filters: { organizationId: ctx.tenant.id, from: "2026-11-01", to: "2026-11-30" },
     });
     assertUuid(created.id);
     assert.equal(created.name, name);
@@ -101,63 +101,63 @@ describe("saved reports", suite, () => {
     assert.equal(created.layout.cards[1].kind, "chart");
     assert.equal(created.layout.cards[2].kind, "list");
     assert.deepEqual(created.layout.cards[2].visibleColumns, ["name", "hours", "share", "inKind"]);
-    assert.deepEqual(created.filters.departmentId, [ctx.department.id]);
+    assert.deepEqual(created.filters.organizationId, [ctx.tenant.id]);
     assertInstant(created.createdAt);
     assertInstant(created.updatedAt);
     ctx.report = created;
 
-    const listed = await callApi(`/organizations/${ctx.org.id}/reports`, { token: ctx.member.accessToken });
+    const listed = await callApi(`/tenants/${ctx.org.id}/reports`, { token: ctx.member.accessToken });
     assert.equal(listed.status, 200);
     assertList(listed.json);
     assert.equal(listed.json.items.some((item) => item.id === created.id), true);
 
-    const read = await callApi(`/organizations/${ctx.org.id}/reports/${created.id}`, { token: ctx.member.accessToken });
+    const read = await callApi(`/tenants/${ctx.org.id}/reports/${created.id}`, { token: ctx.member.accessToken });
     assert.equal(read.status, 200);
     assert.equal(read.json.name, name);
 
-    const outsider = await callApi(`/organizations/${ctx.org.id}/reports`, { token: ctx.outsider.accessToken });
+    const outsider = await callApi(`/tenants/${ctx.org.id}/reports`, { token: ctx.outsider.accessToken });
     assertError(outsider, 403, "forbidden", "Forbidden.");
   });
 
   test("names are unique ignoring case and only one report is the default", async () => {
-    const duplicate = await callApi(`/organizations/${ctx.org.id}/reports`, {
+    const duplicate = await callApi(`/tenants/${ctx.org.id}/reports`, {
       method: "POST",
       token: ctx.admin.accessToken,
       body: { name: ctx.report.name.toUpperCase(), layout: layout([valueCard()]) },
     });
     assertError(duplicate, 409, "conflict", "A report with that name already exists.");
 
-    const next = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/reports`, {
+    const next = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/reports`, {
       name: label("Second"),
       isDefault: true,
       layout: layout([valueCard()]),
     });
     assert.equal(next.isDefault, true);
-    const first = await callApi(`/organizations/${ctx.org.id}/reports/${ctx.report.id}`, { token: ctx.admin.accessToken });
+    const first = await callApi(`/tenants/${ctx.org.id}/reports/${ctx.report.id}`, { token: ctx.admin.accessToken });
     assert.equal(first.json.isDefault, false);
     ctx.second = next;
   });
 
   test("only one report is the dashboard", async () => {
-    const first = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/reports`, {
+    const first = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/reports`, {
       name: label("Home board"),
       isDashboard: true,
       layout: layout([valueCard()]),
     });
     assert.equal(first.isDashboard, true);
-    const second = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/reports`, {
+    const second = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/reports`, {
       name: label("Other board"),
       isDashboard: true,
       layout: layout([valueCard()]),
     });
     assert.equal(second.isDashboard, true);
-    const previous = await callApi(`/organizations/${ctx.org.id}/reports/${first.id}`, { token: ctx.admin.accessToken });
+    const previous = await callApi(`/tenants/${ctx.org.id}/reports/${first.id}`, { token: ctx.admin.accessToken });
     assert.equal(previous.json.isDashboard, false);
   });
 
   test("overlapping cards are rejected", async () => {
     const id = randomUUID();
-    const response = await callApi(`/organizations/${ctx.org.id}/reports`, {
+    const response = await callApi(`/tenants/${ctx.org.id}/reports`, {
       method: "POST",
       token: ctx.admin.accessToken,
       body: {
@@ -170,21 +170,21 @@ describe("saved reports", suite, () => {
 
   test("saved filters and a date override share one rollup", async () => {
     await createJson(ctx.member.accessToken, "/time/duration", {
-      organizationId: ctx.org.id,
-      departmentId: ctx.department.id,
+      tenantId: ctx.org.id,
+      organizationId: ctx.tenant.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       durationMinutes: 90,
       occurredOn: "2026-10-01",
     });
-    const stored = await callApi(`/organizations/${ctx.org.id}/reports/${ctx.report.id}/data`, {
+    const stored = await callApi(`/tenants/${ctx.org.id}/reports/${ctx.report.id}/data`, {
       token: ctx.member.accessToken,
     });
     assert.equal(stored.status, 200);
     assert.equal(stored.json.user.hours, 0);
     assert.equal(stored.json.user.entries, 0);
 
-    const overridden = await callApi(`/organizations/${ctx.org.id}/reports/${ctx.report.id}/data`, {
+    const overridden = await callApi(`/tenants/${ctx.org.id}/reports/${ctx.report.id}/data`, {
       token: ctx.member.accessToken,
       query: { from: "2026-10-01", to: "2026-10-31" },
     });
@@ -192,7 +192,7 @@ describe("saved reports", suite, () => {
     assert.equal(overridden.json.user.hours, 1.5);
     assert.equal(overridden.json.user.entries, 1);
 
-    const cleared = await callApi(`/organizations/${ctx.org.id}/reports/${ctx.report.id}/data`, {
+    const cleared = await callApi(`/tenants/${ctx.org.id}/reports/${ctx.report.id}/data`, {
       token: ctx.member.accessToken,
       query: { clearDates: "true" },
     });
@@ -201,21 +201,21 @@ describe("saved reports", suite, () => {
   });
 
   test("a layout patch without filters keeps stored filters", async () => {
-    const updated = await callApi(`/organizations/${ctx.org.id}/reports/${ctx.report.id}`, {
+    const updated = await callApi(`/tenants/${ctx.org.id}/reports/${ctx.report.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
       body: { layout: layout([valueCard()]) },
     });
     assertStatus(updated, 200);
     assert.equal(updated.json.layout.cards.length, 1);
-    assert.deepEqual(updated.json.filters.departmentId, [ctx.department.id]);
+    assert.deepEqual(updated.json.filters.organizationId, [ctx.tenant.id]);
     assert.equal(updated.json.filters.from, "2026-11-01");
     assert.equal(updated.json.filters.to, "2026-11-30");
   });
 
   test("an admin can rename and delete a design", async () => {
     const renamed = label("Renamed");
-    const updated = await callApi(`/organizations/${ctx.org.id}/reports/${ctx.second.id}`, {
+    const updated = await callApi(`/tenants/${ctx.org.id}/reports/${ctx.second.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
       body: { name: renamed, isDefault: false },
@@ -224,12 +224,12 @@ describe("saved reports", suite, () => {
     assert.equal(updated.json.name, renamed);
     assert.equal(updated.json.isDefault, false);
 
-    const removed = await callApi(`/organizations/${ctx.org.id}/reports/${ctx.second.id}`, {
+    const removed = await callApi(`/tenants/${ctx.org.id}/reports/${ctx.second.id}`, {
       method: "DELETE",
       token: ctx.admin.accessToken,
     });
     assert.equal(removed.status, 204);
-    const missing = await callApi(`/organizations/${ctx.org.id}/reports/${ctx.second.id}`, { token: ctx.admin.accessToken });
+    const missing = await callApi(`/tenants/${ctx.org.id}/reports/${ctx.second.id}`, { token: ctx.admin.accessToken });
     assertError(missing, 404, "not_found", "Not found.");
   });
 });

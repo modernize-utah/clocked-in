@@ -12,7 +12,7 @@ import { useLookups } from "@/hooks/use-lookups";
 import { useMembers } from "@/hooks/use-members";
 import { useReport } from "@/hooks/use-report";
 import { useSavedReports } from "@/hooks/use-saved-reports";
-import { useOrganization, useWorkspace } from "@/hooks/use-workspace";
+import { useTenant, useWorkspace } from "@/hooks/use-workspace";
 import type { ReportTemplate } from "@/lib/api/features/report-templates";
 import type { SavedReport } from "@/lib/api/features/saved-reports";
 import type { EntityLabels } from "@/lib/labels";
@@ -43,17 +43,17 @@ type ResolvedReport = {
   templateKey: string | null;
 };
 
-function readLastSlug(organizationId: string) {
+function readLastSlug(tenantId: string) {
   try {
-    return window.localStorage.getItem(lastReportStorageKey(organizationId));
+    return window.localStorage.getItem(lastReportStorageKey(tenantId));
   } catch {
     return null;
   }
 }
 
-function writeLastSlug(organizationId: string, slug: string) {
+function writeLastSlug(tenantId: string, slug: string) {
   try {
-    window.localStorage.setItem(lastReportStorageKey(organizationId), slug);
+    window.localStorage.setItem(lastReportStorageKey(tenantId), slug);
   } catch {
     return;
   }
@@ -110,7 +110,7 @@ export function ReportWorkspace() {
   const pathname = usePathname();
   const router = useRouter();
   const search = useSearchParams();
-  const organization = useOrganization();
+  const tenant = useTenant();
   const { permissions } = useWorkspace();
   const canViewPayroll = permissions.includes("view_payroll");
   const copy = useLabels();
@@ -121,8 +121,8 @@ export function ReportWorkspace() {
   const { reports, isPending: reportsPending } = useSavedReports();
   const listed = useMemo(() => listedSavedReports(reports), [reports]);
   const templates = useQuery({
-    ...reportTemplatesQuery(organization.id),
-    enabled: Boolean(organization.id),
+    ...reportTemplatesQuery(tenant.id),
+    enabled: Boolean(tenant.id),
   });
   const query = search.toString();
   const [appliedFiltersFor, setAppliedFiltersFor] = useState<string | null>(null);
@@ -153,11 +153,11 @@ export function ReportWorkspace() {
   const filterSummary = reportFilterSummary(filters, { ...names, person: personNames }, copy);
 
   useEffect(() => {
-    if (!organization.id) return;
+    if (!tenant.id) return;
 
     if (!slug) {
       if (reportsPending) return;
-      const last = readLastSlug(organization.id);
+      const last = readLastSlug(tenant.id);
       const next = last && slugStillExists(last, listed) ? last : defaultSlug(listed);
       router.replace(reportPath(next, query), { scroll: false });
       return;
@@ -169,7 +169,7 @@ export function ReportWorkspace() {
     }
 
     if (payrollMode) {
-      writeLastSlug(organization.id, "payroll");
+      writeLastSlug(tenant.id, "payroll");
     }
 
     if (canonical && canonical !== slug) {
@@ -195,14 +195,14 @@ export function ReportWorkspace() {
     }
 
     if (resolved) {
-      writeLastSlug(organization.id, resolved.slug);
+      writeLastSlug(tenant.id, resolved.slug);
     }
   }, [
     appliedFiltersFor,
     canViewPayroll,
     canonical,
     listed,
-    organization.id,
+    tenant.id,
     payrollMode,
     query,
     reportsPending,

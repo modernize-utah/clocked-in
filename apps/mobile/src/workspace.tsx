@@ -8,44 +8,44 @@ import { useSession } from "@/session";
 import { colorsFromTheme, entityLabels, ThemeProvider } from "@/theme";
 import { ErrorText, Loading } from "@/ui";
 
-type WorkspaceValue = Workspace & { switching: boolean; switchOrganization: (organizationId: string) => Promise<void> };
+type WorkspaceValue = Workspace & { switching: boolean; switchTenant: (tenantId: string) => Promise<void> };
 
 const WorkspaceContext = createContext<WorkspaceValue | null>(null);
 
 export function useWorkspace() {
   const workspace = useContext(WorkspaceContext);
-  if (!workspace?.organization) throw new Error("This screen needs an organization.");
-  return { ...workspace, organization: workspace.organization, labels: entityLabels(workspace.organization) };
+  if (!workspace?.tenant) throw new Error("This screen needs an tenant.");
+  return { ...workspace, tenant: workspace.tenant, labels: entityLabels(workspace.tenant) };
 }
 
-/** Loads the workspace once, then keeps children mounted while another organization loads. */
+/** Loads the workspace once, then keeps children mounted while another tenant loads. */
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
-  const { organizationId, setOrganizationId } = useSession();
+  const { tenantId, setTenantId } = useSession();
   const queryClient = useQueryClient();
   const query = useQuery({
-    queryKey: ["workspace", organizationId],
-    queryFn: () => api.workspace(organizationId),
+    queryKey: ["workspace", tenantId],
+    queryFn: () => api.workspace(tenantId),
     placeholderData: keepPreviousData,
   });
 
   useEffect(() => {
-    const selected = query.data?.organization?.id;
-    if (selected && selected !== organizationId && !query.isPlaceholderData) {
-      void setOrganizationId(selected);
+    const selected = query.data?.tenant?.id;
+    if (selected && selected !== tenantId && !query.isPlaceholderData) {
+      void setTenantId(selected);
     }
-  }, [organizationId, query.data?.organization?.id, query.isPlaceholderData, setOrganizationId]);
+  }, [tenantId, query.data?.tenant?.id, query.isPlaceholderData, setTenantId]);
 
-  const switchOrganization = useCallback(
+  const switchTenant = useCallback(
     async (next: string) => {
-      await setOrganizationId(next);
+      await setTenantId(next);
       await queryClient.invalidateQueries({ queryKey: ["workspace"] });
     },
-    [queryClient, setOrganizationId],
+    [queryClient, setTenantId],
   );
 
   const value = useMemo<WorkspaceValue | null>(
-    () => (query.data ? { ...query.data, switching: query.isPlaceholderData, switchOrganization } : null),
-    [query.data, query.isPlaceholderData, switchOrganization],
+    () => (query.data ? { ...query.data, switching: query.isPlaceholderData, switchTenant } : null),
+    [query.data, query.isPlaceholderData, switchTenant],
   );
 
   if (!value) {
@@ -58,30 +58,30 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
     return <Loading />;
   }
-  if (!value.organization) return <Redirect href="/empty" />;
+  if (!value.tenant) return <Redirect href="/empty" />;
 
   return (
-    <ThemeProvider colors={colorsFromTheme(value.organization.theme)}>
+    <ThemeProvider colors={colorsFromTheme(value.tenant.theme)}>
       <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>
     </ThemeProvider>
   );
 }
 
-export function useOrgQuery<T>(key: string, queryFn: (organizationId: string) => Promise<T>, enabled = true) {
-  const { organization } = useWorkspace();
-  return useQuery({ queryKey: [key, organization.id], queryFn: () => queryFn(organization.id), enabled });
+export function useOrgQuery<T>(key: string, queryFn: (tenantId: string) => Promise<T>, enabled = true) {
+  const { tenant } = useWorkspace();
+  return useQuery({ queryKey: [key, tenant.id], queryFn: () => queryFn(tenant.id), enabled });
 }
 
-const noLookups: Lookups = { departments: [], projects: [], categories: [], tags: [], hourlyRates: [] };
+const noLookups: Lookups = { organizations: [], projects: [], categories: [], tags: [], hourlyRates: [] };
 
 export function useLookups() {
-  const query = useOrgQuery("lookups", (organizationId) => api.lookups(organizationId));
+  const query = useOrgQuery("lookups", (tenantId) => api.lookups(tenantId));
   const lookups = query.data ?? noLookups;
   const names = useMemo(
     () => ({
       project: new Map(lookups.projects.map((item) => [item.id, item.title])),
       category: new Map(lookups.categories.map((item) => [item.id, item.name])),
-      department: new Map(lookups.departments.map((item) => [item.id, item.name])),
+      organization: new Map(lookups.organizations.map((item) => [item.id, item.name])),
       tag: new Map(lookups.tags.map((item) => [item.id, item.name])),
     }),
     [lookups],

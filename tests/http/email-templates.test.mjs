@@ -35,16 +35,16 @@ describe("email templates", suite, () => {
     ctx.admin = await signUp("mailadmin");
     ctx.member = await signUp("mailmember");
     ctx.outsider = await signUp("mailout");
-    ctx.org = await createJson(ctx.admin.accessToken, "/organizations", { name: label("Mail org") });
-    await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/invitations`, {
+    ctx.org = await createJson(ctx.admin.accessToken, "/tenants", { name: label("Mail org") });
+    await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/invitations`, {
       email: ctx.member.email,
       role: "MEMBER",
     });
     await acceptInvite(ctx.member.accessToken, ctx.member.email);
-    ctx.path = `/organizations/${ctx.org.id}/email-templates`;
+    ctx.path = `/tenants/${ctx.org.id}/email-templates`;
   });
 
-  test("a new organization is seeded with every template and members can list them", async () => {
+  test("a new tenant is seeded with every template and members can list them", async () => {
     const listed = await callApi(ctx.path, { token: ctx.member.accessToken });
     assert.equal(listed.status, 200, listed.text);
     assert.deepEqual(
@@ -75,13 +75,13 @@ describe("email templates", suite, () => {
       method: "PATCH",
       token: ctx.admin.accessToken,
       body: {
-        subject: "Join {{organization.name}}",
+        subject: "Join {{tenant.name}}",
         template: '<p onclick="x()">Hello <strong>{{user.username}}</strong></p><script>alert(1)</script><p>{{invite.code}}</p>',
       },
     });
     assert.equal(updated.status, 200, updated.text);
     assert.equal(updated.json.version, 2);
-    assert.equal(updated.json.subject, "Join {{organization.name}}");
+    assert.equal(updated.json.subject, "Join {{tenant.name}}");
     assert.equal(updated.json.template, "<p>Hello <strong>{{user.username}}</strong></p><p>{{invite.code}}</p>");
   });
 
@@ -128,25 +128,25 @@ describe("email templates", suite, () => {
     const reset = await callApi(`${ctx.path}/${ctx.invite.id}/reset`, { method: "POST", token: ctx.admin.accessToken });
     assert.equal(reset.status, 200, reset.text);
     assert.equal(reset.json.version, 3);
-    assert.equal(reset.json.subject, "{{organization.name}} invited you to join VolunTime");
+    assert.equal(reset.json.subject, "{{tenant.name}} invited you to join VolunTime");
     assert.match(reset.json.template, /Use this code to accept the invite:/);
   });
 
   test("logging classified hours sends the LoggedTime email", async () => {
-    const category = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/task-categories`, {
+    const category = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/task-categories`, {
       name: label("Mail category"),
     });
-    const project = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/projects`, {
+    const project = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/projects`, {
       title: label("Mail project"),
       accessType: "Public",
     });
     await callApi(`${ctx.path}/${ctx.logged.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
-      body: { subject: "Logged for {{organization.name}}: {{entry.hours}}h" },
+      body: { subject: "Logged for {{tenant.name}}: {{entry.hours}}h" },
     });
     await createJson(ctx.member.accessToken, "/time/duration", {
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       projectId: project.id,
       taskCategoryId: category.id,
       durationMinutes: 90,
@@ -158,8 +158,8 @@ describe("email templates", suite, () => {
     ctx.project = project;
   });
 
-  test("organization emailSettings control when LoggedTime, UnclassifiedEntry, and optional notifications are sent", async () => {
-    const badFreq = await callApi(`/organizations/${ctx.org.id}`, {
+  test("tenant emailSettings control when LoggedTime, UnclassifiedEntry, and optional notifications are sent", async () => {
+    const badFreq = await callApi(`/tenants/${ctx.org.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
       body: {
@@ -171,7 +171,7 @@ describe("email templates", suite, () => {
     });
     assertError(badFreq, 400, "validation_error", "LoggedTime must be immediate, weekly, or off.");
 
-    const badObj = await callApi(`/organizations/${ctx.org.id}`, {
+    const badObj = await callApi(`/tenants/${ctx.org.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
       body: {
@@ -183,7 +183,7 @@ describe("email templates", suite, () => {
     });
     assertError(badObj, 400, "validation_error", "emailSettings must be an object.");
 
-    const badBool = await callApi(`/organizations/${ctx.org.id}`, {
+    const badBool = await callApi(`/tenants/${ctx.org.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
       body: {
@@ -195,7 +195,7 @@ describe("email templates", suite, () => {
     });
     assertError(badBool, 400, "validation_error", "NeedSubmitted must be a boolean.");
 
-    const updated = await callApi(`/organizations/${ctx.org.id}`, {
+    const updated = await callApi(`/tenants/${ctx.org.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
       body: {
@@ -220,7 +220,7 @@ describe("email templates", suite, () => {
     const getEmails = async (email) => (await fetch(`${mailSinkUrl}/emails?to=${encodeURIComponent(email)}`)).json();
     const beforeEmails = await getEmails(ctx.member.email);
     await createJson(ctx.member.accessToken, "/time/duration", {
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       durationMinutes: 60,
@@ -230,20 +230,20 @@ describe("email templates", suite, () => {
     assert.equal(afterLogged.length, beforeEmails.length);
 
     await createJson(ctx.member.accessToken, "/time/clock-in", {
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
     });
     await createJson(ctx.member.accessToken, "/time/clock-out", {}, 200);
     const afterUnclassified = await getEmails(ctx.member.email);
     assert.equal(afterUnclassified.length, beforeEmails.length);
 
     const beforeAdminEmails = await getEmails(ctx.admin.email);
-    const reqRes = await createJson(ctx.member.accessToken, `/organizations/${ctx.org.id}/access-requests`, {
+    const reqRes = await createJson(ctx.member.accessToken, `/tenants/${ctx.org.id}/access-requests`, {
       message: "Need admin access",
     });
     const afterAdminEmails = await getEmails(ctx.admin.email);
     assert.equal(afterAdminEmails.length, beforeAdminEmails.length);
 
-    const decideRes = await callApi(`/organizations/${ctx.org.id}/access-requests/${reqRes.id}`, {
+    const decideRes = await callApi(`/tenants/${ctx.org.id}/access-requests/${reqRes.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
       body: { status: "declined" },
@@ -252,7 +252,7 @@ describe("email templates", suite, () => {
     const afterDecidedEmails = await getEmails(ctx.member.email);
     assert.equal(afterDecidedEmails.length, beforeEmails.length);
 
-    const reenabled = await callApi(`/organizations/${ctx.org.id}`, {
+    const reenabled = await callApi(`/tenants/${ctx.org.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
       body: {
@@ -268,7 +268,7 @@ describe("email templates", suite, () => {
     assert.equal(reenabled.status, 200, reenabled.text);
 
     await createJson(ctx.member.accessToken, "/time/clock-in", {
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
     });
     await createJson(ctx.member.accessToken, "/time/clock-out", {}, 200);
     const [unclassifiedMail] = await waitForMatchingEmails(ctx.member.email, /Please classify your volunteer time/);

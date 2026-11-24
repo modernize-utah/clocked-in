@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { OrganizationView } from "./organization-view";
+import { TenantView } from "./tenant-view";
 
-export const metadata: Metadata = { title: "Organization" };
+export const metadata: Metadata = { title: "Tenant" };
 
-export default function OrganizationPage() {
-  return <OrganizationView />;
+export default function TenantPage() {
+  return <TenantView />;
 }

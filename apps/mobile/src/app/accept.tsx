@@ -28,7 +28,7 @@ export default function AcceptInviteScreen() {
           </Link>
         </>
       ) : null}
-      {done ? <Muted>Invite accepted. Switch to the organization from the header.</Muted> : null}
+      {done ? <Muted>Invite accepted. Switch to the tenant from the header.</Muted> : null}
       <Field autoCapitalize="none" label="Invite code" onChangeText={setCode} value={code} />
       <ErrorText error={error} />
       <Button

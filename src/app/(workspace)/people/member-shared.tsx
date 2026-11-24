@@ -5,7 +5,7 @@ import { Field } from "@/components/field";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useLabels } from "@/hooks/use-labels";
 import { useLookups } from "@/hooks/use-lookups";
-import { useOrganization } from "@/hooks/use-workspace";
+import { useTenant } from "@/hooks/use-workspace";
 import { fetchJson } from "@/lib/fetch-json";
 import type { Membership, Paged } from "@/lib/types";
 
@@ -21,11 +21,11 @@ export function roleLabel(code: string, fallback: string) {
 }
 
 export function useOrgRoleOptions() {
-  const organization = useOrganization();
+  const tenant = useTenant();
   const { data } = useQuery({
-    queryKey: ["org", organization.id, "roles"],
+    queryKey: ["org", tenant.id, "roles"],
     queryFn: ({ signal }) =>
-      fetchJson<Paged<{ code: string; name: string }>>(`/organizations/${organization.id}/roles?limit=100`, signal),
+      fetchJson<Paged<{ code: string; name: string }>>(`/tenants/${tenant.id}/roles?limit=100`, signal),
   });
   const items = data?.items ?? [];
   if (items.length === 0) return fallbackRoles;
@@ -35,9 +35,9 @@ export function useOrgRoleOptions() {
   }));
 }
 
-export function departmentNames(member: Membership, departments: { id: string; name: string }[]) {
-  return (member.departmentIds ?? [])
-    .map((id) => departments.find((item) => item.id === id)?.name)
+export function organizationNames(member: Membership, organizations: { id: string; name: string }[]) {
+  return (member.organizationIds ?? [])
+    .map((id) => organizations.find((item) => item.id === id)?.name)
     .filter((name): name is string => Boolean(name));
 }
 
@@ -55,9 +55,9 @@ export function useUsernamePreview(firstName: string, lastName: string) {
   });
 }
 
-export type GroupAssignment = { departmentId: string; manager: boolean };
+export type GroupAssignment = { organizationId: string; manager: boolean };
 
-export function DepartmentChecks({
+export function OrganizationChecks({
   value,
   onChange,
 }: {
@@ -66,29 +66,29 @@ export function DepartmentChecks({
 }) {
   const { lookups } = useLookups();
   const copy = useLabels();
-  if (lookups.departments.length === 0) {
-    return <p className="text-sm text-muted-foreground">No {copy.departments.toLowerCase()} yet.</p>;
+  if (lookups.organizations.length === 0) {
+    return <p className="text-sm text-muted-foreground">No {copy.organizations.toLowerCase()} yet.</p>;
   }
 
   return (
-    <Field label={copy.departments}>
+    <Field label={copy.organizations}>
       <ul className="grid gap-3">
-        {lookups.departments.map((department) => {
-          const assignment = value.find((item) => item.departmentId === department.id);
+        {lookups.organizations.map((organization) => {
+          const assignment = value.find((item) => item.organizationId === organization.id);
           return (
-            <li key={department.id} className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <li key={organization.id} className="flex flex-wrap items-center gap-x-4 gap-y-1">
               <label className="flex items-center gap-2 text-sm">
                 <Checkbox
                   checked={Boolean(assignment)}
                   onCheckedChange={(next) => {
                     onChange(
                       next === true
-                        ? [...value, { departmentId: department.id, manager: false }]
-                        : value.filter((item) => item.departmentId !== department.id),
+                        ? [...value, { organizationId: organization.id, manager: false }]
+                        : value.filter((item) => item.organizationId !== organization.id),
                     );
                   }}
                 />
-                {department.name}
+                {organization.name}
               </label>
               {assignment ? (
                 <label className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -97,7 +97,7 @@ export function DepartmentChecks({
                     onCheckedChange={(next) => {
                       onChange(
                         value.map((item) =>
-                          item.departmentId === department.id ? { ...item, manager: next === true } : item,
+                          item.organizationId === organization.id ? { ...item, manager: next === true } : item,
                         ),
                       );
                     }}

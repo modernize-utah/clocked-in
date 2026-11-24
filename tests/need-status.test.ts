@@ -8,9 +8,9 @@ test("pending needs sort first", () => {
 });
 
 test("admins see every need; managers see ones they own", () => {
-  const mine = { createdByUserId: "me", departmentId: "group-a" };
-  const theirs = { createdByUserId: "other", departmentId: "group-b" };
-  const inGroup = { createdByUserId: "other", departmentId: "group-a" };
+  const mine = { createdByUserId: "me", organizationId: "group-a" };
+  const theirs = { createdByUserId: "other", organizationId: "group-b" };
+  const inGroup = { createdByUserId: "other", organizationId: "group-a" };
   assert.equal(isOwnedNeed(theirs, "me", "all"), true);
   assert.equal(isOwnedNeed(mine, "me", ["group-a"]), true);
   assert.equal(isOwnedNeed(inGroup, "me", ["group-a"]), true);

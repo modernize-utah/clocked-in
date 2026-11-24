@@ -7,23 +7,23 @@ if (!connectionString) {
 }
 
 export async function archiveCaswjClockifyDuplicates(prisma: PrismaClient) {
-  const organizationName = process.env.CASWJ_ORG_NAME?.trim() || "Cultural Arts Society of West Jordan";
-  const organization =
-    (await prisma.organization.findFirst({
-      where: { name: { equals: organizationName, mode: "insensitive" } },
-      include: { departments: true, projects: true, tags: true },
+  const tenantName = process.env.CASWJ_ORG_NAME?.trim() || "Cultural Arts Society of West Jordan";
+  const tenant =
+    (await prisma.tenant.findFirst({
+      where: { name: { equals: tenantName, mode: "insensitive" } },
+      include: { organizations: true, projects: true, tags: true },
     })) ??
-    (await prisma.organization.findFirst({
+    (await prisma.tenant.findFirst({
       where: { name: { equals: "CASWJ", mode: "insensitive" } },
-      include: { departments: true, projects: true, tags: true },
+      include: { organizations: true, projects: true, tags: true },
     }));
-  if (!organization) {
-    throw new Error(`Organization ${organizationName} was not found.`);
+  if (!tenant) {
+    throw new Error(`Tenant ${tenantName} was not found.`);
   }
 
-  const departmentNames = new Set(organization.departments.map((department) => department.name.toLowerCase()));
-  const duplicateProjects = organization.projects.filter((project) => departmentNames.has(project.title.toLowerCase()));
-  const duplicateTags = organization.tags.filter((tag) => /^\((org|type)\)/i.test(tag.name));
+  const organizationNames = new Set(tenant.organizations.map((organization) => organization.name.toLowerCase()));
+  const duplicateProjects = tenant.projects.filter((project) => organizationNames.has(project.title.toLowerCase()));
+  const duplicateTags = tenant.tags.filter((tag) => /^\((org|type)\)/i.test(tag.name));
 
   await prisma.project.updateMany({
     where: { id: { in: duplicateProjects.map((project) => project.id) } },

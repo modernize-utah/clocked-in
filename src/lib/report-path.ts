@@ -59,19 +59,19 @@ export const scalarAccessors = [
 ] as const;
 
 export const seriesAccessors = [
-  ["user.byDepartment", "Volunteer hours by department"],
+  ["user.byOrganization", "Volunteer hours by organization"],
   ["user.byCategory", "Volunteer hours by task category"],
   ["user.byPerson", "Volunteer hours by person"],
   ["user.byVolunteer", "Volunteer hours by volunteer"],
   ["user.byProject", "Volunteer hours by project"],
   ["user.byMonth", "Volunteer hours by month"],
-  ["staff.byDepartment", "Staff hours by department"],
+  ["staff.byOrganization", "Staff hours by organization"],
   ["staff.byCategory", "Staff hours by task category"],
   ["staff.byPerson", "Staff hours by person"],
   ["staff.byVolunteer", "Staff hours by volunteer"],
   ["staff.byProject", "Staff hours by project"],
   ["staff.byMonth", "Staff hours by month"],
-  ["collective.byDepartment", "Group hours by department"],
+  ["collective.byOrganization", "Group hours by organization"],
   ["collective.byCategory", "Group hours by task category"],
   ["collective.byProject", "Group hours by project"],
 ] as const;

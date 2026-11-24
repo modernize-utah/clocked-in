@@ -29,11 +29,11 @@ export function needStatusRank(status: string) {
 }
 
 export function isOwnedNeed(
-  need: { createdByUserId: string; departmentId: string | null },
+  need: { createdByUserId: string; organizationId: string | null },
   viewerId: string,
-  groupDepartments: "all" | string[],
+  groupOrganizations: "all" | string[],
 ) {
-  if (groupDepartments === "all") return true;
+  if (groupOrganizations === "all") return true;
   if (need.createdByUserId === viewerId) return true;
-  return Boolean(need.departmentId && groupDepartments.includes(need.departmentId));
+  return Boolean(need.organizationId && groupOrganizations.includes(need.organizationId));
 }

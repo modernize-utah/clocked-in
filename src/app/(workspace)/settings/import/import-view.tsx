@@ -15,14 +15,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useActionMutation } from "@/hooks/use-action-mutation";
 import { useLabels } from "@/hooks/use-labels";
-import { useOrganization } from "@/hooks/use-workspace";
+import { useTenant } from "@/hooks/use-workspace";
 import type { ImportResult } from "@/lib/api/features/imports";
 import { type ImportEntity, type ImportField, fieldsFor } from "@/lib/import/fields";
 import { maxImportRows, parseCsv } from "@/lib/import/parse-csv";
 import { applyMapping, fieldChoices, missingRequired, reconcile, type ColumnAssignment } from "@/lib/import/reconcile";
 import { keys } from "@/lib/queries";
 
-const entities: { id: Exclude<ImportEntity, "departments">; label: (copy: { projects: string }) => string }[] = [
+const entities: { id: Exclude<ImportEntity, "organizations">; label: (copy: { projects: string }) => string }[] = [
   { id: "people", label: () => "People" },
   { id: "projects", label: (copy) => copy.projects },
 ];
@@ -41,9 +41,10 @@ function requiredMessage(missing: ImportField[]) {
 }
 
 export function ImportView() {
-  const organization = useOrganization();
+  const tenant = useTenant();
   const copy = useLabels();
-  const [entity, setEntity] = useState<Exclude<ImportEntity, "departments">>("people");
+  const peopleExternal = Boolean(tenant.preferences.portalDirectorySync);
+  const [entity, setEntity] = useState<Exclude<ImportEntity, "organizations">>(peopleExternal ? "projects" : "people");
   const [emailUsers, setEmailUsers] = useState(false);
   const [reviewActions, setReviewActions] = useState<Record<string, ReviewAction>>({});
   const { members } = useMembers();
@@ -55,7 +56,7 @@ export function ImportView() {
   const [overrides, setOverrides] = useState<Record<number, string | null>>({});
   const [result, setResult] = useState<ImportResult | null>(null);
 
-  const fields = useMemo(() => fieldsFor(entity, copy.department), [entity, copy.department]);
+  const fields = useMemo(() => fieldsFor(entity, copy.organization), [entity, copy.organization]);
   const headerRow = hasHeaders ? (rows?.[0] ?? null) : null;
   const data = rows ? (hasHeaders ? rows.slice(1) : rows) : [];
   const width = Math.max(headerRow?.length ?? 0, ...data.map((row) => row.length), 0);
@@ -76,17 +77,19 @@ export function ImportView() {
   const tooMany = data.length > maxImportRows;
   const preview = data.slice(0, 5);
 
+  const availableEntities = peopleExternal ? entities.filter((item) => item.id !== "people") : entities;
+
   const importRows = useActionMutation(
     (input: Record<string, string>[]) => {
       if (entity === "people") {
-        return importPeopleAction(organization.id, input, emailUsers);
+        return importPeopleAction(tenant.id, input, emailUsers);
       }
 
-      return importProjectsAction(organization.id, input);
+      return importProjectsAction(tenant.id, input);
     },
     {
       silent: true,
-      invalidate: [keys.members(organization.id), keys.lookups(organization.id)],
+      invalidate: [keys.members(tenant.id), keys.lookups(tenant.id)],
       onSuccess: (imported) => setResult(imported ?? null),
     },
   );
@@ -100,7 +103,7 @@ export function ImportView() {
     setFileKey((key) => key + 1);
   }
 
-  function chooseEntity(next: Exclude<ImportEntity, "departments">) {
+  function chooseEntity(next: Exclude<ImportEntity, "organizations">) {
     setEntity(next);
     resetFile();
   }
@@ -140,7 +143,7 @@ export function ImportView() {
       onValueChange={(next) => chooseEntity(next === "projects" ? "projects" : "people")}
     >
       <TabsList variant="line">
-        {entities.map((item) => (
+        {availableEntities.map((item) => (
           <TabsTrigger key={item.id} value={item.id}>
             {item.label(copy)}
           </TabsTrigger>
@@ -151,7 +154,7 @@ export function ImportView() {
           <CardTitle>Import {entity === "people" ? "people" : copy.projects.toLowerCase()}</CardTitle>
           <CardDescription>
             Import creates accounts. It does not send invitations. Existing emails are skipped. Check Email users to send
-            welcome credentials. Add {copy.departments.toLowerCase()} one at a time on the {copy.departments} screen.
+            welcome credentials. Add {copy.organizations.toLowerCase()} one at a time on the {copy.organizations} screen.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -429,7 +432,7 @@ function PeopleReview({
                 </TableCell>
                 <TableCell>{row.username || usernameFromName(firstName, lastName)}</TableCell>
                 <TableCell>{row.email}</TableCell>
-                <TableCell>{row.primaryDepartment || "—"}</TableCell>
+                <TableCell>{row.primaryOrganization || "—"}</TableCell>
                 <TableCell>{match}</TableCell>
                 <TableCell>
                   <SelectField

@@ -75,7 +75,7 @@ npm run db:seed:caswj:anon
 
 ## MCP and API reference
 
-MCP is Streamable HTTP at `/mcp` on Next.js. Organization API keys work on REST and MCP (Bearer or `X-Api-Key`), subject to their scopes. Key management requires a human admin JWT. Platform-key endpoints are not part of this app. Existing platform-key rows stay in the database and do not grant access.
+MCP is Streamable HTTP at `/mcp` on Next.js. Tenant API keys work on REST and MCP (Bearer or `X-Api-Key`), subject to their scopes. Key management requires a human admin JWT. Platform-key endpoints are not part of this app. Existing platform-key rows stay in the database and do not grant access.
 
 ```json
 {

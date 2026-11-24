@@ -220,9 +220,9 @@ export function assertSession(body, expected = {}) {
 export const clockedInThemeId = "44444444-4444-4444-8444-444444444441";
 
 export const defaultEntityLabels = {
-  organization: "Organization",
+  tenant: "Tenant",
   project: "Project",
-  department: "Department",
+  organization: "Organization",
   taskCategory: "Task category",
 };
 
@@ -248,7 +248,7 @@ export function defaultPreferences(overrides = {}) {
   };
 }
 
-export function assertOrganization(org, name) {
+export function assertTenant(org, name) {
   assertKeys(org, [
     "id",
     "name",
@@ -284,9 +284,9 @@ export function assertOrganization(org, name) {
 }
 
 export function assertHourlyRate(rate, expected) {
-  assertKeys(rate, ["id", "organizationId", "type", "name", "perHourRate", "isDefault", "isArchived", "source"]);
+  assertKeys(rate, ["id", "tenantId", "type", "name", "perHourRate", "isDefault", "isArchived", "source"]);
   assertUuid(rate.id);
-  assert.equal(rate.organizationId, expected.organizationId);
+  assert.equal(rate.tenantId, expected.tenantId);
   assert.equal(rate.type, expected.type);
   assert.equal(rate.name, expected.name);
   assertMoney(rate.perHourRate, expected.perHourRate);
@@ -295,10 +295,10 @@ export function assertHourlyRate(rate, expected) {
   assert.equal(rate.source, expected.source ?? null);
 }
 
-export function assertNamed(entity, { organizationId, name, isArchived }) {
-  assertKeys(entity, ["id", "organizationId", "name", ...(isArchived === undefined ? [] : ["isArchived"])]);
+export function assertNamed(entity, { tenantId, name, isArchived }) {
+  assertKeys(entity, ["id", "tenantId", "name", ...(isArchived === undefined ? [] : ["isArchived"])]);
   assertUuid(entity.id);
-  assert.equal(entity.organizationId, organizationId);
+  assert.equal(entity.tenantId, tenantId);
   assert.equal(entity.name, name);
   if (isArchived !== undefined) assert.equal(entity.isArchived, isArchived);
 }
@@ -311,45 +311,45 @@ export function assertRole(role, code) {
   assert.equal(role.name, names[code]);
 }
 
-export function assertMembership(membership, { organizationId, departmentId, role, userId, departmentIds }) {
+export function assertMembership(membership, { tenantId, organizationId, role, userId, organizationIds }) {
   assertKeys(membership, [
     "id",
     "userId",
+    "tenantId",
     "organizationId",
-    "departmentId",
     "role",
     "joinedAt",
     "rateType",
     "professionalBillingRate",
     "isActive",
-    "primaryDepartmentId",
-    "departmentIds",
-    ...(departmentId === null ? ["managedDepartmentIds"] : []),
-    "orgUserTitle",
-    "orgUserDescription",
+    "primaryOrganizationId",
+    "organizationIds",
+    ...(organizationId === null ? ["managedOrganizationIds"] : []),
+    "title",
+    "memberDescription",
     "notes",
     "user",
   ]);
   assertUuid(membership.id);
+  assert.equal(membership.tenantId, tenantId);
   assert.equal(membership.organizationId, organizationId);
-  assert.equal(membership.departmentId, departmentId);
   assert.equal(membership.userId, userId);
   assertInstant(membership.joinedAt);
   assertRole(membership.role, role);
-  assert.ok(Array.isArray(membership.departmentIds));
-  if (departmentIds) {
-    assert.deepEqual([...membership.departmentIds].sort(), [...departmentIds].sort());
+  assert.ok(Array.isArray(membership.organizationIds));
+  if (organizationIds) {
+    assert.deepEqual([...membership.organizationIds].sort(), [...organizationIds].sort());
   }
   assertKeys(membership.user, ["id", "username", "email", "firstName", "lastName", "displayName"]);
   assert.equal(membership.user.id, userId);
 }
 
-export function assertInvitation(invitation, { email, organizationId, departmentId, role }) {
+export function assertInvitation(invitation, { email, tenantId, organizationId, role }) {
   assertKeys(invitation, [
     "id",
     "email",
+    "tenantId",
     "organizationId",
-    "departmentId",
     "role",
     "invitedByUserId",
     "expiresAt",
@@ -362,8 +362,8 @@ export function assertInvitation(invitation, { email, organizationId, department
   ]);
   assertUuid(invitation.id);
   assert.equal(invitation.email, email.toLowerCase());
+  assert.equal(invitation.tenantId, tenantId);
   assert.equal(invitation.organizationId, organizationId);
-  assert.equal(invitation.departmentId, departmentId);
   assertRole(invitation.role, role);
   assertUuid(invitation.invitedByUserId);
   assertInstant(invitation.expiresAt);
@@ -374,8 +374,8 @@ export function assertInvitation(invitation, { email, organizationId, department
 export function assertProject(project, expected) {
   assertKeys(project, [
     "id",
+    "tenantId",
     "organizationId",
-    "departmentId",
     "ownerUserId",
     "title",
     "description",
@@ -387,8 +387,8 @@ export function assertProject(project, expected) {
     "editorIds",
   ]);
   assertUuid(project.id);
-  assert.equal(project.organizationId, expected.organizationId);
-  assert.equal(project.departmentId, expected.departmentId ?? null);
+  assert.equal(project.tenantId, expected.tenantId);
+  assert.equal(project.organizationId, expected.organizationId ?? null);
   assert.equal(project.projectType, expected.projectType ?? "Project");
   assert.equal(project.ownerUserId, expected.ownerUserId);
   assert.equal(project.title, expected.title);
@@ -402,8 +402,8 @@ export function assertTimeEntry(entry, expected) {
     "id",
     "userId",
     "enteredByUserId",
+    "tenantId",
     "organizationId",
-    "departmentId",
     "projectId",
     "taskCategoryId",
     "mode",
@@ -422,8 +422,8 @@ export function assertTimeEntry(entry, expected) {
   assertUuid(entry.id);
   assert.equal(entry.userId, expected.userId);
   assert.equal(entry.enteredByUserId, expected.enteredByUserId);
-  assert.equal(entry.organizationId, expected.organizationId);
-  assert.equal(entry.departmentId, expected.departmentId ?? null);
+  assert.equal(entry.tenantId, expected.tenantId);
+  assert.equal(entry.organizationId, expected.organizationId ?? null);
   assert.equal(entry.projectId, expected.projectId);
   assert.equal(entry.taskCategoryId, expected.taskCategoryId);
   assert.equal(entry.mode, expected.mode);
@@ -452,8 +452,8 @@ export function assertCollective(entry, expected) {
   assertKeys(entry, [
     "id",
     "recordedByUserId",
+    "tenantId",
     "organizationId",
-    "departmentId",
     "projectId",
     "taskCategoryId",
     "startedAt",
@@ -468,8 +468,8 @@ export function assertCollective(entry, expected) {
   ]);
   assertUuid(entry.id);
   assert.equal(entry.recordedByUserId, expected.recordedByUserId);
-  assert.equal(entry.organizationId, expected.organizationId);
-  assert.equal(entry.departmentId, expected.departmentId ?? null);
+  assert.equal(entry.tenantId, expected.tenantId);
+  assert.equal(entry.organizationId, expected.organizationId ?? null);
   assert.equal(entry.participantCount, expected.participantCount);
   assertInstant(entry.startedAt);
   assertInstant(entry.endedAt);
@@ -683,21 +683,21 @@ export async function acceptInvite(token, email) {
   return response.json;
 }
 
-/** Adds an existing account to an organization the way people join: invite, then accept. */
-export async function joinOrg(adminToken, organizationId, person, { role = "MEMBER", departmentIds, managedDepartmentIds } = {}) {
-  await createJson(adminToken, `/organizations/${organizationId}/invitations`, {
+/** Adds an existing account to an tenant the way people join: invite, then accept. */
+export async function joinOrg(adminToken, tenantId, person, { role = "MEMBER", organizationIds, managedOrganizationIds } = {}) {
+  await createJson(adminToken, `/tenants/${tenantId}/invitations`, {
     email: person.email,
     role,
     firstName: person.firstName,
     lastName: person.lastName,
   });
   const accepted = await acceptInvite(person.accessToken, person.email);
-  let membership = accepted.organizationMembership;
-  if (departmentIds || managedDepartmentIds) {
-    const response = await callApi(`/organizations/${organizationId}/memberships/${membership.id}`, {
+  let membership = accepted.tenantMembership;
+  if (organizationIds || managedOrganizationIds) {
+    const response = await callApi(`/tenants/${tenantId}/memberships/${membership.id}`, {
       method: "PATCH",
       token: adminToken,
-      body: { ...(departmentIds ? { departmentIds } : {}), ...(managedDepartmentIds ? { managedDepartmentIds } : {}) },
+      body: { ...(organizationIds ? { organizationIds } : {}), ...(managedOrganizationIds ? { managedOrganizationIds } : {}) },
     });
     assertStatus(response, 200);
     membership = response.json;

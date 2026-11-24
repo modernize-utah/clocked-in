@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { OrganizationForm } from "./organization-form";
+import { TenantForm } from "./tenant-form";
 
-export const metadata: Metadata = { title: "Organization settings" };
+export const metadata: Metadata = { title: "Tenant settings" };
 
-export default function OrganizationSettingsPage() {
-  return <OrganizationForm />;
+export default function TenantSettingsPage() {
+  return <TenantForm />;
 }

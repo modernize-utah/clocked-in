@@ -127,7 +127,7 @@ export async function signUp(
 
   const tenantSlug = options?.tenantSlug?.trim().toLowerCase() || null;
   if (tenantSlug && !invitationEmail) {
-    const pinned = await prisma.organization.findFirst({ where: { slug: tenantSlug }, select: { id: true } });
+    const pinned = await prisma.tenant.findFirst({ where: { slug: tenantSlug }, select: { id: true } });
     if (!pinned) {
       notFound();
     }
@@ -217,12 +217,12 @@ export async function logOut(access: Access, request: RefreshTokenRequest) {
 }
 
 /**
- * A reset uses an organization's template and host only when the person is an active member,
- * because that organization's admins edit the template that carries the reset code.
+ * A reset uses an tenant's template and host only when the person is an active member,
+ * because that tenant's admins edit the template that carries the reset code.
  */
-async function resetOrganization(userId: string, tenantSlug?: string | null) {
+async function resetTenant(userId: string, tenantSlug?: string | null) {
   if (tenantSlug) {
-    const pinned = await prisma.organization.findFirst({
+    const pinned = await prisma.tenant.findFirst({
       where: { slug: tenantSlug, memberships: { some: { userId, isActive: true } } },
       select: { id: true, slug: true },
     });
@@ -231,13 +231,13 @@ async function resetOrganization(userId: string, tenantSlug?: string | null) {
     }
   }
 
-  const memberships = await prisma.organizationMembership.findMany({
+  const memberships = await prisma.tenantMembership.findMany({
     where: { userId, isActive: true },
-    select: { organization: { select: { id: true, slug: true } } },
-    distinct: ["organizationId"],
+    select: { tenant: { select: { id: true, slug: true } } },
+    distinct: ["tenantId"],
     take: 2,
   });
-  return memberships.length === 1 ? memberships[0].organization : null;
+  return memberships.length === 1 ? memberships[0].tenant : null;
 }
 
 export async function requestPasswordReset(
@@ -285,10 +285,10 @@ export async function requestPasswordReset(
     data: { userId: user.id, codeHash: hashCode(code), expiresAt: new Date(Date.now() + resetCodeMs) },
   });
   try {
-    const org = await resetOrganization(user.id, options?.tenantSlug?.trim().toLowerCase() || null);
+    const org = await resetTenant(user.id, options?.tenantSlug?.trim().toLowerCase() || null);
     await sendEmail({
       to: email,
-      organizationId: org?.id ?? null,
+      tenantId: org?.id ?? null,
       for: "PasswordReset",
       context: { reset: { code, url: appUrl(`/forgot-password?code=${encodeURIComponent(code)}`, org?.slug) } },
     });

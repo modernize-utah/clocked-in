@@ -5,6 +5,7 @@ import { ChevronDownIcon, MoreVerticalIcon, PencilIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { createConnectionAction, deleteConnectionAction, updateConnectionAction } from "@/app/actions/connections";
+import { pullPortalDirectoryAction } from "@/app/actions/external-sync";
 import { removeMemberAction, removeMembersAction, updateMemberAction, type MemberPatch } from "@/app/actions/members";
 import { DialogActions } from "@/components/dialog-actions";
 import { EntityFormDialog } from "@/components/entity-forms/entity-form-dialog";
@@ -41,20 +42,20 @@ import { useActionMutation } from "@/hooks/use-action-mutation";
 import { useLabels } from "@/hooks/use-labels";
 import { useLookups } from "@/hooks/use-lookups";
 import { useMembers } from "@/hooks/use-members";
-import { useOrganization, useWorkspace } from "@/hooks/use-workspace";
+import { useTenant, useWorkspace } from "@/hooks/use-workspace";
 import { formatPersonName } from "@/lib/format";
 import { connectionPersonName, memberRelationships, relationshipFor } from "@/lib/member-connection";
 import { connectionsQuery, keys } from "@/lib/queries";
 import type { Membership } from "@/lib/types";
-import { departmentNames, emailPattern, roleLabel } from "./member-shared";
+import { organizationNames, emailPattern, roleLabel } from "./member-shared";
 import { PersonDialog } from "./person-forms";
 
 const relationshipOptions = memberRelationships.map((relationship) => ({ value: relationship, label: relationship }));
 
-function removalDescription(count: number, organizationName: string) {
+function removalDescription(count: number, tenantName: string) {
   const people = count === 1 ? "1 person" : `${count} people`;
   const history = count === 1 ? "Their account and time history stay." : "Their accounts and time history stay.";
-  return `${people} will lose access to ${organizationName}. ${history}`;
+  return `${people} will lose access to ${tenantName}. ${history}`;
 }
 
 function InlineEmail({
@@ -163,7 +164,7 @@ function InlineEmail({
   );
 }
 
-function DepartmentSummary({ names }: { names: string[] }) {
+function OrganizationSummary({ names }: { names: string[] }) {
   if (names.length === 0) return <span className="text-muted-foreground">—</span>;
   if (names.length === 1) return <span className="whitespace-normal break-words text-muted-foreground">{names[0]}</span>;
 
@@ -174,11 +175,11 @@ function DepartmentSummary({ names }: { names: string[] }) {
           <button
             type="button"
             className="text-left whitespace-normal break-words text-muted-foreground underline decoration-dotted underline-offset-2"
-            aria-label={`${names.length} departments: ${names.join(", ")}`}
+            aria-label={`${names.length} organizations: ${names.join(", ")}`}
           />
         }
       >
-        {names.length} departments
+        {names.length} organizations
       </TooltipTrigger>
       <TooltipContent className="max-w-xs">
         <ul className="flex flex-col gap-0.5 text-left">
@@ -192,12 +193,12 @@ function DepartmentSummary({ names }: { names: string[] }) {
 }
 
 export function PeopleView() {
-  const organization = useOrganization();
+  const tenant = useTenant();
   const copy = useLabels();
-  const { viewer, isAdmin, isCoordinator, groupDepartments } = useWorkspace();
+  const { viewer, isAdmin, isCoordinator, groupOrganizations } = useWorkspace();
   const { members: allMembers, isPending: membersPending } = useMembers();
   const members = isCoordinator
-    ? allMembers.filter((member) => (member.departmentIds ?? []).some((id) => groupDepartments.includes(id)))
+    ? allMembers.filter((member) => (member.organizationIds ?? []).some((id) => groupOrganizations.includes(id)))
     : allMembers;
   const { lookups, isPending: lookupsPending } = useLookups();
   const [selected, setSelected] = useState<string[]>([]);
@@ -208,16 +209,18 @@ export function PeopleView() {
   const [removeMember, setRemoveMember] = useState<Membership | null>(null);
   const [pendingRemoval, setPendingRemoval] = useState<Membership[] | null>(null);
   const [timeFor, setTimeFor] = useState<string[] | null>(null);
-  const invalidate = [keys.members(organization.id)];
+  const externalPeople = Boolean(tenant.preferences.portalDirectorySync);
+  const invalidate = [keys.members(tenant.id)];
+  const pullPeople = useActionMutation(() => pullPortalDirectoryAction(tenant.id), { invalidate });
   const update = useActionMutation(
     ({ membershipId, patch }: { membershipId: string; patch: MemberPatch }) =>
-      updateMemberAction(organization.id, membershipId, patch),
+      updateMemberAction(tenant.id, membershipId, patch),
     { invalidate },
   );
   const [emailSavingId, setEmailSavingId] = useState<string | null>(null);
   const saveEmail = useActionMutation(
     ({ membershipId, email }: { membershipId: string; email: string }) =>
-      updateMemberAction(organization.id, membershipId, { email }),
+      updateMemberAction(tenant.id, membershipId, { email }),
     { invalidate, silent: true, onSuccess: () => toast.success("Email saved.") },
   );
 
@@ -229,12 +232,12 @@ export function PeopleView() {
       setEmailSavingId((current) => (current === membershipId ? null : current));
     }
   }
-  const remove = useActionMutation((membershipId: string) => removeMemberAction(organization.id, membershipId), {
+  const remove = useActionMutation((membershipId: string) => removeMemberAction(tenant.id, membershipId), {
     invalidate,
     onSuccess: () => setRemoveMember(null),
   });
   const removeMany = useActionMutation(
-    (membershipIds: string[]) => removeMembersAction(organization.id, membershipIds),
+    (membershipIds: string[]) => removeMembersAction(tenant.id, membershipIds),
     {
       invalidate,
       onSuccess: () => {
@@ -254,16 +257,22 @@ export function PeopleView() {
         <CardHeader>
           <CardTitle>People</CardTitle>
           <CardDescription>
-            Volunteers log their own time, and time for people they are connected to. Admins can log time for others.
-            Removing someone leaves the account and their history.
+            {externalPeople
+              ? "People are managed by an external system of record. You can pull the latest list, but cannot create or edit members here."
+              : "Volunteers log their own time, and time for people they are connected to. Admins can log time for others. Removing someone leaves the account and their history."}
           </CardDescription>
           <CardAction className="flex flex-col items-end gap-2">
-            {isAdmin ? (
+            {externalPeople && isAdmin ? (
+              <Button type="button" className="h-9" disabled={pullPeople.isPending} onClick={() => pullPeople.mutate()}>
+                Pull from source
+              </Button>
+            ) : null}
+            {!externalPeople && isAdmin ? (
               <Button type="button" className="h-9" onClick={() => setAddOpen(true)}>
                 Add person
               </Button>
             ) : null}
-            {selected.length > 0 ? (
+            {!externalPeople && selected.length > 0 ? (
               <DropdownMenu>
                 <DropdownMenuTrigger render={<Button type="button" variant="outline" className="h-9" />}>
                   Actions
@@ -282,6 +291,23 @@ export function PeopleView() {
                     onClick={() => setPendingRemoval(members.filter((member) => selectedIds.has(member.id)))}
                   >
                     Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+            {externalPeople && selected.length > 0 ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger render={<Button type="button" variant="outline" className="h-9" />}>
+                  Actions
+                  <ChevronDownIcon data-icon="inline-end" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() =>
+                      setTimeFor(members.filter((member) => selectedIds.has(member.id)).map((member) => member.userId))
+                    }
+                  >
+                    Add time
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -305,7 +331,7 @@ export function PeopleView() {
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead>{copy.departments}</TableHead>
+                  <TableHead>{copy.organizations}</TableHead>
                   <TableHead className="w-20">Status</TableHead>
                   <TableHead className="w-12 text-right">Actions</TableHead>
                 </TableRow>
@@ -337,18 +363,22 @@ export function PeopleView() {
                       ) : null}
                     </TableCell>
                     <TableCell className="whitespace-normal">
-                      <InlineEmail
-                        email={member.user.email ?? ""}
-                        name={formatPersonName(member.user)}
-                        pending={emailSavingId === member.id}
-                        onSave={(email) => saveMemberEmail(member.id, email)}
-                      />
+                      {externalPeople ? (
+                        <span className="text-sm">{member.user.email}</span>
+                      ) : (
+                        <InlineEmail
+                          email={member.user.email ?? ""}
+                          name={formatPersonName(member.user)}
+                          pending={emailSavingId === member.id}
+                          onSave={(email) => saveMemberEmail(member.id, email)}
+                        />
+                      )}
                     </TableCell>
                     <TableCell className="max-w-36 whitespace-normal break-words leading-snug">
                       {roleLabel(member.role.code, member.role.name)}
                     </TableCell>
                     <TableCell className="max-w-44 whitespace-normal break-words leading-snug">
-                      <DepartmentSummary names={departmentNames(member, lookups.departments)} />
+                      <OrganizationSummary names={organizationNames(member, lookups.organizations)} />
                     </TableCell>
                     <TableCell>
                       <Badge variant={member.isActive === false ? "outline" : "secondary"}>
@@ -358,6 +388,7 @@ export function PeopleView() {
                     <TableCell className="text-right">
                       <PersonActions
                         member={member}
+                        readOnlyExternal={externalPeople}
                         onEdit={() => setEditMember(member)}
                         onRemove={() => setRemoveMember(member)}
                         onToggleActive={() =>
@@ -417,6 +448,7 @@ export function PeopleView() {
                         </p>
                         <PersonActions
                           member={member}
+                          readOnlyExternal={externalPeople}
                           onEdit={() => setEditMember(member)}
                           onRemove={() => setRemoveMember(member)}
                           onToggleActive={() =>
@@ -426,18 +458,22 @@ export function PeopleView() {
                           onAddConnection={isAdmin ? () => setConnectionMember(member) : undefined}
                         />
                       </div>
+                      {externalPeople ? (
+                        <p className="mt-1 text-sm text-muted-foreground">{member.user.email}</p>
+                      ) : (
                       <InlineEmail
                         email={member.user.email ?? ""}
                         name={formatPersonName(member.user)}
                         pending={emailSavingId === member.id}
                         onSave={(email) => saveMemberEmail(member.id, email)}
                       />
+                      )}
                       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                         <span>{roleLabel(member.role.code, member.role.name)}</span>
                         <Badge variant={member.isActive === false ? "outline" : "secondary"}>
                           {member.isActive === false ? "Inactive" : "Active"}
                         </Badge>
-                        <DepartmentSummary names={departmentNames(member, lookups.departments)} />
+                        <OrganizationSummary names={organizationNames(member, lookups.organizations)} />
                       </div>
                     </div>
                   </div>
@@ -449,7 +485,7 @@ export function PeopleView() {
       </Card>
       <PersonProfileDialog
         member={profileMember}
-        departmentNames={profileMember ? departmentNames(profileMember, lookups.departments) : []}
+        organizationNames={profileMember ? organizationNames(profileMember, lookups.organizations) : []}
         timeZone={viewer.timezone}
         onOpenChange={(open) => {
           if (!open) setProfileMember(null);
@@ -486,9 +522,9 @@ export function PeopleView() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove from organization?</AlertDialogTitle>
+            <AlertDialogTitle>Remove from tenant?</AlertDialogTitle>
             <AlertDialogDescription>
-              {pendingRemoval ? removalDescription(pendingRemoval.length, organization.name) : null}
+              {pendingRemoval ? removalDescription(pendingRemoval.length, tenant.name) : null}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -513,10 +549,10 @@ export function PeopleView() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove from organization?</AlertDialogTitle>
+            <AlertDialogTitle>Remove from tenant?</AlertDialogTitle>
             <AlertDialogDescription>
               {removeMember
-                ? `${formatPersonName(removeMember.user)} will lose access to ${organization.name}. Their account and time history stay.`
+                ? `${formatPersonName(removeMember.user)} will lose access to ${tenant.name}. Their account and time history stay.`
                 : null}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -547,15 +583,15 @@ function PersonConnectionDialog({
   members: Membership[];
   onOpenChange: (open: boolean) => void;
 }) {
-  const organization = useOrganization();
-  const connections = useQuery({ ...connectionsQuery(organization.id), enabled: Boolean(member) });
+  const tenant = useTenant();
+  const connections = useQuery({ ...connectionsQuery(tenant.id), enabled: Boolean(member) });
   const [otherUserId, setOtherUserId] = useState("");
   const [relationship, setRelationship] = useState<string>(memberRelationships[0]);
-  const invalidate = [keys.connections(organization.id)];
+  const invalidate = [keys.connections(tenant.id)];
 
   const create = useActionMutation(
     (input: { userId: string; connectedUserId: string; relationship: string }) =>
-      createConnectionAction(organization.id, input),
+      createConnectionAction(tenant.id, input),
     {
       invalidate,
       onSuccess: () => {
@@ -566,14 +602,14 @@ function PersonConnectionDialog({
   );
   const update = useActionMutation(
     (input: { connectionId: string; userId: string; relationship: string }) =>
-      updateConnectionAction(organization.id, input.connectionId, {
+      updateConnectionAction(tenant.id, input.connectionId, {
         userId: input.userId,
         relationship: input.relationship,
       }),
     { invalidate },
   );
   const remove = useActionMutation(
-    (connectionId: string) => deleteConnectionAction(organization.id, connectionId),
+    (connectionId: string) => deleteConnectionAction(tenant.id, connectionId),
     { invalidate },
   );
 
@@ -691,6 +727,7 @@ function PersonConnectionDialog({
 
 function PersonActions({
   member,
+  readOnlyExternal,
   onEdit,
   onRemove,
   onToggleActive,
@@ -698,6 +735,7 @@ function PersonActions({
   onAddConnection,
 }: {
   member: Membership;
+  readOnlyExternal?: boolean;
   onEdit: () => void;
   onRemove: () => void;
   onToggleActive: () => void;
@@ -712,12 +750,16 @@ function PersonActions({
         <MoreVerticalIcon />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={onEdit}>Edit</DropdownMenuItem>
-        {onAddConnection ? <DropdownMenuItem onClick={onAddConnection}>Add connection</DropdownMenuItem> : null}
-        <DropdownMenuItem onClick={onRemove}>Remove</DropdownMenuItem>
-        <DropdownMenuItem onClick={onToggleActive}>
-          {member.isActive === false ? "Activate" : "Deactivate"}
-        </DropdownMenuItem>
+        {!readOnlyExternal ? <DropdownMenuItem onClick={onEdit}>Edit</DropdownMenuItem> : null}
+        {!readOnlyExternal && onAddConnection ? (
+          <DropdownMenuItem onClick={onAddConnection}>Add connection</DropdownMenuItem>
+        ) : null}
+        {!readOnlyExternal ? <DropdownMenuItem onClick={onRemove}>Remove</DropdownMenuItem> : null}
+        {!readOnlyExternal ? (
+          <DropdownMenuItem onClick={onToggleActive}>
+            {member.isActive === false ? "Activate" : "Deactivate"}
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuItem onClick={onAddTime}>Add Time</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

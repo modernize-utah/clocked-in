@@ -13,7 +13,7 @@ export function AuthCard({
   children: React.ReactNode;
 }) {
   return (
-    <Card className="relative gap-6 overflow-hidden pt-8 pb-0 shadow-sm [--card-spacing:--spacing(6)]">
+    <Card className="relative gap-6 overflow-hidden pt-8 pb-0 [--card-spacing:--spacing(6)]">
       <div className="brand-rule absolute inset-x-0 top-0" />
       <CardHeader className="gap-2">
         <CardTitle className="text-2xl font-semibold tracking-tight">{title}</CardTitle>

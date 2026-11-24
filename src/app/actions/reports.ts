@@ -5,22 +5,22 @@ import { createSavedReport, deleteSavedReport, updateSavedReport } from "@/lib/a
 import { run } from "@/lib/server/action";
 import { requireAccess } from "@/lib/server/session";
 
-export async function createReportAction(organizationId: string, body: Record<string, unknown>) {
-  return run(async () => createSavedReport(await requireAccess(), organizationId, body));
+export async function createReportAction(tenantId: string, body: Record<string, unknown>) {
+  return run(async () => createSavedReport(await requireAccess(), tenantId, body));
 }
 
-export async function updateReportAction(organizationId: string, reportId: string, body: Record<string, unknown>) {
-  return run(async () => updateSavedReport(await requireAccess(), organizationId, reportId, body));
+export async function updateReportAction(tenantId: string, reportId: string, body: Record<string, unknown>) {
+  return run(async () => updateSavedReport(await requireAccess(), tenantId, reportId, body));
 }
 
-export async function deleteReportAction(organizationId: string, reportId: string) {
-  return run(async () => deleteSavedReport(await requireAccess(), organizationId, reportId));
+export async function deleteReportAction(tenantId: string, reportId: string) {
+  return run(async () => deleteSavedReport(await requireAccess(), tenantId, reportId));
 }
 
-export async function createReportTemplateAction(organizationId: string, body: Record<string, unknown>) {
-  return run(async () => createReportTemplate(await requireAccess(), organizationId, body));
+export async function createReportTemplateAction(tenantId: string, body: Record<string, unknown>) {
+  return run(async () => createReportTemplate(await requireAccess(), tenantId, body));
 }
 
-export async function updateReportTemplateAction(organizationId: string, templateId: string, body: Record<string, unknown>) {
-  return run(async () => updateReportTemplate(await requireAccess(), organizationId, templateId, body));
+export async function updateReportTemplateAction(tenantId: string, templateId: string, body: Record<string, unknown>) {
+  return run(async () => updateReportTemplate(await requireAccess(), tenantId, templateId, body));
 }

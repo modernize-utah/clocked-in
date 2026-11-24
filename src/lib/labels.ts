@@ -1,20 +1,20 @@
-import type { OrganizationPreferences } from "@/lib/api/features/organizations";
+import type { TenantPreferences } from "@/lib/api/features/tenants";
 
 export type EntityLabels = {
-  organization: string;
+  tenant: string;
   project: string;
-  department: string;
+  organization: string;
   taskCategory: string;
 };
 
 export const defaultEntityLabels: EntityLabels = {
-  organization: "Organization",
+  tenant: "Community",
   project: "Project",
-  department: "Department",
+  organization: "Organization",
   taskCategory: "Task category",
 };
 
-export function readEntityLabels(preferences?: Pick<OrganizationPreferences, "entityLabels"> | null): EntityLabels {
+export function readEntityLabels(preferences?: Pick<TenantPreferences, "entityLabels"> | null): EntityLabels {
   return { ...defaultEntityLabels, ...preferences?.entityLabels };
 }
 
@@ -30,13 +30,13 @@ function pluralize(label: string) {
   return `${label}s`;
 }
 
-export function labels(preferences?: Pick<OrganizationPreferences, "entityLabels"> | null) {
+export function labels(preferences?: Pick<TenantPreferences, "entityLabels"> | null) {
   const entity = readEntityLabels(preferences);
   return {
     ...entity,
-    organizations: pluralize(entity.organization),
+    tenants: pluralize(entity.tenant),
     projects: pluralize(entity.project),
-    departments: pluralize(entity.department),
+    organizations: pluralize(entity.organization),
     taskCategories: pluralize(entity.taskCategory),
   };
 }

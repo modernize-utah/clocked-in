@@ -131,14 +131,14 @@ export async function getUser(access: Access, userId: string) {
     return userJson(user);
   }
 
-  const shared = await access.sharedOrganizationIds(user.id);
+  const shared = await access.sharedTenantIds(user.id);
   if (shared.length === 0) {
     forbidden();
   }
 
   let adminOfShared = false;
-  for (const organizationId of shared) {
-    adminOfShared ||= await access.isOrgAdmin(organizationId);
+  for (const tenantId of shared) {
+    adminOfShared ||= await access.isOrgAdmin(tenantId);
   }
 
   return userJson(user, adminOfShared);
@@ -155,10 +155,10 @@ export async function updateUser(access: Access, userId: string, request: Update
   }
 
   if (caller.id !== user.id && !access.isSuperAdmin) {
-    const shared = await access.sharedOrganizationIds(user.id);
+    const shared = await access.sharedTenantIds(user.id);
     let adminOfShared = false;
-    for (const organizationId of shared) {
-      adminOfShared ||= await access.isOrgAdmin(organizationId);
+    for (const tenantId of shared) {
+      adminOfShared ||= await access.isOrgAdmin(tenantId);
     }
 
     if (!adminOfShared) {

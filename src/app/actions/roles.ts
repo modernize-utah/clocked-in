@@ -1,39 +1,39 @@
 "use server";
 
 import {
-  createOrganizationRole,
-  deleteOrganizationRole,
+  createTenantRole,
+  deleteTenantRole,
   parseCreateRole,
   parseUpdateRole,
-  updateOrganizationRole,
+  updateTenantRole,
 } from "@/lib/api/features/roles";
 import { body, run } from "@/lib/server/action";
 import { requireAccess } from "@/lib/server/session";
 
 export async function createRoleAction(
-  organizationId: string,
+  tenantId: string,
   input: { name: string; code?: string; scope?: string; permissions: string[] },
 ) {
   return run(async () => {
     const access = await requireAccess();
-    return createOrganizationRole(access, organizationId, parseCreateRole(body(input)));
+    return createTenantRole(access, tenantId, parseCreateRole(body(input)));
   }, "Role created.");
 }
 
 export async function updateRoleAction(
-  organizationId: string,
+  tenantId: string,
   roleId: string,
   input: { name?: string; scope?: string; permissions?: string[] },
 ) {
   return run(async () => {
     const access = await requireAccess();
-    return updateOrganizationRole(access, organizationId, roleId, parseUpdateRole(body(input)));
+    return updateTenantRole(access, tenantId, roleId, parseUpdateRole(body(input)));
   }, "Role saved.");
 }
 
-export async function deleteRoleAction(organizationId: string, roleId: string) {
+export async function deleteRoleAction(tenantId: string, roleId: string) {
   return run(async () => {
     const access = await requireAccess();
-    await deleteOrganizationRole(access, organizationId, roleId);
+    await deleteTenantRole(access, tenantId, roleId);
   }, "Role deleted.");
 }

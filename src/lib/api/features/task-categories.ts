@@ -2,11 +2,11 @@ import { Access } from "@/lib/api/access";
 import { guard } from "@/lib/api/db";
 import { conflict, notFound } from "@/lib/api/errors";
 import { list, page } from "@/lib/api/json";
-import { NameRequest } from "@/lib/api/features/organizations";
+import { NameRequest } from "@/lib/api/features/tenants";
 import { prisma } from "@/lib/prisma";
 
-function taskCategoryJson(category: { id: string; organizationId: string; name: string }) {
-  return { id: category.id, organizationId: category.organizationId, name: category.name };
+function taskCategoryJson(category: { id: string; tenantId: string; name: string }) {
+  return { id: category.id, tenantId: category.tenantId, name: category.name };
 }
 
 async function managed(access: Access, categoryId: string) {
@@ -15,15 +15,15 @@ async function managed(access: Access, categoryId: string) {
     notFound();
   }
 
-  await access.requireOrganization(category.organizationId, true);
+  await access.requireTenant(category.tenantId, true);
   return category;
 }
 
-export async function listTaskCategories(access: Access, organizationId: string, params: URLSearchParams) {
+export async function listTaskCategories(access: Access, tenantId: string, params: URLSearchParams) {
   const paging = page(params);
-  await access.requireOrganization(organizationId, false);
+  await access.requireTenant(tenantId, false);
   const categories = await prisma.taskCategory.findMany({
-    where: { organizationId },
+    where: { tenantId },
     orderBy: { name: "asc" },
     skip: paging.offset,
     take: paging.limit,
@@ -31,9 +31,9 @@ export async function listTaskCategories(access: Access, organizationId: string,
   return list(categories.map(taskCategoryJson), paging);
 }
 
-export async function createTaskCategory(access: Access, organizationId: string, request: NameRequest) {
-  await access.requireOrganization(organizationId, true);
-  return taskCategoryJson(await guard(prisma.taskCategory.create({ data: { organizationId, name: request.name } })));
+export async function createTaskCategory(access: Access, tenantId: string, request: NameRequest) {
+  await access.requireTenant(tenantId, true);
+  return taskCategoryJson(await guard(prisma.taskCategory.create({ data: { tenantId, name: request.name } })));
 }
 
 export async function updateTaskCategory(access: Access, categoryId: string, request: NameRequest) {

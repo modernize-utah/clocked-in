@@ -21,16 +21,16 @@ describe("voluntime feedback", suite, () => {
   before(async () => {
     ctx.admin = await signUp("vtfadmin");
     ctx.volunteer = await signUp("vtfvol");
-    ctx.org = await createJson(ctx.admin.accessToken, "/organizations", { name: label("VTF org") });
+    ctx.org = await createJson(ctx.admin.accessToken, "/tenants", { name: label("VTF org") });
     await joinOrg(ctx.admin.accessToken, ctx.org.id, ctx.volunteer, { role: "VOLUNTEER" });
   });
 
   test("lists system roles and creates a custom role", async () => {
-    const listed = await callApi(`/organizations/${ctx.org.id}/roles`, { token: ctx.admin.accessToken });
+    const listed = await callApi(`/tenants/${ctx.org.id}/roles`, { token: ctx.admin.accessToken });
     assert.equal(listed.status, 200, listed.text);
     assertList(listed.json);
     assert.ok(listed.json.items.some((role) => role.code === "ADMIN" && role.isSystem));
-    const created = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/roles`, {
+    const created = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/roles`, {
       name: "Event lead",
       permissions: ["log_own_time", "create_needs", "create_projects"],
     });
@@ -40,10 +40,10 @@ describe("voluntime feedback", suite, () => {
   });
 
   test("only a SuperAdmin can update a system role", async () => {
-    const listed = await callApi(`/organizations/${ctx.org.id}/roles`, { token: ctx.admin.accessToken });
+    const listed = await callApi(`/tenants/${ctx.org.id}/roles`, { token: ctx.admin.accessToken });
     const volunteer = listed.json.items.find((role) => role.code === "VOLUNTEER" && role.isSystem);
     assert.ok(volunteer);
-    const denied = await callApi(`/organizations/${ctx.org.id}/roles/${volunteer.id}`, {
+    const denied = await callApi(`/tenants/${ctx.org.id}/roles/${volunteer.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
       body: { name: "Helper", scope: "self", permissions: volunteer.permissions },
@@ -53,7 +53,7 @@ describe("voluntime feedback", suite, () => {
     await grantSuperAdmin(actor.user.id);
     const superAdmin = { ...actor, ...(await logIn(actor.username, actor.password)) };
     try {
-      const updated = await callApi(`/organizations/${ctx.org.id}/roles/${volunteer.id}`, {
+      const updated = await callApi(`/tenants/${ctx.org.id}/roles/${volunteer.id}`, {
         method: "PATCH",
         token: superAdmin.accessToken,
         body: { name: "Helper", scope: "assigned_groups", permissions: ["log_own_time", "view_reports"] },
@@ -63,7 +63,7 @@ describe("voluntime feedback", suite, () => {
       assert.equal(updated.json.scope, "assigned_groups");
       assert.deepEqual([...updated.json.permissions].sort(), ["log_own_time", "view_reports"]);
     } finally {
-      const restored = await callApi(`/organizations/${ctx.org.id}/roles/${volunteer.id}`, {
+      const restored = await callApi(`/tenants/${ctx.org.id}/roles/${volunteer.id}`, {
         method: "PATCH",
         token: superAdmin.accessToken,
         body: { name: volunteer.name, scope: volunteer.scope, permissions: volunteer.permissions },
@@ -76,7 +76,7 @@ describe("voluntime feedback", suite, () => {
 
   test("invite stores reserved name and username", async () => {
     const person = identity("vtfinvite");
-    const created = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/invitations`, {
+    const created = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/invitations`, {
       email: person.email,
       role: "VOLUNTEER",
       firstName: "Pat",
@@ -88,14 +88,14 @@ describe("voluntime feedback", suite, () => {
   });
 
   test("volunteer can request access and an admin can approve it", async () => {
-    const created = await createJson(ctx.volunteer.accessToken, `/organizations/${ctx.org.id}/access-requests`, {
+    const created = await createJson(ctx.volunteer.accessToken, `/tenants/${ctx.org.id}/access-requests`, {
       message: "I can help manage a group.",
       requestedRole: "ADMIN",
     });
     assert.equal(created.status, "pending");
-    const listed = await callApi(`/organizations/${ctx.org.id}/access-requests`, { token: ctx.admin.accessToken });
+    const listed = await callApi(`/tenants/${ctx.org.id}/access-requests`, { token: ctx.admin.accessToken });
     assert.ok(listed.json.items.some((item) => item.id === created.id));
-    const decided = await callApi(`/organizations/${ctx.org.id}/access-requests/${created.id}`, {
+    const decided = await callApi(`/tenants/${ctx.org.id}/access-requests/${created.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
       body: { status: "approved" },
@@ -105,38 +105,38 @@ describe("voluntime feedback", suite, () => {
   });
 
   test("reports, exports, and new projects follow the role's permissions", async () => {
-    const loggerRole = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/roles`, {
+    const loggerRole = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/roles`, {
       name: "Logger only",
-      scope: "organization",
+      scope: "tenant",
       permissions: ["log_own_time"],
     });
     const logger = await signUp("vtflogger");
     await joinOrg(ctx.admin.accessToken, ctx.org.id, logger, { role: loggerRole.code });
 
-    const own = await callApi(`/organizations/${ctx.org.id}/report`, { token: logger.accessToken });
+    const own = await callApi(`/tenants/${ctx.org.id}/report`, { token: logger.accessToken });
     assert.equal(own.status, 200, own.text);
-    const others = await callApi(`/organizations/${ctx.org.id}/report`, {
+    const others = await callApi(`/tenants/${ctx.org.id}/report`, {
       token: logger.accessToken,
       query: { userId: ctx.admin.user.id },
     });
     assertError(others, 403, "forbidden", "Forbidden.");
     for (const path of ["time-entries.csv", "summary.csv"]) {
-      const exported = await callApi(`/organizations/${ctx.org.id}/${path}`, { token: logger.accessToken });
+      const exported = await callApi(`/tenants/${ctx.org.id}/${path}`, { token: logger.accessToken });
       assertError(exported, 403, "forbidden", "Forbidden.");
     }
-    const project = await callApi(`/organizations/${ctx.org.id}/projects`, {
+    const project = await callApi(`/tenants/${ctx.org.id}/projects`, {
       method: "POST",
       token: logger.accessToken,
       body: { title: label("Not allowed"), accessType: "Public" },
     });
     assertError(project, 403, "forbidden", "Forbidden.");
 
-    const adminExport = await callApi(`/organizations/${ctx.org.id}/time-entries.csv`, { token: ctx.admin.accessToken });
+    const adminExport = await callApi(`/tenants/${ctx.org.id}/time-entries.csv`, { token: ctx.admin.accessToken });
     assert.equal(adminExport.status, 200, adminExport.text);
   });
 
   test("roles, access requests, and imports cannot grant more than the granter holds", async () => {
-    const keeperRole = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/roles`, {
+    const keeperRole = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/roles`, {
       name: "Role keeper",
       scope: "assigned_groups",
       permissions: ["log_own_time", "manage_roles", "approve_access_requests", "import_people"],
@@ -144,27 +144,27 @@ describe("voluntime feedback", suite, () => {
     const keeper = await signUp("vtfkeeper");
     await joinOrg(ctx.admin.accessToken, ctx.org.id, keeper, { role: keeperRole.code });
 
-    const promote = await callApi(`/organizations/${ctx.org.id}/roles/${keeperRole.id}`, {
+    const promote = await callApi(`/tenants/${ctx.org.id}/roles/${keeperRole.id}`, {
       method: "PATCH",
       token: keeper.accessToken,
-      body: { permissions: [...keeperRole.permissions, "manage_organization"] },
+      body: { permissions: [...keeperRole.permissions, "manage_tenant"] },
     });
-    assertError(promote, 403, "forbidden", "You can only grant permissions you have, and manage_organization is not one of them.");
-    const widen = await callApi(`/organizations/${ctx.org.id}/roles/${keeperRole.id}`, {
+    assertError(promote, 403, "forbidden", "You can only grant permissions you have, and manage_tenant is not one of them.");
+    const widen = await callApi(`/tenants/${ctx.org.id}/roles/${keeperRole.id}`, {
       method: "PATCH",
       token: keeper.accessToken,
-      body: { scope: "organization" },
+      body: { scope: "tenant" },
     });
     assertError(widen, 403, "forbidden", "You can only grant a scope as wide as your own.");
-    const rename = await callApi(`/organizations/${ctx.org.id}/roles/${keeperRole.id}`, {
+    const rename = await callApi(`/tenants/${ctx.org.id}/roles/${keeperRole.id}`, {
       method: "PATCH",
       token: keeper.accessToken,
       body: { name: "Role keepers", permissions: keeperRole.permissions },
     });
     assert.equal(rename.status, 200, rename.text);
 
-    const own = await createJson(keeper.accessToken, `/organizations/${ctx.org.id}/access-requests`, { requestedRole: "ADMIN" });
-    const selfApproved = await callApi(`/organizations/${ctx.org.id}/access-requests/${own.id}`, {
+    const own = await createJson(keeper.accessToken, `/tenants/${ctx.org.id}/access-requests`, { requestedRole: "ADMIN" });
+    const selfApproved = await callApi(`/tenants/${ctx.org.id}/access-requests/${own.id}`, {
       method: "PATCH",
       token: keeper.accessToken,
       body: { status: "approved" },
@@ -172,15 +172,15 @@ describe("voluntime feedback", suite, () => {
     assertError(selfApproved, 403, "forbidden", "You cannot review your own access request.");
     const asker = await signUp("vtfasker");
     await joinOrg(ctx.admin.accessToken, ctx.org.id, asker, { role: "VOLUNTEER" });
-    const theirs = await createJson(asker.accessToken, `/organizations/${ctx.org.id}/access-requests`, { requestedRole: "ADMIN" });
-    const grantAdmin = await callApi(`/organizations/${ctx.org.id}/access-requests/${theirs.id}`, {
+    const theirs = await createJson(asker.accessToken, `/tenants/${ctx.org.id}/access-requests`, { requestedRole: "ADMIN" });
+    const grantAdmin = await callApi(`/tenants/${ctx.org.id}/access-requests/${theirs.id}`, {
       method: "PATCH",
       token: keeper.accessToken,
       body: { status: "approved" },
     });
     assert.equal(grantAdmin.status, 403, grantAdmin.text);
 
-    const imported = await callApi(`/organizations/${ctx.org.id}/imports/people`, {
+    const imported = await callApi(`/tenants/${ctx.org.id}/imports/people`, {
       method: "POST",
       token: keeper.accessToken,
       body: { rows: [{ email: identity("vtfimported").email, firstName: "Imp", lastName: "Orted", role: "admin" }] },
@@ -190,38 +190,38 @@ describe("voluntime feedback", suite, () => {
     assert.equal(imported.json.errors[0].message, "You cannot import people with the ADMIN role.");
   });
 
-  test("an access request cannot grant another organization's departments", async () => {
+  test("an access request cannot grant another tenant's organizations", async () => {
     const attacker = await signUp("vtfcross");
-    const victimGroup = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/departments`, {
+    const victimGroup = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/tenants`, {
       name: label("Victim group"),
     });
-    const ownOrg = await createJson(attacker.accessToken, "/organizations", { name: label("Attacker org") });
-    const refused = await callApi(`/organizations/${ownOrg.id}/access-requests`, {
+    const ownOrg = await createJson(attacker.accessToken, "/tenants", { name: label("Attacker org") });
+    const refused = await callApi(`/tenants/${ownOrg.id}/access-requests`, {
       method: "POST",
       token: attacker.accessToken,
-      body: { requestedDepartmentIds: [victimGroup.id] },
+      body: { requestedOrganizationIds: [victimGroup.id] },
     });
-    assertError(refused, 400, "validation_error", "requestedDepartmentIds must be departments of this organization.");
+    assertError(refused, 400, "validation_error", "requestedOrganizationIds must be organizations of this tenant.");
 
     const accomplice = await signUp("vtfaccomplice");
     await joinOrg(attacker.accessToken, ownOrg.id, accomplice, { role: "VOLUNTEER" });
     const planted = await queryDatabase(
-      `INSERT INTO "AccessRequest" ("id", "organizationId", "userId", "requestedDepartmentIds", "status")
+      `INSERT INTO "AccessRequest" ("id", "tenantId", "userId", "requestedOrganizationIds", "status")
        VALUES (gen_random_uuid(), $1::uuid, $2::uuid, $3::jsonb, 'pending') RETURNING "id"`,
       [ownOrg.id, accomplice.user.id, JSON.stringify([victimGroup.id])],
     );
-    const approved = await callApi(`/organizations/${ownOrg.id}/access-requests/${planted.rows[0].id}`, {
+    const approved = await callApi(`/tenants/${ownOrg.id}/access-requests/${planted.rows[0].id}`, {
       method: "PATCH",
       token: attacker.accessToken,
       body: { status: "approved" },
     });
     assert.equal(approved.status, 200, approved.text);
-    const members = await callApi(`/departments/${victimGroup.id}/memberships`, { token: ctx.admin.accessToken });
+    const members = await callApi(`/tenants/${victimGroup.id}/memberships`, { token: ctx.admin.accessToken });
     assert.equal(members.json.items.some((item) => item.userId === accomplice.user.id), false);
   });
 
   test("archives a project and keeps it out of placement lookups", async () => {
-    const project = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/projects`, {
+    const project = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/projects`, {
       title: label("Archive me"),
       accessType: "Public",
     });
@@ -232,14 +232,14 @@ describe("voluntime feedback", suite, () => {
     });
     assert.equal(archived.status, 200, archived.text);
     assert.equal(archived.json.isActive, false);
-    const listed = await callApi(`/organizations/${ctx.org.id}/projects`, { token: ctx.volunteer.accessToken });
+    const listed = await callApi(`/tenants/${ctx.org.id}/projects`, { token: ctx.volunteer.accessToken });
     assert.equal(listed.json.items.some((item) => item.id === project.id), false);
   });
 
   test("group-scoped role submits a need that stays private until approved", async () => {
     const manager = await signUp("vtfmgr");
     await joinOrg(ctx.admin.accessToken, ctx.org.id, manager, { role: ctx.role.code });
-    const need = await createJson(manager.accessToken, `/organizations/${ctx.org.id}/volunteer-needs`, {
+    const need = await createJson(manager.accessToken, `/tenants/${ctx.org.id}/volunteer-needs`, {
       name: label("Pending need"),
       type: "Task",
       countNeeded: 2,
@@ -262,7 +262,7 @@ describe("voluntime feedback", suite, () => {
 
   test("public openings lists published needs for a slug", async () => {
     const slug = `vtf-${Date.now().toString(36)}`;
-    const updated = await callApi(`/organizations/${ctx.org.id}`, {
+    const updated = await callApi(`/tenants/${ctx.org.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
       body: { publicSlug: slug },

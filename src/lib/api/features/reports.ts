@@ -3,14 +3,14 @@ import { Access } from "@/lib/api/access";
 import { forbidden } from "@/lib/api/errors";
 import { cents, hoursFromMinutes, inKindFromMinutes, queryDate, queryUuids } from "@/lib/api/json";
 import { labels } from "@/lib/labels";
-import { readPreferences } from "@/lib/api/features/organizations";
+import { readPreferences } from "@/lib/api/features/tenants";
 import { prisma } from "@/lib/prisma";
 
 /** Task category whose hours count as participation, not volunteering, in the volunteer table. Matches Reports.cs. */
 export const participantHoursCategory = "participant hours";
 
 type Filter = {
-  departmentIds?: string[];
+  organizationIds?: string[];
   taskCategoryIds?: string[];
   projectIds?: string[];
   userIds?: string[];
@@ -20,7 +20,7 @@ type Filter = {
 
 function parseFilter(params: URLSearchParams): Filter {
   return {
-    departmentIds: queryUuids(params, "departmentId"),
+    organizationIds: queryUuids(params, "organizationId"),
     taskCategoryIds: queryUuids(params, "taskCategoryId"),
     projectIds: queryUuids(params, "projectId"),
     userIds: queryUuids(params, "userId"),
@@ -90,13 +90,13 @@ function sorted(rows: BucketRow[]) {
 }
 
 function userWhere(
-  organizationId: string,
+  tenantId: string,
   filter: Filter,
   rateType?: "Volunteer" | "Professional",
 ): Prisma.UserTimeEntryWhereInput {
   return {
-    organizationId,
-    departmentId: idsWhere(filter.departmentIds),
+    tenantId,
+    organizationId: idsWhere(filter.organizationIds),
     taskCategoryId: idsWhere(filter.taskCategoryIds),
     projectId: idsWhere(filter.projectIds),
     userId: idsWhere(filter.userIds),
@@ -142,22 +142,22 @@ function namesById<T extends { id: string }>(rows: T[], label: (row: T) => strin
   return new Map(rows.map((row) => [row.id, label(row)]));
 }
 
-async function userRollup(organizationId: string, filter: Filter, rateType: "Volunteer" | "Professional" = "Volunteer") {
-  const where = userWhere(organizationId, filter, rateType);
+async function userRollup(tenantId: string, filter: Filter, rateType: "Volunteer" | "Professional" = "Volunteer") {
+  const where = userWhere(tenantId, filter, rateType);
   const aggregate = { _count: { _all: true }, _sum: { durationMinutes: true, inKindValue: true } } as const;
-  const [byUser, byDepartment, byCategory, byProject] = await Promise.all([
+  const [byUser, byOrganization, byCategory, byProject] = await Promise.all([
     prisma.userTimeEntry.groupBy({ by: ["userId"], where, ...aggregate }),
-    prisma.userTimeEntry.groupBy({ by: ["departmentId", "userId"], where, ...aggregate }),
+    prisma.userTimeEntry.groupBy({ by: ["organizationId", "userId"], where, ...aggregate }),
     prisma.userTimeEntry.groupBy({ by: ["taskCategoryId", "userId"], where, ...aggregate }),
     prisma.userTimeEntry.groupBy({ by: ["projectId", "userId"], where, ...aggregate }),
   ]);
   const ids = (values: (string | null)[]) => [...new Set(values.filter((value): value is string => value !== null))];
-  const [users, departments, categories, projects] = await Promise.all([
+  const [users, organizations, categories, projects] = await Promise.all([
     prisma.user
       .findMany({ where: { id: { in: ids(byUser.map((g) => g.userId)) } }, select: { id: true, ...personSelect } })
       .then((rows) => namesById(rows, personLabel)),
-    prisma.department
-      .findMany({ where: { id: { in: ids(byDepartment.map((g) => g.departmentId)) } }, select: { id: true, name: true } })
+    prisma.tenant
+      .findMany({ where: { id: { in: ids(byOrganization.map((g) => g.organizationId)) } }, select: { id: true, name: true } })
       .then((rows) => namesById(rows, (row) => row.name)),
     prisma.taskCategory
       .findMany({ where: { id: { in: ids(byCategory.map((g) => g.taskCategoryId)) } }, select: { id: true, name: true } })
@@ -170,8 +170,8 @@ async function userRollup(organizationId: string, filter: Filter, rateType: "Vol
       .then((rows) => new Map(rows.map((row) => [row.id, row]))),
   ]);
 
-  const organization = await prisma.organization.findUniqueOrThrow({
-    where: { id: organizationId },
+  const tenant = await prisma.tenant.findUniqueOrThrow({
+    where: { id: tenantId },
     select: { name: true },
   });
   const [byMonth, byUserCategory] = await Promise.all([
@@ -209,12 +209,12 @@ async function userRollup(organizationId: string, filter: Filter, rateType: "Vol
     volunteers: named.length,
     entries: people.reduce((sum, row) => sum + row.entries, 0),
     inKind: people.reduce((sum, row) => sum + row.inKindCents, 0) / 100,
-    byDepartment: sorted(
+    byOrganization: sorted(
       bucketsFrom(
-        byDepartment,
-        (g) => g.departmentId,
+        byOrganization,
+        (g) => g.organizationId,
         (key) =>
-          key === null ? { id: "organization", label: organization.name } : { id: key, label: departments.get(key) ?? "" },
+          key === null ? { id: "tenant", label: tenant.name } : { id: key, label: organizations.get(key) ?? "" },
       ),
     ),
     byCategory: sorted(
@@ -250,12 +250,12 @@ async function userRollup(organizationId: string, filter: Filter, rateType: "Vol
   };
 }
 
-async function collectiveRollup(organizationId: string, filter: Filter) {
+async function collectiveRollup(tenantId: string, filter: Filter) {
   const to = filter.to ? new Date(filter.to.getTime() + 24 * 60 * 60 * 1000) : undefined;
   const entries = await prisma.collectiveTimeEntry.findMany({
     where: {
-      organizationId,
-      departmentId: idsWhere(filter.departmentIds),
+      tenantId,
+      organizationId: idsWhere(filter.organizationIds),
       taskCategoryId: idsWhere(filter.taskCategoryIds),
       projectId: idsWhere(filter.projectIds),
       OR: [{ hourlyRateId: null }, { rate: { type: "Volunteer" } }],
@@ -265,8 +265,8 @@ async function collectiveRollup(organizationId: string, filter: Filter) {
       startedAt: true,
       endedAt: true,
       inKindValue: true,
-      departmentId: true,
-      department: { select: { name: true } },
+      organizationId: true,
+      organization: { select: { name: true } },
       taskCategoryId: true,
       taskCategory: { select: { name: true } },
       projectId: true,
@@ -276,9 +276,9 @@ async function collectiveRollup(organizationId: string, filter: Filter) {
   const rows = entries.map((entry) => ({
     minutes: Math.round((entry.endedAt.getTime() - entry.startedAt.getTime()) / 60000),
     inKindCents: cents(entry.inKindValue),
-    department: entry.departmentId
-      ? { id: entry.departmentId, label: entry.department!.name }
-      : { id: "organization", label: "Organization" },
+    organization: entry.organizationId
+      ? { id: entry.organizationId, label: entry.organization!.name }
+      : { id: "tenant", label: "Tenant" },
     category: { id: entry.taskCategoryId, label: entry.taskCategory.name },
     project: { id: entry.projectId, label: entry.project.title, projectType: entry.project.projectType },
   }));
@@ -309,31 +309,31 @@ async function collectiveRollup(organizationId: string, filter: Filter) {
     hours: hoursFromMinutes(rows.reduce((sum, row) => sum + row.minutes, 0)),
     entries: rows.length,
     inKind: rows.reduce((sum, row) => sum + row.inKindCents, 0) / 100,
-    byDepartment: group((row) => row.department),
+    byOrganization: group((row) => row.organization),
     byCategory: group((row) => row.category),
     byProject: group((row) => row.project),
   };
 }
 
-async function forCaller(access: Access, organizationId: string, filter: Filter) {
+async function forCaller(access: Access, tenantId: string, filter: Filter) {
   // Without view_reports a caller still sees their own hours, which the dashboard needs.
-  const visibility = (await access.can(organizationId, "view_reports"))
-    ? await access.visibility(organizationId)
+  const visibility = (await access.can(tenantId, "view_reports"))
+    ? await access.visibility(tenantId)
     : ({ kind: "self" } as const);
   if (visibility.kind === "all") {
     return filter;
   }
 
-  if (visibility.kind === "departments") {
-    if (filter.departmentIds) {
-      if (filter.departmentIds.some((id) => !visibility.departmentIds.includes(id))) {
+  if (visibility.kind === "organizations") {
+    if (filter.organizationIds) {
+      if (filter.organizationIds.some((id) => !visibility.organizationIds.includes(id))) {
         forbidden();
       }
 
       return filter;
     }
 
-    return { ...filter, departmentIds: visibility.departmentIds };
+    return { ...filter, organizationIds: visibility.organizationIds };
   }
 
   if (filter.userIds?.some((id) => id !== access.actorUserId)) {
@@ -343,14 +343,14 @@ async function forCaller(access: Access, organizationId: string, filter: Filter)
   return { ...filter, userIds: [access.actorUserId] };
 }
 
-export async function report(access: Access, organizationId: string, params: URLSearchParams) {
+export async function report(access: Access, tenantId: string, params: URLSearchParams) {
   const parsed = parseFilter(params);
-  await access.requireOrganization(organizationId, false);
-  const filter = await forCaller(access, organizationId, parsed);
+  await access.requireTenant(tenantId, false);
+  const filter = await forCaller(access, tenantId, parsed);
   return {
-    user: await userRollup(organizationId, filter, "Volunteer"),
-    staff: await userRollup(organizationId, filter, "Professional"),
-    collective: await collectiveRollup(organizationId, filter),
+    user: await userRollup(tenantId, filter, "Volunteer"),
+    staff: await userRollup(tenantId, filter, "Professional"),
+    collective: await collectiveRollup(tenantId, filter),
   };
 }
 
@@ -405,15 +405,15 @@ function csvResponse(lines: string[]) {
   return new Response(lines.join("\n"), { headers: { "content-type": "text/csv; charset=utf-8" } });
 }
 
-export async function csv(access: Access, organizationId: string, params: URLSearchParams) {
-  const organization = await access.requirePermission(organizationId, "export_reports");
-  const filter = await forCaller(access, organizationId, parseFilter(params));
-  const copy = labels(readPreferences(organization.preferences));
+export async function csv(access: Access, tenantId: string, params: URLSearchParams) {
+  const tenant = await access.requirePermission(tenantId, "export_reports");
+  const filter = await forCaller(access, tenantId, parseFilter(params));
+  const copy = labels(readPreferences(tenant.preferences));
   const header = [
     "Date",
     copy.project,
     "Volunteer",
-    `${copy.department} / ${copy.organization}`,
+    `${copy.organization} / ${copy.tenant}`,
     copy.taskCategory,
     "Entry Method",
     "Start Time",
@@ -431,14 +431,14 @@ export async function csv(access: Access, organizationId: string, params: URLSea
     "Volunteer ID",
   ].join(",");
   const entries = await prisma.userTimeEntry.findMany({
-    where: { ...userWhere(organizationId, filter), NOT: { rate: { type: "Paid" } } },
+    where: { ...userWhere(tenantId, filter), NOT: { rate: { type: "Paid" } } },
     orderBy: [{ occurredOn: "asc" }, { createdAt: "asc" }],
     select: {
       occurredOn: true,
       project: { select: { title: true } },
       user: { select: { ...personSelect, profile: { select: { ...personSelect.profile.select, memberNumber: true } } } },
-      department: { select: { name: true } },
       organization: { select: { name: true } },
+      tenant: { select: { name: true } },
       taskCategory: { select: { name: true } },
       mode: true,
       startedAt: true,
@@ -459,7 +459,7 @@ export async function csv(access: Access, organizationId: string, params: URLSea
       sheetDate(entry.occurredOn),
       entry.project?.title ?? "",
       personLabel(entry.user),
-      entry.department?.name ?? entry.organization.name,
+      entry.organization?.name ?? entry.tenant.name,
       entry.taskCategory?.name ?? "",
       entryMethod(entry.mode, entry.startedAt, entry.endedAt),
       sheetTime(entry.startedAt),
@@ -485,11 +485,11 @@ export async function csv(access: Access, organizationId: string, params: URLSea
   return csvResponse(lines);
 }
 
-export async function summaryCsv(access: Access, organizationId: string, params: URLSearchParams) {
-  await access.requirePermission(organizationId, "export_reports");
-  const data = await report(access, organizationId, params);
-  const organization = await access.requireOrganization(organizationId, false);
-  const copy = labels(readPreferences(organization.preferences));
+export async function summaryCsv(access: Access, tenantId: string, params: URLSearchParams) {
+  await access.requirePermission(tenantId, "export_reports");
+  const data = await report(access, tenantId, params);
+  const tenant = await access.requireTenant(tenantId, false);
+  const copy = labels(readPreferences(tenant.preferences));
   const table = (title: string, rows: { label: string; hours: number; inKind: number }[], hoursHeader: string) => [
     "",
     [title, hoursHeader, "In-Kind Value"].map(csvCell).join(","),
@@ -500,7 +500,7 @@ export async function summaryCsv(access: Access, organizationId: string, params:
     ["Total In-Kind Value", data.user.inKind.toFixed(2)].map(csvCell).join(","),
     ["Unique Volunteers", String(data.user.volunteers)].map(csvCell).join(","),
     ["Total Entries", String(data.user.entries)].map(csvCell).join(","),
-    ...table(copy.organization, data.user.byDepartment, "Volunteer Hours"),
+    ...table(copy.tenant, data.user.byOrganization, "Volunteer Hours"),
     ...table(copy.taskCategory, data.user.byCategory, "Volunteer Hours"),
     ...table("Month", data.user.byMonth, "Volunteer Hours"),
     ...table("Volunteer", data.user.byVolunteer, "Total Hours"),
@@ -509,22 +509,22 @@ export async function summaryCsv(access: Access, organizationId: string, params:
   return csvResponse(lines);
 }
 
-export async function payroll(access: Access, organizationId: string, params: URLSearchParams) {
-  await access.requirePermission(organizationId, "view_payroll");
-  const filter = await forCaller(access, organizationId, parseFilter(params));
-  const organization = await prisma.organization.findUniqueOrThrow({
-    where: { id: organizationId },
+export async function payroll(access: Access, tenantId: string, params: URLSearchParams) {
+  await access.requirePermission(tenantId, "view_payroll");
+  const filter = await forCaller(access, tenantId, parseFilter(params));
+  const tenant = await prisma.tenant.findUniqueOrThrow({
+    where: { id: tenantId },
     select: { name: true },
   });
   const entries = await prisma.userTimeEntry.findMany({
-    where: { ...userWhere(organizationId, filter), rate: { type: "Paid" }, durationMinutes: { not: null } },
+    where: { ...userWhere(tenantId, filter), rate: { type: "Paid" }, durationMinutes: { not: null } },
     select: {
       userId: true,
-      departmentId: true,
+      organizationId: true,
       durationMinutes: true,
       hourlyRate: true,
       user: { select: personSelect },
-      department: { select: { name: true } },
+      organization: { select: { name: true } },
     },
   });
   const groups = new Map<
@@ -534,11 +534,11 @@ export async function payroll(access: Access, organizationId: string, params: UR
   for (const entry of entries) {
     if (entry.durationMinutes === null) continue;
     const payRate = Number(entry.hourlyRate);
-    const key = `${entry.userId}:${entry.departmentId ?? ""}:${payRate.toFixed(2)}`;
+    const key = `${entry.userId}:${entry.organizationId ?? ""}:${payRate.toFixed(2)}`;
     const row = groups.get(key) ?? {
       userId: entry.userId,
       person: personLabel(entry.user),
-      group: entry.department?.name ?? organization.name,
+      group: entry.organization?.name ?? tenant.name,
       minutes: 0,
       payRate,
       grossCents: 0,
@@ -572,8 +572,8 @@ export async function payroll(access: Access, organizationId: string, params: UR
   };
 }
 
-export async function payrollCsv(access: Access, organizationId: string, params: URLSearchParams) {
-  const data = await payroll(access, organizationId, params);
+export async function payrollCsv(access: Access, tenantId: string, params: URLSearchParams) {
+  const data = await payroll(access, tenantId, params);
   const lines = [
     ["Person", "Group", "Hours", "Pay rate", "Gross pay", "Entries"].map(csvCell).join(","),
     ...data.rows.map((row) =>
@@ -585,11 +585,11 @@ export async function payrollCsv(access: Access, organizationId: string, params:
   return csvResponse(lines);
 }
 
-export async function viewCsv(access: Access, organizationId: string, params: URLSearchParams) {
-  await access.requirePermission(organizationId, "export_reports");
-  const data = await report(access, organizationId, params);
-  const organization = await access.requireOrganization(organizationId, false);
-  const copy = labels(readPreferences(organization.preferences));
+export async function viewCsv(access: Access, tenantId: string, params: URLSearchParams) {
+  await access.requirePermission(tenantId, "export_reports");
+  const data = await report(access, tenantId, params);
+  const tenant = await access.requireTenant(tenantId, false);
+  const copy = labels(readPreferences(tenant.preferences));
   const side = params.get("side") === "collective" ? data.collective : data.user;
   return csvResponse([
     ["Label", "Hours", "In-kind"].map(csvCell).join(","),
@@ -598,7 +598,7 @@ export async function viewCsv(access: Access, organizationId: string, params: UR
     [`By ${copy.taskCategory}`, "Hours", "In-kind"].map(csvCell).join(","),
     ...side.byCategory.map((row) => [row.label, hoursCell(Math.round(row.hours * 60)), row.inKind.toFixed(2)].map(csvCell).join(",")),
     "",
-    [`By ${copy.department}`, "Hours", "In-kind"].map(csvCell).join(","),
-    ...side.byDepartment.map((row) => [row.label, hoursCell(Math.round(row.hours * 60)), row.inKind.toFixed(2)].map(csvCell).join(",")),
+    [`By ${copy.organization}`, "Hours", "In-kind"].map(csvCell).join(","),
+    ...side.byOrganization.map((row) => [row.label, hoursCell(Math.round(row.hours * 60)), row.inKind.toFixed(2)].map(csvCell).join(",")),
   ]);
 }

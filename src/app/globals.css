@@ -52,43 +52,46 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --background: #f4f7f8;
+  --foreground: #001836;
+  --card: #ffffff;
+  --card-foreground: #001836;
+  --popover: #ffffff;
+  --popover-foreground: #001836;
+  --primary: #001836;
+  --primary-foreground: #ffffff;
+  --secondary: color-mix(in oklch, #001836 8%, #ffffff);
+  --secondary-foreground: #001836;
+  --muted: color-mix(in oklch, #001836 6%, #ffffff);
+  --muted-foreground: color-mix(in oklch, #001836 72%, #ffffff);
+  --accent: color-mix(in oklch, #2a6f97 14%, #ffffff);
+  --accent-foreground: #001836;
+  --destructive: #9b2348;
+  --border: color-mix(in oklch, #001836 12%, #ffffff);
+  --input: color-mix(in oklch, #001836 12%, #ffffff);
+  --ring: #001836;
   --chart-1: var(--primary);
   --chart-2: var(--primary);
   --chart-3: var(--primary);
   --chart-4: var(--primary);
   --chart-5: var(--primary);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --radius-button: 6px;
+  --radius-nav: 10px;
+  --radius-pill: 999px;
+  --sidebar: #001836;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #d4ac59;
+  --sidebar-primary-foreground: #001836;
+  --sidebar-accent: color-mix(in oklch, #ffffff 12%, transparent);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: color-mix(in oklch, #ffffff 14%, transparent);
+  --sidebar-ring: #ffffff;
   --highlight: #d4ac59;
   --success: #4ebfae;
   --brand-accent: #2a6f97;
-  --font-sans: var(--font-geist);
-  --font-heading: var(--font-geist);
+  --font-sans: var(--font-nunito), "Nunito Sans", sans-serif;
+  --font-heading: var(--font-arimo), "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
 .dark {
@@ -137,7 +140,15 @@
   }
   h1, h2, h3 {
     font-family: var(--font-heading), var(--font-sans), sans-serif;
-    letter-spacing: -0.02em;
+    font-weight: 700;
+  }
+  a {
+    color: var(--brand-accent);
+    text-decoration-line: underline;
+    text-underline-offset: 2px;
+  }
+  a:hover {
+    color: var(--foreground);
   }
 }
 

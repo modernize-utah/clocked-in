@@ -10,7 +10,7 @@ import { useWorkspace } from "@/workspace";
 
 export default function ProfileScreen() {
   const colors = useColors();
-  const { viewer, organization } = useWorkspace();
+  const { viewer, tenant } = useWorkspace();
   const { user, changePassword, replaceUser } = useSession();
   const profile = user?.profile;
   const [displayName, setDisplayName] = useState(profile?.displayName ?? viewer.name);
@@ -100,7 +100,7 @@ export default function ProfileScreen() {
           onPress={() => {
             setPending("profile");
             api
-              .createAccessRequest(organization.id, accessMessage.trim())
+              .createAccessRequest(tenant.id, accessMessage.trim())
               .then(() => {
                 setAccessMessage("");
                 setMessage("Request sent.");

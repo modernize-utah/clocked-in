@@ -13,16 +13,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useActionMutation } from "@/hooks/use-action-mutation";
 import { useLabels } from "@/hooks/use-labels";
-import { useOrganization } from "@/hooks/use-workspace";
+import { useTenant } from "@/hooks/use-workspace";
 import { keys } from "@/lib/queries";
 
 type NameKind = NamedLookupKind;
 
 function kindCopy(kind: NameKind, copy: ReturnType<typeof useLabels>) {
-  if (kind === "departments") {
+  if (kind === "organizations") {
     return {
-      noun: copy.department.toLowerCase(),
-      description: `Teams or sites inside this ${copy.organization.toLowerCase()}. Hours can be logged against a ${copy.department.toLowerCase()}, and reports break down by it.`,
+      noun: copy.organization.toLowerCase(),
+      description: `Teams or sites inside this ${copy.tenant.toLowerCase()}. Hours can be logged against a ${copy.organization.toLowerCase()}, and reports break down by it.`,
     };
   }
 
@@ -59,8 +59,8 @@ type DialogProps = {
   onSaved?: (entity: NamedEntity) => void;
 };
 
-export function DepartmentForm(props: FormProps) {
-  return <NameEntityForm kind="departments" {...props} />;
+export function OrganizationForm(props: FormProps) {
+  return <NameEntityForm kind="organizations" {...props} />;
 }
 
 export function TaskCategoryForm(props: FormProps) {
@@ -104,8 +104,8 @@ export function NamedEntityDialog({ kind, open, onOpenChange, entity, onCreated,
   );
 }
 
-export function CreateDepartmentDialog(props: DialogProps) {
-  return <NamedEntityDialog kind="departments" {...props} />;
+export function CreateOrganizationDialog(props: DialogProps) {
+  return <NamedEntityDialog kind="organizations" {...props} />;
 }
 
 export function CreateTaskCategoryDialog(props: DialogProps) {
@@ -128,19 +128,19 @@ function NameEntityForm({
   onSaved,
   onCancel,
 }: FormProps & { kind: NameKind }) {
-  const organization = useOrganization();
+  const tenant = useTenant();
   const queryClient = useQueryClient();
   const [name, setName] = useState(entity?.name ?? "");
-  const invalidate = [keys.lookups(organization.id)];
+  const invalidate = [keys.lookups(tenant.id)];
 
   function remember(saved: NamedEntity) {
-    rememberLookup(queryClient, organization.id, (current) => ({
+    rememberLookup(queryClient, tenant.id, (current) => ({
       ...current,
-      [kind]: upsertNamed(current[kind], { id: saved.id, organizationId: organization.id, name: saved.name }),
+      [kind]: upsertNamed(current[kind], { id: saved.id, tenantId: tenant.id, name: saved.name }),
     }));
   }
 
-  const create = useActionMutation((value: string) => createLookupAction(kind, organization.id, value), {
+  const create = useActionMutation((value: string) => createLookupAction(kind, tenant.id, value), {
     invalidate,
     onSuccess: (data) => {
       if (namedEntity(data)) {

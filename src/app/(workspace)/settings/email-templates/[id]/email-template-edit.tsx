@@ -17,7 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { useActionMutation } from "@/hooks/use-action-mutation";
-import { useOrganization } from "@/hooks/use-workspace";
+import { useTenant } from "@/hooks/use-workspace";
 import type { EmailTemplateJson } from "@/lib/api/features/email-templates";
 import { emailForLabels, emailTemplateFields, previewEmail } from "@/lib/email/templates";
 import { emailTemplateQuery, keys } from "@/lib/queries";
@@ -37,8 +37,8 @@ function draftOf(template: EmailTemplateJson): Draft {
 }
 
 export function EmailTemplateEdit({ templateId }: { templateId: string }) {
-  const organization = useOrganization();
-  const { data, isPending, isError } = useQuery(emailTemplateQuery(organization.id, templateId));
+  const tenant = useTenant();
+  const { data, isPending, isError } = useQuery(emailTemplateQuery(tenant.id, templateId));
   if (isPending) return <PageSkeleton rows={8} />;
   if (isError || !data) {
     return (
@@ -57,7 +57,7 @@ export function EmailTemplateEdit({ templateId }: { templateId: string }) {
 }
 
 function TemplateForm({ template }: { template: EmailTemplateJson }) {
-  const organization = useOrganization();
+  const tenant = useTenant();
   const router = useRouter();
   const queryClient = useQueryClient();
   const saved = useMemo(() => draftOf(template), [template]);
@@ -70,15 +70,15 @@ function TemplateForm({ template }: { template: EmailTemplateJson }) {
   const dirty = (Object.keys(saved) as (keyof Draft)[]).some((key) => draft[key] !== saved[key]);
   const fields = Object.keys(emailTemplateFields[template.for]);
   const preview = useMemo(() => previewEmail(draft, template.for), [draft, template.for]);
-  const invalidate = [keys.emailTemplates(organization.id), keys.emailTemplate(organization.id, template.id)];
+  const invalidate = [keys.emailTemplates(tenant.id), keys.emailTemplate(tenant.id, template.id)];
   const onSaved = (next: EmailTemplateJson | undefined) => {
-    if (next) queryClient.setQueryData(keys.emailTemplate(organization.id, template.id), next);
+    if (next) queryClient.setQueryData(keys.emailTemplate(tenant.id, template.id), next);
   };
-  const save = useActionMutation((input: Partial<Draft>) => updateEmailTemplateAction(organization.id, template.id, input), {
+  const save = useActionMutation((input: Partial<Draft>) => updateEmailTemplateAction(tenant.id, template.id, input), {
     invalidate,
     onSuccess: onSaved,
   });
-  const reset = useActionMutation(() => resetEmailTemplateAction(organization.id, template.id), {
+  const reset = useActionMutation(() => resetEmailTemplateAction(tenant.id, template.id), {
     invalidate,
     onSuccess: onSaved,
   });
@@ -157,7 +157,7 @@ function TemplateForm({ template }: { template: EmailTemplateJson }) {
             <CardTitle>{template.name}</CardTitle>
             <CardDescription>
               {template.for === "PasswordReset"
-                ? "Changes here apply only when the person resetting belongs to this one organization. Everyone else gets the default."
+                ? "Changes here apply only when the person resetting belongs to this one tenant. Everyone else gets the default."
                 : "Fields in braces are filled in when the email is sent."}
             </CardDescription>
           </CardHeader>

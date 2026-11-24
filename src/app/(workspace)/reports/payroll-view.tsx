@@ -5,14 +5,14 @@ import { WalletIcon } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { PageSkeleton } from "@/components/skeletons";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useOrganization } from "@/hooks/use-workspace";
+import { useTenant } from "@/hooks/use-workspace";
 import { formatCurrency, formatHours, formatNumber } from "@/lib/format";
 import { payrollQuery } from "@/lib/queries";
 import type { ReportFilters } from "@/lib/report-layout";
 
 export function PayrollView({ filters }: { filters: ReportFilters }) {
-  const organization = useOrganization();
-  const payroll = useQuery(payrollQuery(organization.id, filters));
+  const tenant = useTenant();
+  const payroll = useQuery(payrollQuery(tenant.id, filters));
 
   if (payroll.isPending && !payroll.data) {
     return <PageSkeleton />;

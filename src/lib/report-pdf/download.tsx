@@ -8,12 +8,12 @@ import { paginatePdfBlocks, reportPdfBlocks } from "./blocks";
 import { capturePdfCharts } from "./capture";
 import { reportPdfFilename } from "./filename";
 import { pageContentHeight } from "./layout";
-import type { Organization } from "@/lib/types";
+import type { Tenant } from "@/lib/types";
 
 export type ReportPdfInput = {
   title: string;
   slug: string;
-  organization: Pick<Organization, "name" | "markUrl" | "theme">;
+  tenant: Pick<Tenant, "name" | "markUrl" | "theme">;
   filters: ReportFilters;
   filterSummary: string;
   cards: ReportCard[];
@@ -46,9 +46,9 @@ function themeColors(theme: ChartPaletteSource & { primary: string; foreground: 
 }
 
 export async function downloadReportPdf(input: ReportPdfInput) {
-  const captured = await capturePdfCharts(reportPdfBlocks(input.cards, input.data, input.organization.theme));
+  const captured = await capturePdfCharts(reportPdfBlocks(input.cards, input.data, input.tenant.theme));
   const blocks = paginatePdfBlocks(captured, pageContentHeight - 80).flat();
-  const logoSrc = brandAssetSrc("mark", input.organization.markUrl);
+  const logoSrc = brandAssetSrc("mark", input.tenant.markUrl);
   const logo = logoSrc ? await fetchDataUrl(logoSrc) : null;
   const [{ pdf }, { ReportPdfDocument }] = await Promise.all([
     import("@react-pdf/renderer"),
@@ -57,11 +57,11 @@ export async function downloadReportPdf(input: ReportPdfInput) {
   const blob = await pdf(
     <ReportPdfDocument
       title={input.title}
-      organizationName={input.organization.name}
+      tenantName={input.tenant.name}
       logoSrc={logo}
       filterSummary={input.filterSummary}
       blocks={blocks}
-      colors={themeColors(input.organization.theme)}
+      colors={themeColors(input.tenant.theme)}
     />,
   ).toBlob();
   downloadBlob(reportPdfFilename(input.slug, input.filters), blob, "application/pdf");

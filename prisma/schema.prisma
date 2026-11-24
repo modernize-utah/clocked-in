@@ -15,6 +15,8 @@ model User {
   username                   String                   @unique(map: "IX_User_username")
   /// Stored lowercase. The initial migration rejects any other casing.
   email                      String                   @unique(map: "IX_User_email")
+  /// Portal person id / ID-token sub when synced from an external authority.
+  externalId                 String?                  @unique(map: "IX_User_externalId")
   passwordHash               String
   createdAt                  DateTime                 @default(now()) @db.Timestamptz(6)
   updatedAt                  DateTime                 @updatedAt @db.Timestamptz(6)
@@ -23,7 +25,7 @@ model User {
   /// When true, the user must set a new password before using the app.
   mustChangePassword         Boolean                  @default(false)
   collectiveTimeEntries      CollectiveTimeEntry[]    @relation("CollectiveTimeEntryRecordedBy")
-  departmentMemberships      DepartmentMembership[]
+  organizationMemberships      OrganizationMembership[]
   feedback                   Feedback[]
   feedbackActionsTaken       FeedbackAction[]         @relation("FeedbackActionTakenBy")
   Guest                      Guest?
@@ -31,8 +33,8 @@ model User {
   connectionsCreated         MemberConnection[]       @relation("MemberConnectionCreatedBy")
   connectionsAsUserA         MemberConnection[]       @relation("MemberConnectionUserA")
   connectionsAsUserB         MemberConnection[]       @relation("MemberConnectionUserB")
-  organizationApiKeysCreated OrganizationApiKey[]
-  organizationMemberships    OrganizationMembership[]
+  tenantApiKeysCreated TenantApiKey[]
+  tenantMemberships    TenantMembership[]
   passwordResetCodes         PasswordResetCode[]
   platformApiKeysCreated     PlatformApiKey[]
   ownedProjects              Project[]                @relation("ProjectOwner")
@@ -64,26 +66,29 @@ model UserProfile {
   user         User    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_UserProfile_User_userId")
 }
 
-/// System roles have a null organizationId. Custom roles belong to one organization.
+/// System roles have a null tenantId. Custom roles belong to one tenant.
 /// The initial migration seeds MEMBER, VOLUNTEER, and ADMIN.
 model Role {
   id                      String                   @id(map: "PK_Role") @default(uuid()) @db.Uuid
   code                    String
   name                    String
-  organizationId          String?                  @db.Uuid
+  tenantId          String?                  @db.Uuid
   isSystem                Boolean                  @default(false)
   /// organization, assigned_groups, or self.
   scope                   String                   @default("organization")
-  departmentMemberships   DepartmentMembership[]
+  /// External system of record id when roles are synced.
+  externalId              String?
+  organizationMemberships   OrganizationMembership[]
   invitations             Invitation[]
-  organization            Organization?            @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Role_Organization_organizationId")
-  organizationMemberships OrganizationMembership[]
+  tenant                  Tenant?            @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Role_Tenant_tenantId")
+  tenantMemberships TenantMembership[]
   permissions             RolePermission[]
   accessRequests          AccessRequest[]
 
-  @@unique([code], map: "Role_system_code_key", where: raw("(\"organizationId\" IS NULL)"))
-  @@unique([organizationId, code], map: "Role_org_code_key", where: raw("(\"organizationId\" IS NOT NULL)"))
-  @@index([organizationId], map: "IX_Role_organizationId")
+  @@unique([code], map: "Role_system_code_key", where: raw("(\"tenantId\" IS NULL)"))
+  @@unique([tenantId, code], map: "Role_org_code_key", where: raw("(\"tenantId\" IS NOT NULL)"))
+  @@unique([tenantId, externalId], map: "Role_org_externalId_key", where: raw("(\"tenantId\" IS NOT NULL AND \"externalId\" IS NOT NULL)"))
+  @@index([tenantId], map: "IX_Role_tenantId")
 }
 
 model RolePermission {
@@ -97,138 +102,155 @@ model RolePermission {
   @@index([roleId], map: "IX_RolePermission_roleId")
 }
 
-model Organization {
-  id                    String                   @id(map: "PK_Organization") @default(uuid()) @db.Uuid
+model Tenant {
+  id                    String                   @id(map: "PK_Tenant") @default(uuid()) @db.Uuid
   name                  String
   /// Volunteer, Professional, or Paid.
   defaultRateType       String                   @default("Volunteer")
-  /// Org settings. Known fields are defined by OrganizationPreferences.
+  /// Org settings. Known fields are defined by TenantPreferences.
   preferences           Json                     @default("{\"allowTimeEntryEditing\": false}")
   accentImageUrl        String?
   markUrl               String?
   wordmarkUrl           String?
   themeId               String                   @default(dbgenerated("'44444444-4444-4444-8444-444444444441'::uuid")) @db.Uuid
   wordmarkOnLightUrl    String?
-  /// Organization about information in Markdown.
+  /// Tenant about information in Markdown.
   description           String?
   websiteUrl            String?
-  publicSlug            String?                  @unique(map: "IX_Organization_publicSlug", where: raw("(\"publicSlug\" IS NOT NULL)"))
-  slug                  String?                  @unique(map: "IX_Organization_slug", where: raw("(slug IS NOT NULL)")) @db.Citext
+  publicSlug            String?                  @unique(map: "IX_Tenant_publicSlug", where: raw("(\"publicSlug\" IS NOT NULL)"))
+  slug                  String?                  @unique(map: "IX_Tenant_slug", where: raw("(slug IS NOT NULL)")) @db.Citext
+  /// Portal society external id when this tenant is synced from the portal.
+  externalId                String?
+  /// Portal OAuth client id (c + 20 hex).
+  portalClientId            String?
+  /// AES-GCM ciphertext for portal client secret.
+  portalClientSecretEnc     String?
+  /// AES-GCM ciphertext for portal API token (caswj_at_…).
+  portalApiTokenEnc         String?
+  /// AES-GCM ciphertext for portal webhook signing secret (caswj_wh_…).
+  portalWebhookSecretEnc    String?
+  portalLastPulledAt        DateTime?                @db.Timestamptz(6)
   collectiveTimeEntries CollectiveTimeEntry[]
-  departments           Department[]
+  organizations           Organization[]
   emailTemplates        EmailTemplate[]
   feedback              Feedback[]
   hourlyRates           HourlyRate[]
   invitations           Invitation[]
   connections           MemberConnection[]
-  theme                 Theme                    @relation("OrganizationTheme", fields: [themeId], references: [id], onUpdate: NoAction, map: "FK_Organization_Theme_themeId")
-  apiKeys               OrganizationApiKey[]
-  memberships           OrganizationMembership[]
+  theme                 Theme                    @relation("TenantTheme", fields: [themeId], references: [id], onUpdate: NoAction, map: "FK_Tenant_Theme_themeId")
+  apiKeys               TenantApiKey[]
+  memberships           TenantMembership[]
   projects              Project[]
   reports               Report[]
   reportTemplates       ReportTemplate[]
   roles                 Role[]
   tags                  Tag[]
   taskCategories        TaskCategory[]
-  themes                Theme[]                  @relation("OrganizationThemes")
+  themes                Theme[]                  @relation("TenantThemes")
   timeEntries           UserTimeEntry[]
   VolunteerNeed         VolunteerNeed[]
   accessRequests        AccessRequest[]
 
-  @@index([themeId], map: "IX_Organization_themeId")
+  @@unique([externalId], map: "IX_Tenant_externalId", where: raw("(\"externalId\" IS NOT NULL)"))
+  @@index([themeId], map: "IX_Tenant_themeId")
 }
 
-model OrganizationMembership {
-  id                      String       @id(map: "PK_OrganizationMembership") @default(uuid()) @db.Uuid
+model TenantMembership {
+  id                      String       @id(map: "PK_TenantMembership") @default(uuid()) @db.Uuid
   userId                  String       @db.Uuid
-  organizationId          String       @db.Uuid
+  tenantId          String       @db.Uuid
   roleId                  String       @db.Uuid
   joinedAt                DateTime     @default(now()) @db.Timestamptz(6)
   isActive                Boolean      @default(true)
   professionalBillingRate Decimal?     @db.Decimal(10, 2)
   /// Volunteer, Professional, or Paid. Paid and Professional require professionalBillingRate.
   rateType                String       @default("Volunteer")
-  primaryDepartmentId     String?      @db.Uuid
+  primaryOrganizationId     String?      @db.Uuid
   /// Description of the user for this organization in Markdown.
-  orgUserDescription      String?
+  memberDescription      String?
   /// Title of the user for this organization.
-  orgUserTitle            String?
+  title            String?
   /// The organization's private notes about this person. Only people with manage_members see them.
   notes                   String?
-  primaryDepartment       Department?  @relation("PrimaryDepartment", fields: [primaryDepartmentId], references: [id], onUpdate: NoAction, map: "FK_OrganizationMembership_Department_primaryDepartmentId")
-  organization            Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_OrganizationMembership_Organization_organizationId")
-  role                    Role         @relation(fields: [roleId], references: [id], onUpdate: NoAction, map: "FK_OrganizationMembership_Role_roleId")
-  user                    User         @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_OrganizationMembership_User_userId")
+  primaryOrganization       Organization?  @relation("PrimaryOrganization", fields: [primaryOrganizationId], references: [id], onUpdate: NoAction, map: "FK_TenantMembership_Organization_primaryOrganizationId")
+  tenant                  Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_TenantMembership_Tenant_tenantId")
+  role                    Role         @relation(fields: [roleId], references: [id], onUpdate: NoAction, map: "FK_TenantMembership_Role_roleId")
+  user                    User         @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_TenantMembership_User_userId")
 
-  @@unique([userId, organizationId], map: "IX_OrganizationMembership_userId_organizationId")
-  @@index([organizationId], map: "IX_OrganizationMembership_organizationId")
-  @@index([primaryDepartmentId], map: "IX_OrganizationMembership_primaryDepartmentId")
-  @@index([roleId], map: "IX_OrganizationMembership_roleId")
+  @@unique([userId, tenantId], map: "IX_TenantMembership_userId_tenantId")
+  @@index([tenantId], map: "IX_TenantMembership_tenantId")
+  @@index([primaryOrganizationId], map: "IX_TenantMembership_primaryOrganizationId")
+  @@index([roleId], map: "IX_TenantMembership_roleId")
 }
 
-model Department {
-  id                    String                   @id(map: "PK_Department") @default(uuid()) @db.Uuid
-  organizationId        String                   @db.Uuid
+model Organization {
+  id                    String                   @id(map: "PK_Organization") @default(uuid()) @db.Uuid
+  tenantId        String                   @db.Uuid
   name                  String                   @db.Citext
+  /// External system of record id when organizations are synced.
+  externalId            String?
   collectiveTimeEntries CollectiveTimeEntry[]
-  organization          Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Department_Organization_organizationId")
-  memberships           DepartmentMembership[]
+  tenant                Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Organization_Tenant_tenantId")
+  memberships           OrganizationMembership[]
   invitations           Invitation[]
-  primaryMemberships    OrganizationMembership[] @relation("PrimaryDepartment")
+  primaryMemberships    TenantMembership[] @relation("PrimaryOrganization")
   projects              Project[]
   timeEntries           UserTimeEntry[]
   VolunteerNeed         VolunteerNeed[]
 
-  @@unique([organizationId, name], map: "IX_Department_organizationId_name")
+  @@unique([tenantId, name], map: "IX_Organization_tenantId_name")
+  @@unique([tenantId, externalId], map: "Organization_org_externalId_key", where: raw("(\"externalId\" IS NOT NULL)"))
 }
 
-model DepartmentMembership {
-  id           String     @id(map: "PK_DepartmentMembership") @default(uuid()) @db.Uuid
+model OrganizationMembership {
+  id           String     @id(map: "PK_OrganizationMembership") @default(uuid()) @db.Uuid
   userId       String     @db.Uuid
-  departmentId String     @db.Uuid
+  organizationId String     @db.Uuid
   roleId       String     @db.Uuid
   joinedAt     DateTime   @default(now()) @db.Timestamptz(6)
-  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_DepartmentMembership_Department_departmentId")
-  role         Role       @relation(fields: [roleId], references: [id], onUpdate: NoAction, map: "FK_DepartmentMembership_Role_roleId")
-  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_DepartmentMembership_User_userId")
+  /// Position title from portal (e.g. Chair) when held.
+  title        String?
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_OrganizationMembership_Organization_organizationId")
+  role         Role       @relation(fields: [roleId], references: [id], onUpdate: NoAction, map: "FK_OrganizationMembership_Role_roleId")
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_OrganizationMembership_User_userId")
 
-  @@unique([userId, departmentId], map: "IX_DepartmentMembership_userId_departmentId")
-  @@index([departmentId], map: "IX_DepartmentMembership_departmentId")
-  @@index([roleId], map: "IX_DepartmentMembership_roleId")
+  @@unique([userId, organizationId], map: "IX_OrganizationMembership_userId_organizationId")
+  @@index([organizationId], map: "IX_OrganizationMembership_organizationId")
+  @@index([roleId], map: "IX_OrganizationMembership_roleId")
 }
 
 model Tag {
   id                      String                   @id(map: "PK_Tag") @default(uuid()) @db.Uuid
-  organizationId          String                   @db.Uuid
+  tenantId          String                   @db.Uuid
   name                    String                   @db.Citext
   isArchived              Boolean                  @default(false)
   collectiveTimeEntryTags CollectiveTimeEntryTag[]
-  organization            Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Tag_Organization_organizationId")
+  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Tag_Tenant_tenantId")
   userTimeEntryTags       UserTimeEntryTag[]
 
-  @@unique([organizationId, name], map: "IX_Tag_organizationId_name")
+  @@unique([tenantId, name], map: "IX_Tag_tenantId_name")
 }
 
 model TaskCategory {
   id                    String                @id(map: "PK_TaskCategory") @default(uuid()) @db.Uuid
-  organizationId        String                @db.Uuid
+  tenantId        String                @db.Uuid
   name                  String                @db.Citext
   collectiveTimeEntries CollectiveTimeEntry[]
-  organization          Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_TaskCategory_Organization_organizationId")
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_TaskCategory_Tenant_tenantId")
   userTimeEntries       UserTimeEntry[]
   VolunteerNeed         VolunteerNeed[]
 
-  @@unique([organizationId, name], map: "IX_TaskCategory_organizationId_name")
+  @@unique([tenantId, name], map: "IX_TaskCategory_tenantId_name")
 }
 
 model Project {
   id                    String                @id(map: "PK_Project") @default(uuid()) @db.Uuid
-  organizationId        String                @db.Uuid
-  departmentId          String?               @db.Uuid
+  tenantId        String                @db.Uuid
+  organizationId          String?               @db.Uuid
   ownerUserId           String                @db.Uuid
   title                 String                @db.Citext
   description           String?
-  /// Public, Private, Organization, or Department.
+  /// Public, Private, Tenant, or Organization.
   accessType            String
   startDate             DateTime?             @db.Date
   endDate               DateTime?             @db.Date
@@ -236,23 +258,23 @@ model Project {
   /// Project or Event.
   projectType           String                @default("Project")
   collectiveTimeEntries CollectiveTimeEntry[]
-  department            Department?           @relation(fields: [departmentId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Project_Department_departmentId")
-  organization          Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Project_Organization_organizationId")
+  organization          Organization?           @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Project_Organization_organizationId")
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Project_Tenant_tenantId")
   owner                 User                  @relation("ProjectOwner", fields: [ownerUserId], references: [id], onUpdate: NoAction, map: "FK_Project_User_ownerUserId")
   editors               ProjectEditor[]
   userTimeEntries       UserTimeEntry[]
   VolunteerNeed         VolunteerNeed[]
 
-  @@unique([organizationId, title], map: "IX_Project_organizationId_title")
-  @@index([departmentId], map: "IX_Project_departmentId")
+  @@unique([tenantId, title], map: "IX_Project_tenantId_title")
+  @@index([organizationId], map: "IX_Project_organizationId")
   @@index([ownerUserId], map: "IX_Project_ownerUserId")
 }
 
 model UserTimeEntry {
   id              String             @id(map: "PK_UserTimeEntry") @default(uuid()) @db.Uuid
   userId          String             @db.Uuid
-  organizationId  String             @db.Uuid
-  departmentId    String?            @db.Uuid
+  tenantId  String             @db.Uuid
+  organizationId    String?            @db.Uuid
   mode            TimeEntryMode
   startedAt       DateTime?          @db.Timestamptz(6)
   endedAt         DateTime?          @db.Timestamptz(6)
@@ -268,18 +290,18 @@ model UserTimeEntry {
   /// Unique when set. Idempotent import key.
   sourceRef       String?            @unique(map: "IX_UserTimeEntry_sourceRef")
   hourlyRateId    String?            @db.Uuid
-  department      Department?        @relation(fields: [departmentId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "FK_UserTimeEntry_Department_departmentId")
+  organization  Organization?        @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "FK_UserTimeEntry_Organization_organizationId")
   rate            HourlyRate?        @relation(fields: [hourlyRateId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "FK_UserTimeEntry_HourlyRate_hourlyRateId")
-  organization    Organization       @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "FK_UserTimeEntry_Organization_organizationId")
+  tenant    Tenant       @relation(fields: [tenantId], references: [id], onUpdate: NoAction, map: "FK_UserTimeEntry_Tenant_tenantId")
   project         Project?           @relation(fields: [projectId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "FK_UserTimeEntry_Project_projectId")
   taskCategory    TaskCategory?      @relation(fields: [taskCategoryId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "FK_UserTimeEntry_TaskCategory_taskCategoryId")
   enteredBy       User               @relation("UserTimeEntryEnteredBy", fields: [enteredByUserId], references: [id], onUpdate: NoAction, map: "FK_UserTimeEntry_User_enteredByUserId")
   user            User               @relation("UserTimeEntryHoursFor", fields: [userId], references: [id], onUpdate: NoAction, map: "FK_UserTimeEntry_User_userId")
   tags            UserTimeEntryTag[]
 
-  @@index([departmentId], map: "IX_UserTimeEntry_departmentId")
+  @@index([organizationId], map: "IX_UserTimeEntry_organizationId")
   @@index([enteredByUserId], map: "IX_UserTimeEntry_enteredByUserId")
-  @@index([organizationId, occurredOn], map: "IX_UserTimeEntry_organizationId_occurredOn")
+  @@index([tenantId, occurredOn], map: "IX_UserTimeEntry_tenantId_occurredOn")
   @@index([projectId], map: "IX_UserTimeEntry_projectId")
   @@index([taskCategoryId], map: "IX_UserTimeEntry_taskCategoryId")
   @@index([userId, occurredOn], map: "IX_UserTimeEntry_userId_occurredOn")
@@ -289,8 +311,8 @@ model UserTimeEntry {
 model CollectiveTimeEntry {
   id               String                   @id(map: "PK_CollectiveTimeEntry") @default(uuid()) @db.Uuid
   recordedByUserId String                   @db.Uuid
-  organizationId   String                   @db.Uuid
-  departmentId     String?                  @db.Uuid
+  tenantId   String                   @db.Uuid
+  organizationId     String?                  @db.Uuid
   startedAt        DateTime                 @db.Timestamptz(6)
   endedAt          DateTime                 @db.Timestamptz(6)
   participantCount Int
@@ -301,16 +323,16 @@ model CollectiveTimeEntry {
   projectId        String                   @default(dbgenerated("'00000000-0000-0000-0000-000000000000'::uuid")) @db.Uuid
   taskCategoryId   String                   @default(dbgenerated("'00000000-0000-0000-0000-000000000000'::uuid")) @db.Uuid
   hourlyRateId     String?                  @db.Uuid
-  department       Department?              @relation(fields: [departmentId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "FK_CollectiveTimeEntry_Department_departmentId")
+  organization   Organization?              @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "FK_CollectiveTimeEntry_Organization_organizationId")
   rate             HourlyRate?              @relation(fields: [hourlyRateId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "FK_CollectiveTimeEntry_HourlyRate_hourlyRateId")
-  organization     Organization             @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "FK_CollectiveTimeEntry_Organization_organizationId")
+  tenant           Tenant             @relation(fields: [tenantId], references: [id], onUpdate: NoAction, map: "FK_CollectiveTimeEntry_Tenant_tenantId")
   project          Project                  @relation(fields: [projectId], references: [id], onUpdate: NoAction, map: "FK_CollectiveTimeEntry_Project_projectId")
   taskCategory     TaskCategory             @relation(fields: [taskCategoryId], references: [id], onUpdate: NoAction, map: "FK_CollectiveTimeEntry_TaskCategory_taskCategoryId")
   recordedBy       User                     @relation("CollectiveTimeEntryRecordedBy", fields: [recordedByUserId], references: [id], onUpdate: NoAction, map: "FK_CollectiveTimeEntry_User_recordedByUserId")
   tags             CollectiveTimeEntryTag[]
 
-  @@index([departmentId], map: "IX_CollectiveTimeEntry_departmentId")
-  @@index([organizationId, startedAt], map: "IX_CollectiveTimeEntry_organizationId_startedAt")
+  @@index([organizationId], map: "IX_CollectiveTimeEntry_organizationId")
+  @@index([tenantId, startedAt], map: "IX_CollectiveTimeEntry_tenantId_startedAt")
   @@index([projectId], map: "IX_CollectiveTimeEntry_projectId")
   @@index([recordedByUserId], map: "IX_CollectiveTimeEntry_recordedByUserId")
   @@index([taskCategoryId], map: "IX_CollectiveTimeEntry_taskCategoryId")
@@ -328,14 +350,14 @@ model RefreshToken {
   @@index([userId], map: "IX_RefreshToken_userId")
 }
 
-/// Pending invite to an organization, or to one of its departments when departmentId is set.
+/// Pending invite to an organization, or to one of its organizations when organizationId is set.
 /// Partial unique indexes in the migration allow one pending invite per email and target.
 model Invitation {
   id              String       @id(map: "PK_Invitation") @default(uuid()) @db.Uuid
   /// Stored lowercase. The migration rejects any other casing.
   email           String
-  organizationId  String       @db.Uuid
-  departmentId    String?      @db.Uuid
+  tenantId  String       @db.Uuid
+  organizationId    String?      @db.Uuid
   roleId          String       @db.Uuid
   codeHash        String       @unique(map: "IX_Invitation_codeHash")
   invitedByUserId String       @db.Uuid
@@ -346,17 +368,17 @@ model Invitation {
   firstName       String?
   lastName        String?
   username        String?
-  department      Department?  @relation(fields: [departmentId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Invitation_Department_departmentId")
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Invitation_Organization_organizationId")
+  organization  Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Invitation_Organization_organizationId")
+  tenant          Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Invitation_Tenant_tenantId")
   role            Role         @relation(fields: [roleId], references: [id], onUpdate: NoAction, map: "FK_Invitation_Role_roleId")
   invitedBy       User         @relation("InvitationInvitedBy", fields: [invitedByUserId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Invitation_User_invitedByUserId")
 
-  @@unique([email, departmentId], map: "Invitation_pending_department_key", where: raw("((\"departmentId\" IS NOT NULL) AND (\"acceptedAt\" IS NULL) AND (\"revokedAt\" IS NULL))"))
-  @@unique([email, organizationId], map: "Invitation_pending_org_key", where: raw("((\"departmentId\" IS NULL) AND (\"acceptedAt\" IS NULL) AND (\"revokedAt\" IS NULL))"))
-  @@index([departmentId], map: "IX_Invitation_departmentId")
+  @@unique([email, organizationId], map: "Invitation_pending_department_key", where: raw("((\"organizationId\" IS NOT NULL) AND (\"acceptedAt\" IS NULL) AND (\"revokedAt\" IS NULL))"))
+  @@unique([email, tenantId], map: "Invitation_pending_org_key", where: raw("((\"organizationId\" IS NULL) AND (\"acceptedAt\" IS NULL) AND (\"revokedAt\" IS NULL))"))
+  @@index([organizationId], map: "IX_Invitation_organizationId")
   @@index([email], map: "IX_Invitation_email")
   @@index([invitedByUserId], map: "IX_Invitation_invitedByUserId")
-  @@index([organizationId], map: "IX_Invitation_organizationId")
+  @@index([tenantId], map: "IX_Invitation_tenantId")
   @@index([roleId], map: "IX_Invitation_roleId")
 }
 
@@ -413,7 +435,7 @@ model UserTimeEntryTag {
 
 model HourlyRate {
   id                    String                @id(map: "PK_HourlyRate") @default(uuid()) @db.Uuid
-  organizationId        String                @db.Uuid
+  tenantId        String                @db.Uuid
   /// Volunteer, Professional, or Paid. Paid hours are gross pay, not in-kind.
   type                  String
   name                  String                @db.Citext
@@ -423,18 +445,18 @@ model HourlyRate {
   /// Optional citation for where this rate comes from.
   source                String?
   collectiveTimeEntries CollectiveTimeEntry[]
-  organization          Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_HourlyRate_Organization_organizationId")
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_HourlyRate_Tenant_tenantId")
   userTimeEntries       UserTimeEntry[]
 
-  @@unique([organizationId], map: "HourlyRate_default_volunteer_key", where: raw("((\"isDefault\" = true) AND (type = 'Volunteer'::text))"))
-  @@unique([organizationId, name], map: "IX_HourlyRate_organizationId_name")
+  @@unique([tenantId], map: "HourlyRate_default_volunteer_key", where: raw("((\"isDefault\" = true) AND (type = 'Volunteer'::text))"))
+  @@unique([tenantId, name], map: "IX_HourlyRate_tenantId_name")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model Theme {
   id                    String         @id(map: "PK_Theme") @default(uuid()) @db.Uuid
-  name                  String         @unique(map: "Theme_global_name_key", where: raw("(\"organizationId\" IS NULL)"))
-  organizationId        String?        @db.Uuid
+  name                  String         @unique(map: "Theme_global_name_key", where: raw("(\"tenantId\" IS NULL)"))
+  tenantId        String?        @db.Uuid
   primary               String
   primaryForeground     String
   highlight             String
@@ -449,17 +471,17 @@ model Theme {
   sequentialPalette     String
   divergingPalette      String
   chartColor            String
-  assignedOrganizations Organization[] @relation("OrganizationTheme")
-  organization          Organization?  @relation("OrganizationThemes", fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Theme_Organization_organizationId")
+  assignedTenants Tenant[] @relation("TenantTheme")
+  tenant                Tenant?  @relation("TenantThemes", fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Theme_Tenant_tenantId")
 
-  @@unique([organizationId, name], map: "Theme_organization_name_key", where: raw("(\"organizationId\" IS NOT NULL)"))
+  @@unique([tenantId, name], map: "Theme_organization_name_key", where: raw("(\"tenantId\" IS NOT NULL)"))
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model Feedback {
   id                    String           @id(map: "PK_Feedback") @default(uuid()) @db.Uuid
   userId                String           @db.Uuid
-  organizationId        String?          @db.Uuid
+  tenantId        String?          @db.Uuid
   type                  String
   priority              String
   area                  String
@@ -472,12 +494,12 @@ model Feedback {
   linearIssueId         String?          @unique(map: "IX_Feedback_linearIssueId", where: raw("(\"linearIssueId\" IS NOT NULL)"))
   linearIssueIdentifier String?
   ticketUrl             String?
-  organization          Organization?    @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "FK_Feedback_Organization_organizationId")
+  tenant                Tenant?    @relation(fields: [tenantId], references: [id], onUpdate: NoAction, map: "FK_Feedback_Tenant_tenantId")
   user                  User             @relation(fields: [userId], references: [id], onUpdate: NoAction, map: "FK_Feedback_User_userId")
   actions               FeedbackAction[]
 
   @@index([createdAt], map: "IX_Feedback_createdAt")
-  @@index([organizationId], map: "IX_Feedback_organizationId")
+  @@index([tenantId], map: "IX_Feedback_tenantId")
   @@index([status], map: "IX_Feedback_status")
   @@index([userId], map: "IX_Feedback_userId")
 }
@@ -499,24 +521,24 @@ model FeedbackAction {
   @@index([takenByUserId], map: "IX_FeedbackAction_takenByUserId")
 }
 
-model OrganizationApiKey {
-  id              String       @id(map: "PK_OrganizationApiKey") @db.Uuid
-  organizationId  String       @db.Uuid
+model TenantApiKey {
+  id              String       @id(map: "PK_TenantApiKey") @db.Uuid
+  tenantId  String       @db.Uuid
   name            String
   prefix          String
-  keyHash         String       @unique(map: "IX_OrganizationApiKey_keyHash")
+  keyHash         String       @unique(map: "IX_TenantApiKey_keyHash")
   scopes          String
   createdByUserId String       @db.Uuid
   createdAt       DateTime     @default(now()) @db.Timestamptz(6)
   lastUsedAt      DateTime?    @db.Timestamptz(6)
   expiresAt       DateTime?    @db.Timestamptz(6)
   revokedAt       DateTime?    @db.Timestamptz(6)
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_OrganizationApiKey_Organization_organizationId")
-  createdBy       User         @relation(fields: [createdByUserId], references: [id], onUpdate: NoAction, map: "FK_OrganizationApiKey_User_createdByUserId")
+  tenant          Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_TenantApiKey_Tenant_tenantId")
+  createdBy       User         @relation(fields: [createdByUserId], references: [id], onUpdate: NoAction, map: "FK_TenantApiKey_User_createdByUserId")
 
-  @@index([createdByUserId], map: "IX_OrganizationApiKey_createdByUserId")
-  @@index([organizationId], map: "IX_OrganizationApiKey_organizationId")
-  @@index([prefix], map: "IX_OrganizationApiKey_prefix")
+  @@index([createdByUserId], map: "IX_TenantApiKey_createdByUserId")
+  @@index([tenantId], map: "IX_TenantApiKey_tenantId")
+  @@index([prefix], map: "IX_TenantApiKey_prefix")
 }
 
 model PlatformApiKey {
@@ -536,21 +558,21 @@ model PlatformApiKey {
   @@index([prefix], map: "IX_PlatformApiKey_prefix")
 }
 
-/// One relationship between two members of an organization. userAId is the lower id. relationship is how user B relates to user A.
+/// One relationship between two members of a tenant. userAId is the lower id. relationship is how user B relates to user A.
 model MemberConnection {
   id              String       @id(map: "PK_MemberConnection") @db.Uuid
-  organizationId  String       @db.Uuid
+  tenantId  String       @db.Uuid
   userAId         String       @db.Uuid
   userBId         String       @db.Uuid
   relationship    String
   createdByUserId String       @db.Uuid
   createdAt       DateTime     @default(now()) @db.Timestamptz(6)
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_MemberConnection_Organization_organizationId")
+  tenant          Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_MemberConnection_Tenant_tenantId")
   createdBy       User         @relation("MemberConnectionCreatedBy", fields: [createdByUserId], references: [id], onUpdate: NoAction, map: "FK_MemberConnection_User_createdByUserId")
   userA           User         @relation("MemberConnectionUserA", fields: [userAId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_MemberConnection_User_userAId")
   userB           User         @relation("MemberConnectionUserB", fields: [userBId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_MemberConnection_User_userBId")
 
-  @@unique([organizationId, userAId, userBId], map: "MemberConnection_pair_key")
+  @@unique([tenantId, userAId, userBId], map: "MemberConnection_pair_key")
   @@index([createdByUserId], map: "IX_MemberConnection_createdByUserId")
   @@index([userAId], map: "IX_MemberConnection_userAId")
   @@index([userBId], map: "IX_MemberConnection_userBId")
@@ -560,7 +582,7 @@ model MemberConnection {
 /// A named report design. layout is the card grid. filters is the saved report query.
 model Report {
   id             String       @id(map: "PK_Report") @db.Uuid
-  organizationId String       @db.Uuid
+  tenantId String       @db.Uuid
   name           String       @db.Citext
   isDefault      Boolean      @default(false)
   isDashboard    Boolean      @default(false)
@@ -568,17 +590,17 @@ model Report {
   filters        Json         @default("{}")
   createdAt      DateTime     @default(now()) @db.Timestamptz(6)
   updatedAt      DateTime     @default(now()) @db.Timestamptz(6)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Report_Organization_organizationId")
+  tenant         Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Report_Tenant_tenantId")
 
-  @@unique([organizationId, name], map: "IX_Report_organizationId_name")
-  @@unique([organizationId], map: "Report_one_default", where: raw("(\"isDefault\" = true)"))
-  @@unique([organizationId], map: "Report_one_dashboard", where: raw("(\"isDashboard\" = true)"))
+  @@unique([tenantId, name], map: "IX_Report_tenantId_name")
+  @@unique([tenantId], map: "Report_one_default", where: raw("(\"isDefault\" = true)"))
+  @@unique([tenantId], map: "Report_one_dashboard", where: raw("(\"isDashboard\" = true)"))
 }
 
-/// An organization's copy of one transactional email. `for` is fixed at seed; `template` is sanitized TipTap HTML.
+/// A tenant's copy of one transactional email. `for` is fixed at seed; `template` is sanitized TipTap HTML.
 model EmailTemplate {
   id             String       @id(map: "PK_EmailTemplate") @db.Uuid
-  organizationId String       @db.Uuid
+  tenantId String       @db.Uuid
   name           String
   version        Int          @default(1)
   for            String
@@ -589,15 +611,15 @@ model EmailTemplate {
   isEnabled      Boolean      @default(true)
   createdAt      DateTime     @default(now()) @db.Timestamptz(6)
   updatedAt      DateTime     @default(now()) @db.Timestamptz(6)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_EmailTemplate_Organization_organizationId")
+  tenant         Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_EmailTemplate_Tenant_tenantId")
 
-  @@unique([organizationId, for], map: "EmailTemplate_organization_for")
+  @@unique([tenantId, for], map: "EmailTemplate_organization_for")
 }
 
-/// A reusable card layout. A null organizationId is a global template. An organization row with baseTemplateId replaces that global for one organization.
+/// A reusable card layout. A null tenantId is a global template. An organization row with baseTemplateId replaces that global for one tenant.
 model ReportTemplate {
   id             String           @id(map: "PK_ReportTemplate") @db.Uuid
-  organizationId String?          @db.Uuid
+  tenantId String?          @db.Uuid
   /// summary, people, groups, or staff on a global template.
   key            String?
   name           String           @db.Citext
@@ -607,12 +629,12 @@ model ReportTemplate {
   updatedAt      DateTime         @default(now()) @db.Timestamptz(6)
   baseTemplate   ReportTemplate?  @relation("ReportTemplateBase", fields: [baseTemplateId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_ReportTemplate_ReportTemplate_baseTemplateId")
   overrides      ReportTemplate[] @relation("ReportTemplateBase")
-  organization   Organization?    @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_ReportTemplate_Organization_organizationId")
+  tenant   Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_ReportTemplate_Tenant_tenantId")
 
-  @@unique([key], map: "ReportTemplate_global_key", where: raw("(\"organizationId\" IS NULL AND \"key\" IS NOT NULL)"))
-  @@unique([name], map: "ReportTemplate_global_name", where: raw("(\"organizationId\" IS NULL)"))
-  @@unique([organizationId, baseTemplateId], map: "ReportTemplate_override", where: raw("(\"baseTemplateId\" IS NOT NULL)"))
-  @@unique([organizationId, name], map: "ReportTemplate_org_name", where: raw("(\"organizationId\" IS NOT NULL)"))
+  @@unique([key], map: "ReportTemplate_global_key", where: raw("(\"tenantId\" IS NULL AND \"key\" IS NOT NULL)"))
+  @@unique([name], map: "ReportTemplate_global_name", where: raw("(\"tenantId\" IS NULL)"))
+  @@unique([tenantId, baseTemplateId], map: "ReportTemplate_override", where: raw("(\"baseTemplateId\" IS NOT NULL)"))
+  @@unique([tenantId, name], map: "ReportTemplate_org_name", where: raw("(\"tenantId\" IS NOT NULL)"))
   @@index([baseTemplateId], map: "IX_ReportTemplate_baseTemplateId")
 }
 
@@ -630,25 +652,25 @@ model Guest {
 
 model AccessRequest {
   id                     String         @id(map: "PK_AccessRequest") @default(uuid()) @db.Uuid
-  organizationId         String         @db.Uuid
+  tenantId         String         @db.Uuid
   userId                 String?        @db.Uuid
   guestId                String?        @db.Uuid
   requestedRoleId        String?        @db.Uuid
-  requestedDepartmentIds Json           @default("[]")
+  requestedOrganizationIds Json           @default("[]")
   message                String?
   status                 String         @default("pending")
   reviewedByUserId       String?        @db.Uuid
   reviewedAt             DateTime?      @db.Timestamptz(6)
   volunteerNeedId        String?        @db.Uuid
   createdAt              DateTime       @default(now()) @db.Timestamptz(6)
-  organization           Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_AccessRequest_Organization_organizationId")
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_AccessRequest_Tenant_tenantId")
   user                   User?          @relation("AccessRequestUser", fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_AccessRequest_User_userId")
   guest                  Guest?         @relation(fields: [guestId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "FK_AccessRequest_Guest_guestId")
   requestedRole          Role?          @relation(fields: [requestedRoleId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "FK_AccessRequest_Role_requestedRoleId")
   reviewedBy             User?          @relation("AccessRequestReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "FK_AccessRequest_User_reviewedByUserId")
   volunteerNeed          VolunteerNeed? @relation(fields: [volunteerNeedId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "FK_AccessRequest_VolunteerNeed_volunteerNeedId")
 
-  @@index([organizationId], map: "IX_AccessRequest_organizationId")
+  @@index([tenantId], map: "IX_AccessRequest_tenantId")
   @@index([userId], map: "IX_AccessRequest_userId")
   @@index([status], map: "IX_AccessRequest_status")
 }
@@ -656,7 +678,7 @@ model AccessRequest {
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model VolunteerNeed {
   id              String            @id(map: "PK_VolunteerNeed") @db.Uuid
-  organizationId  String            @db.Uuid
+  tenantId  String            @db.Uuid
   createdByUserId String            @db.Uuid
   publicToken     String            @unique(map: "IX_VolunteerNeed_publicToken")
   name            String            @db.Citext
@@ -672,13 +694,13 @@ model VolunteerNeed {
   questions       Json              @default("{\"items\": [], \"version\": 1}")
   projectId       String?           @db.Uuid
   taskCategoryId  String?           @db.Uuid
-  departmentId    String?           @db.Uuid
+  organizationId    String?           @db.Uuid
   createdAt       DateTime          @default(now()) @db.Timestamptz(6)
   updatedAt       DateTime          @default(now()) @db.Timestamptz(6)
   /// draft, pending_approval, published, or rejected.
   status          String            @default("published")
-  Department      Department?       @relation(fields: [departmentId], references: [id], onUpdate: NoAction, map: "FK_VolunteerNeed_Department_departmentId")
-  Organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_VolunteerNeed_Organization_organizationId")
+  organization   Organization?       @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "FK_VolunteerNeed_Organization_organizationId")
+  Tenant    Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_VolunteerNeed_Tenant_tenantId")
   Project         Project?          @relation(fields: [projectId], references: [id], onUpdate: NoAction, map: "FK_VolunteerNeed_Project_projectId")
   TaskCategory    TaskCategory?     @relation(fields: [taskCategoryId], references: [id], onUpdate: NoAction, map: "FK_VolunteerNeed_TaskCategory_taskCategoryId")
   User            User              @relation(fields: [createdByUserId], references: [id], onUpdate: NoAction, map: "FK_VolunteerNeed_User_createdByUserId")
@@ -686,8 +708,8 @@ model VolunteerNeed {
   AccessRequest   AccessRequest[]
 
   @@index([createdByUserId], map: "IX_VolunteerNeed_createdByUserId")
-  @@index([departmentId], map: "IX_VolunteerNeed_departmentId")
   @@index([organizationId], map: "IX_VolunteerNeed_organizationId")
+  @@index([tenantId], map: "IX_VolunteerNeed_tenantId")
   @@index([projectId], map: "IX_VolunteerNeed_projectId")
   @@index([taskCategoryId], map: "IX_VolunteerNeed_taskCategoryId")
 }

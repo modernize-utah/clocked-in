@@ -22,7 +22,7 @@ export function useClock() {
       tagIds?: string[];
       projectId?: string | null;
       taskCategoryId?: string | null;
-      departmentId?: string | null;
+      organizationId?: string | null;
     },
     TimeEntry
   >(clockOutAction, {

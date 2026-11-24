@@ -1,5 +1,5 @@
 import { authenticate } from "@/lib/api/access";
-import { parseName } from "@/lib/api/features/organizations";
+import { parseName } from "@/lib/api/features/tenants";
 import { deleteTag, updateTag } from "@/lib/api/features/tags";
 import { withGuids } from "@/lib/api/guid";
 import { readBody } from "@/lib/api/json";

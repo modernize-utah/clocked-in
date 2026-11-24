@@ -25,23 +25,23 @@ import { prisma } from "@/lib/prisma";
 
 export const accountInclude = { profile: true } as const;
 export type Account = Prisma.UserGetPayload<{ include: typeof accountInclude }>;
-type OrganizationWithTheme = Prisma.OrganizationGetPayload<{ include: { theme: true } }>;
+type TenantWithTheme = Prisma.TenantGetPayload<{ include: { theme: true } }>;
 
-type CallerOrganization = { isActive: boolean; role: RoleCode | null; roleId: string | null; scope: RoleScope };
-type CallerDepartment = { departmentId: string; organizationId: string; isAdmin: boolean };
+type CallerTenant = { isActive: boolean; role: RoleCode | null; roleId: string | null; scope: RoleScope };
+type CallerOrganization = { organizationId: string; tenantId: string; isAdmin: boolean };
 
 function roleScopeFrom(scope: string, code: string): RoleScope {
-  if (scope === "organization" || scope === "assigned_groups" || scope === "self") {
+  if (scope === "tenant" || scope === "assigned_groups" || scope === "self") {
     return scope;
   }
   return defaultScopeForCode(code);
 }
 
 export class Access {
-  private organizations?: Map<string, CallerOrganization>;
-  private departments?: CallerDepartment[];
+  private tenants?: Map<string, CallerTenant>;
+  private organizations?: CallerOrganization[];
   private permissionSets?: Map<string, Set<Permission>>;
-  private pinnedOrg?: OrganizationWithTheme | null;
+  private pinnedOrg?: TenantWithTheme | null;
 
   constructor(
     private readonly account: Account | null,
@@ -69,17 +69,17 @@ export class Access {
     return this.account ?? forbidden();
   }
 
-  canWrite(organizationId: string) {
-    return this.apiKey !== null && this.apiKey.organizationId === organizationId && this.apiKey.canWrite;
+  canWrite(tenantId: string) {
+    return this.apiKey !== null && this.apiKey.tenantId === tenantId && this.apiKey.canWrite;
   }
 
-  async pinnedOrganization(): Promise<OrganizationWithTheme | null> {
+  async pinnedTenant(): Promise<TenantWithTheme | null> {
     if (!this.tenantSlug) {
       return null;
     }
 
     if (this.pinnedOrg === undefined) {
-      this.pinnedOrg = await prisma.organization.findFirst({
+      this.pinnedOrg = await prisma.tenant.findFirst({
         where: { slug: this.tenantSlug },
         include: { theme: true },
       });
@@ -88,24 +88,24 @@ export class Access {
     return this.pinnedOrg ?? notFound();
   }
 
-  async requireOrganization(organizationId: string, admin: boolean) {
-    const pinned = await this.pinnedOrganization();
-    if (pinned && pinned.id !== organizationId) {
+  async requireTenant(tenantId: string, admin: boolean) {
+    const pinned = await this.pinnedTenant();
+    if (pinned && pinned.id !== tenantId) {
       notFound();
     }
 
-    const organization =
+    const tenant =
       pinned ??
-      (await prisma.organization.findUnique({
-        where: { id: organizationId },
+      (await prisma.tenant.findUnique({
+        where: { id: tenantId },
         include: { theme: true },
       }));
-    if (!organization) {
+    if (!tenant) {
       notFound();
     }
 
     if (this.apiKey) {
-      if (this.apiKey.organizationId !== organizationId) {
+      if (this.apiKey.tenantId !== tenantId) {
         forbidden();
       }
 
@@ -113,79 +113,79 @@ export class Access {
         forbidden();
       }
 
-      return organization;
+      return tenant;
     }
 
     if (this.isSuperAdmin && !pinned) {
-      return organization;
+      return tenant;
     }
 
-    const membership = (await this.organizationMemberships()).get(organizationId);
-    if (!membership || !membership.isActive || (admin && !(await this.can(organizationId, "manage_organization")))) {
+    const membership = (await this.tenantMemberships()).get(tenantId);
+    if (!membership || !membership.isActive || (admin && !(await this.can(tenantId, "manage_tenant")))) {
       if (!membership?.isActive && this.isSuperAdmin && !pinned) {
-        return organization;
+        return tenant;
       }
       forbidden();
     }
 
-    return organization;
+    return tenant;
   }
 
-  async requireOrganizationAdmin(organizationId: string) {
-    const organization = await this.requireOrganization(organizationId, true);
+  async requireTenantAdmin(tenantId: string) {
+    const tenant = await this.requireTenant(tenantId, true);
     if (this.apiKey && !this.apiKey.isAdmin) {
       forbidden();
     }
 
+    return tenant;
+  }
+
+  async requireOrganization(organizationId: string) {
+    const organization = await prisma.organization.findUnique({ where: { id: organizationId } });
+    if (!organization) {
+      notFound();
+    }
+
+    await this.requireTenant(organization.tenantId, false);
     return organization;
   }
 
-  async requireDepartment(departmentId: string) {
-    const department = await prisma.department.findUnique({ where: { id: departmentId } });
-    if (!department) {
+  async requireOrganizationManager(organizationId: string) {
+    const organization = await prisma.organization.findUnique({ where: { id: organizationId } });
+    if (!organization) {
       notFound();
     }
 
-    await this.requireOrganization(department.organizationId, false);
-    return department;
-  }
-
-  async requireDepartmentManager(departmentId: string) {
-    const department = await prisma.department.findUnique({ where: { id: departmentId } });
-    if (!department) {
-      notFound();
-    }
-
-    const pinned = await this.pinnedOrganization();
-    if (pinned && pinned.id !== department.organizationId) {
+    const pinned = await this.pinnedTenant();
+    if (pinned && pinned.id !== organization.tenantId) {
       notFound();
     }
 
     if (
       !(this.isSuperAdmin && !pinned) &&
-      !(await this.can(department.organizationId, "manage_organization")) &&
-      !(await this.can(department.organizationId, "invite_members", departmentId)) &&
-      !(await this.isDepartmentAdmin(departmentId))
+      !(await this.can(organization.tenantId, "manage_tenant")) &&
+      !(await this.can(organization.tenantId, "invite_members", organizationId)) &&
+      !(await this.isOrganizationAdmin(organizationId))
     ) {
       forbidden();
     }
 
-    return department;
+    return organization;
   }
 
-  async can(organizationId: string, permission: Permission, departmentId?: string | null) {
+  async can(tenantId: string, permission: Permission, organizationId?: string | null) {
     if (this.isSuperAdmin && !this.tenantSlug) {
       return true;
     }
 
     if (this.apiKey) {
-      if (this.apiKey.organizationId !== organizationId) {
+      if (this.apiKey.tenantId !== tenantId) {
         return false;
       }
       return apiKeyPermissions(this.apiKey.isAdmin, this.apiKey.canWrite).includes(permission);
     }
 
-    const membership = (await this.organizationMemberships()).get(organizationId);
+    const membership = (await this.tenantMemberships()).get(tenantId);
     if (!membership?.isActive) {
       return this.isSuperAdmin && !this.tenantSlug;
     }
@@ -194,65 +194,65 @@ export class Access {
       return true;
     }
 
-    const granted = await this.permissionsFor(organizationId);
+    const granted = await this.permissionsFor(tenantId);
     if (!granted.has(permission)) {
       return false;
     }
 
-    if (departmentId && groupManagerPermissions.includes(permission) && membership.role !== "ADMIN") {
-      return this.isDepartmentAdmin(departmentId);
+    if (organizationId && groupManagerPermissions.includes(permission) && membership.role !== "ADMIN") {
+      return this.isOrganizationAdmin(organizationId);
     }
 
     return true;
   }
 
-  /** Saving report designs: an admin API key, or a person with manage_organization or design_reports. */
-  async requireReportDesigner(organizationId: string) {
+  /** Saving report designs: an admin API key, or a person with manage_tenant or design_reports. */
+  async requireReportDesigner(tenantId: string) {
     if (this.apiKey) {
-      return this.requireOrganizationAdmin(organizationId);
+      return this.requireTenantAdmin(tenantId);
     }
 
-    const organization = await this.requireOrganization(organizationId, false);
-    if (!(await this.can(organizationId, "manage_organization")) && !(await this.can(organizationId, "design_reports"))) {
+    const tenant = await this.requireTenant(tenantId, false);
+    if (!(await this.can(tenantId, "manage_tenant")) && !(await this.can(tenantId, "design_reports"))) {
       forbidden();
     }
-    return organization;
+    return tenant;
   }
 
-  async requirePermission(organizationId: string, permission: Permission, departmentId?: string | null) {
-    const organization = await this.requireOrganization(organizationId, false);
-    if (!(await this.can(organizationId, permission, departmentId))) {
+  async requirePermission(tenantId: string, permission: Permission, organizationId?: string | null) {
+    const tenant = await this.requireTenant(tenantId, false);
+    if (!(await this.can(tenantId, permission, organizationId))) {
       forbidden();
     }
-    return organization;
+    return tenant;
   }
 
-  async permissionsFor(organizationId: string) {
+  async permissionsFor(tenantId: string) {
     if (!this.permissionSets) {
       this.permissionSets = new Map();
     }
 
-    const cached = this.permissionSets.get(organizationId);
+    const cached = this.permissionSets.get(tenantId);
     if (cached) {
       return cached;
     }
 
-    const membership = (await this.organizationMemberships()).get(organizationId);
+    const membership = (await this.tenantMemberships()).get(tenantId);
     if (this.isSuperAdmin && (!this.tenantSlug || membership?.isActive)) {
       const all = new Set(apiKeyPermissions(true, true));
-      this.permissionSets.set(organizationId, all);
+      this.permissionSets.set(tenantId, all);
       return all;
     }
 
     if (this.apiKey) {
       const granted = new Set(apiKeyPermissions(this.apiKey.isAdmin, this.apiKey.canWrite));
-      this.permissionSets.set(organizationId, granted);
+      this.permissionSets.set(tenantId, granted);
       return granted;
     }
 
     if (!membership?.isActive) {
       const none = new Set<Permission>();
-      this.permissionSets.set(organizationId, none);
+      this.permissionSets.set(tenantId, none);
       return none;
     }
 
@@ -272,168 +272,168 @@ export class Access {
       }
     }
 
-    if ((await this.adminDepartmentIds(organizationId)).length > 0) {
+    if ((await this.adminOrganizationIds(tenantId)).length > 0) {
       for (const permission of groupManagerPermissions) {
         granted.add(permission);
       }
     }
 
-    this.permissionSets.set(organizationId, granted);
+    this.permissionSets.set(tenantId, granted);
     return granted;
   }
 
-  async isOrgAdmin(organizationId: string) {
-    return this.can(organizationId, "manage_organization");
+  async isOrgAdmin(tenantId: string) {
+    return this.can(tenantId, "manage_tenant");
   }
 
-  async isActiveMember(organizationId: string) {
+  async isActiveMember(tenantId: string) {
     if (this.apiKey) {
-      return this.apiKey.organizationId === organizationId;
+      return this.apiKey.tenantId === tenantId;
     }
 
-    return (await this.organizationMemberships()).get(organizationId)?.isActive === true;
+    return (await this.tenantMemberships()).get(tenantId)?.isActive === true;
   }
 
-  async isOrgVolunteer(organizationId: string) {
+  async isOrgVolunteer(tenantId: string) {
     if (this.apiKey) {
       return false;
     }
 
-    const membership = (await this.organizationMemberships()).get(organizationId);
+    const membership = (await this.tenantMemberships()).get(tenantId);
     return membership !== undefined && membership.isActive && membership.role === "VOLUNTEER";
   }
 
-  async organizationRole(organizationId: string) {
-    const membership = (await this.organizationMemberships()).get(organizationId);
+  async tenantRole(tenantId: string) {
+    const membership = (await this.tenantMemberships()).get(tenantId);
     return membership?.isActive ? membership.role : null;
   }
 
-  async organizationsWhereCallerCanReadOthers() {
+  async tenantsWhereCallerCanReadOthers() {
     const ids: string[] = [];
-    for (const [organizationId, membership] of await this.organizationMemberships()) {
+    for (const [tenantId, membership] of await this.tenantMemberships()) {
       if (!membership.isActive) continue;
       if (
-        (await this.can(organizationId, "log_member_time")) ||
-        (await this.can(organizationId, "view_reports")) ||
-        (await this.can(organizationId, "manage_members"))
+        (await this.can(tenantId, "log_member_time")) ||
+        (await this.can(tenantId, "view_reports")) ||
+        (await this.can(tenantId, "manage_members"))
       ) {
-        ids.push(organizationId);
+        ids.push(tenantId);
       }
     }
     return ids;
   }
 
-  async isDepartmentAdmin(departmentId: string) {
-    const department = (await this.departmentMemberships()).find((item) => item.departmentId === departmentId);
-    if (!department || !department.isAdmin) {
+  async isOrganizationAdmin(organizationId: string) {
+    const organization = (await this.organizationMemberships()).find((item) => item.organizationId === organizationId);
+    if (!organization || !organization.isAdmin) {
       return false;
     }
 
-    return (await this.organizationMemberships()).get(department.organizationId)?.isActive === true;
+    return (await this.tenantMemberships()).get(organization.tenantId)?.isActive === true;
   }
 
-  async roleScope(organizationId: string): Promise<RoleScope> {
-    const membership = (await this.organizationMemberships()).get(organizationId);
+  async roleScope(tenantId: string): Promise<RoleScope> {
+    const membership = (await this.tenantMemberships()).get(tenantId);
     return membership?.scope ?? defaultScopeForCode(membership?.role);
   }
 
-  async assignedDepartmentIds(organizationId: string) {
-    const membership = (await this.organizationMemberships()).get(organizationId);
+  async assignedOrganizationIds(tenantId: string) {
+    const membership = (await this.tenantMemberships()).get(tenantId);
     if (!membership?.isActive) {
       return [];
     }
 
-    return (await this.departmentMemberships())
-      .filter((item) => item.organizationId === organizationId)
-      .map((item) => item.departmentId);
+    return (await this.organizationMemberships())
+      .filter((item) => item.tenantId === tenantId)
+      .map((item) => item.organizationId);
   }
 
-  async visibility(organizationId: string): Promise<
-    { kind: "all" } | { kind: "departments"; departmentIds: string[] } | { kind: "self" }
+  async visibility(tenantId: string): Promise<
+    { kind: "all" } | { kind: "organizations"; organizationIds: string[] } | { kind: "self" }
   > {
-    if (this.isSuperAdmin || this.isApiKey || (await this.isOrgAdmin(organizationId))) {
+    if (this.isSuperAdmin || this.isApiKey || (await this.isOrgAdmin(tenantId))) {
       return { kind: "all" };
     }
 
-    const scope = await this.roleScope(organizationId);
+    const scope = await this.roleScope(tenantId);
     if (scope === "assigned_groups") {
-      return { kind: "departments", departmentIds: await this.assignedDepartmentIds(organizationId) };
+      return { kind: "organizations", organizationIds: await this.assignedOrganizationIds(tenantId) };
     }
 
-    const adminDepartments = await this.adminDepartmentIds(organizationId);
-    if (adminDepartments.length > 0) {
-      return { kind: "departments", departmentIds: adminDepartments };
+    const adminOrganizations = await this.adminOrganizationIds(tenantId);
+    if (adminOrganizations.length > 0) {
+      return { kind: "organizations", organizationIds: adminOrganizations };
     }
 
-    if (scope === "self" || (await this.isOrgVolunteer(organizationId))) {
+    if (scope === "self" || (await this.isOrgVolunteer(tenantId))) {
       return { kind: "self" };
     }
 
     return { kind: "all" };
   }
 
-  async adminDepartmentIds(organizationId: string) {
-    const membership = (await this.organizationMemberships()).get(organizationId);
+  async adminOrganizationIds(tenantId: string) {
+    const membership = (await this.tenantMemberships()).get(tenantId);
     if (!membership?.isActive) {
       return [];
     }
 
-    return (await this.departmentMemberships())
-      .filter((item) => item.organizationId === organizationId && item.isAdmin)
-      .map((item) => item.departmentId);
+    return (await this.organizationMemberships())
+      .filter((item) => item.tenantId === tenantId && item.isAdmin)
+      .map((item) => item.organizationId);
   }
 
-  async activeOrganizationIds() {
-    return [...(await this.organizationMemberships()).entries()]
+  async activeTenantIds() {
+    return [...(await this.tenantMemberships()).entries()]
       .filter(([, membership]) => membership.isActive)
-      .map(([organizationId]) => organizationId);
+      .map(([tenantId]) => tenantId);
   }
 
-  async departmentIds() {
-    return (await this.departmentMemberships()).map((item) => item.departmentId);
+  async organizationIds() {
+    return (await this.organizationMemberships()).map((item) => item.organizationId);
   }
 
-  async sharedOrganizationIds(otherUserId: string) {
-    const organizationIds = await this.activeOrganizationIds();
-    if (organizationIds.length === 0) {
+  async sharedTenantIds(otherUserId: string) {
+    const tenantIds = await this.activeTenantIds();
+    if (tenantIds.length === 0) {
       return [];
     }
 
-    const shared = await prisma.organizationMembership.findMany({
-      where: { userId: otherUserId, organizationId: { in: organizationIds } },
-      select: { organizationId: true },
+    const shared = await prisma.tenantMembership.findMany({
+      where: { userId: otherUserId, tenantId: { in: tenantIds } },
+      select: { tenantId: true },
     });
-    return shared.map((membership) => membership.organizationId);
+    return shared.map((membership) => membership.tenantId);
   }
 
-  private async organizationMemberships(): Promise<Map<string, CallerOrganization>> {
-    if (this.organizations) {
-      return this.organizations;
+  private async tenantMemberships(): Promise<Map<string, CallerTenant>> {
+    if (this.tenants) {
+      return this.tenants;
     }
 
-    const pinned = await this.pinnedOrganization();
+    const pinned = await this.pinnedTenant();
     if (this.apiKey) {
-      const organizations =
-        !pinned || this.apiKey.organizationId === pinned.id
-          ? new Map<string, CallerOrganization>([
+      const tenants =
+        !pinned || this.apiKey.tenantId === pinned.id
+          ? new Map<string, CallerTenant>([
               [
-                this.apiKey.organizationId,
-                { isActive: true, role: this.apiKey.isAdmin ? "ADMIN" : "MEMBER", roleId: null, scope: "organization" },
+                this.apiKey.tenantId,
+                { isActive: true, role: this.apiKey.isAdmin ? "ADMIN" : "MEMBER", roleId: null, scope: "tenant" },
               ],
             ])
-          : new Map<string, CallerOrganization>();
-      this.organizations = organizations;
-      return organizations;
+          : new Map<string, CallerTenant>();
+      this.tenants = tenants;
+      return tenants;
     }
 
-    const organizations = new Map<string, CallerOrganization>(
+    const tenants = new Map<string, CallerTenant>(
       (
-        await prisma.organizationMembership.findMany({
-          where: { userId: this.caller.id, ...(pinned ? { organizationId: pinned.id } : {}) },
-          select: { organizationId: true, isActive: true, roleId: true, role: { select: { code: true, scope: true } } },
+        await prisma.tenantMembership.findMany({
+          where: { userId: this.caller.id, ...(pinned ? { tenantId: pinned.id } : {}) },
+          select: { tenantId: true, isActive: true, roleId: true, role: { select: { code: true, scope: true } } },
         })
       ).map((membership) => [
-        membership.organizationId,
+        membership.tenantId,
         {
           isActive: membership.isActive,
           roleId: membership.roleId,
@@ -442,46 +442,46 @@ export class Access {
         },
       ]),
     );
-    this.organizations = organizations;
-    return organizations;
+    this.tenants = tenants;
+    return tenants;
   }
 
-  private async departmentMemberships() {
-    if (this.departments) {
-      return this.departments;
+  private async organizationMemberships() {
+    if (this.organizations) {
+      return this.organizations;
     }
 
-    const pinned = await this.pinnedOrganization();
+    const pinned = await this.pinnedTenant();
     if (this.apiKey) {
       const key = this.apiKey;
-      if (pinned && key.organizationId !== pinned.id) {
-        this.departments = [];
-        return this.departments;
+      if (pinned && key.tenantId !== pinned.id) {
+        this.organizations = [];
+        return this.organizations;
       }
 
-      const departments = await prisma.department.findMany({
-        where: { organizationId: key.organizationId },
-        select: { id: true, organizationId: true },
+      const organizations = await prisma.tenant.findMany({
+        where: { tenantId: key.tenantId },
+        select: { id: true, tenantId: true },
       });
-      this.departments = departments.map((department) => ({
-        departmentId: department.id,
-        organizationId: department.organizationId,
+      this.organizations = organizations.map((organization) => ({
+        organizationId: organization.id,
+        tenantId: organization.tenantId,
         isAdmin: key.canWrite,
       }));
-      return this.departments;
+      return this.organizations;
     }
 
-    this.departments = (
-      await prisma.departmentMembership.findMany({
-        where: { userId: this.caller.id, ...(pinned ? { department: { organizationId: pinned.id } } : {}) },
-        select: { departmentId: true, department: { select: { organizationId: true } }, role: { select: { code: true } } },
+    this.organizations = (
+      await prisma.tenantMembership.findMany({
+        where: { userId: this.caller.id, ...(pinned ? { organization: { tenantId: pinned.id } } : {}) },
+        select: { organizationId: true, organization: { select: { tenantId: true } }, role: { select: { code: true } } },
       })
     ).map((membership) => ({
-      departmentId: membership.departmentId,
-      organizationId: membership.department.organizationId,
+      organizationId: membership.organizationId,
+      tenantId: membership.organization.tenantId,
       isAdmin: membership.role.code === "ADMIN",
     }));
-    return this.departments;
+    return this.organizations;
   }
 }
 
@@ -502,7 +502,7 @@ async function authenticateApiKey(raw: string, tenantSlug: string | null) {
     unauthorized();
   }
 
-  const keys = await prisma.organizationApiKey.findMany({ where: { prefix, revokedAt: null } });
+  const keys = await prisma.tenantApiKey.findMany({ where: { prefix, revokedAt: null } });
   const match = keys.find((item) => apiKeyMatches(raw, item.keyHash));
   if (!match) {
     verifyDummyApiKey(raw);
@@ -514,7 +514,7 @@ async function authenticateApiKey(raw: string, tenantSlug: string | null) {
   }
 
   try {
-    await prisma.organizationApiKey.update({ where: { id: match.id }, data: { lastUsedAt: new Date() } });
+    await prisma.tenantApiKey.update({ where: { id: match.id }, data: { lastUsedAt: new Date() } });
   } catch (error) {
     console.warn("Could not record API key last-used time.", error);
   }

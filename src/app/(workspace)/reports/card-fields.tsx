@@ -69,13 +69,13 @@ export function CardFields({
             id="card-scope"
             value={card.scope}
             onValueChange={(scope) => {
-              if (scope === "mine" || scope === "organization") {
+              if (scope === "mine" || scope === "tenant") {
                 onPatch({ scope, accessor: `entries.${scope}` } as Partial<ReportCard>);
               }
             }}
             options={entriesScopes.map((value) => ({
               value,
-              label: value === "mine" ? "My entries" : "Organization entries",
+              label: value === "mine" ? "My entries" : "Tenant entries",
             }))}
           />
         </Field>

@@ -4,10 +4,10 @@ import { brandAssetSrc, wordmarkSrc } from "@/lib/brand";
 import { portalName } from "@/lib/portal";
 
 export function AuthBrand({
-  organization,
+  tenant,
   surface,
 }: {
-  organization: {
+  tenant: {
     name: string;
     markUrl: string | null;
     wordmarkUrl: string | null;
@@ -15,13 +15,13 @@ export function AuthBrand({
   } | null;
   surface: "dark" | "light";
 }) {
-  const mark = brandAssetSrc("mark", organization?.markUrl ?? null);
-  const wordmark = wordmarkSrc(organization, surface);
-  const name = organization?.name || portalName();
+  const mark = brandAssetSrc("mark", tenant?.markUrl ?? null);
+  const wordmark = wordmarkSrc(tenant, surface);
+  const name = tenant?.name || portalName();
   const branded = Boolean(mark || wordmark);
 
   return (
-    <Link href="/" className="relative flex items-center gap-2.5 font-semibold">
+    <Link href="/" className="relative flex items-center gap-2.5 font-semibold text-inherit no-underline hover:text-inherit">
       {mark ? (
         <img src={mark} alt="" width={36} height={36} className="size-9 rounded-lg object-contain" />
       ) : (

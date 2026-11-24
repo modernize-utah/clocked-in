@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useActionMutation } from "@/hooks/use-action-mutation";
 import { useMembers } from "@/hooks/use-members";
-import { useOrganization } from "@/hooks/use-workspace";
+import { useTenant } from "@/hooks/use-workspace";
 import { connectionPersonName, memberRelationships, type MemberConnectionRecord } from "@/lib/member-connection";
 import { connectionsQuery, keys } from "@/lib/queries";
 import { EmptyState } from "@/components/empty-state";
@@ -21,16 +21,16 @@ function pairKey(left: string, right: string) {
 }
 
 export function ConnectionsCard() {
-  const organization = useOrganization();
-  const connections = useQuery(connectionsQuery(organization.id));
+  const tenant = useTenant();
+  const connections = useQuery(connectionsQuery(tenant.id));
   const { members } = useMembers();
   const [userId, setUserId] = useState("");
   const [connectedUserId, setConnectedUserId] = useState("");
   const [relationship, setRelationship] = useState<string>(memberRelationships[0]);
-  const invalidate = [keys.connections(organization.id)];
+  const invalidate = [keys.connections(tenant.id)];
   const create = useActionMutation(
     (input: { userId: string; connectedUserId: string; relationship: string }) =>
-      createConnectionAction(organization.id, input),
+      createConnectionAction(tenant.id, input),
     {
       invalidate,
       onSuccess: () => setConnectedUserId(""),
@@ -38,14 +38,14 @@ export function ConnectionsCard() {
   );
   const update = useActionMutation(
     (input: { connectionId: string; userId: string; relationship: string }) =>
-      updateConnectionAction(organization.id, input.connectionId, {
+      updateConnectionAction(tenant.id, input.connectionId, {
         userId: input.userId,
         relationship: input.relationship,
       }),
     { invalidate },
   );
   const remove = useActionMutation(
-    (connectionId: string) => deleteConnectionAction(organization.id, connectionId),
+    (connectionId: string) => deleteConnectionAction(tenant.id, connectionId),
     { invalidate },
   );
 

@@ -24,13 +24,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { useActionMutation } from "@/hooks/use-action-mutation";
 import { useApiKeys } from "@/hooks/use-api-keys";
-import { useOrganization, useWorkspace } from "@/hooks/use-workspace";
+import { useTenant, useWorkspace } from "@/hooks/use-workspace";
 import { formatInstant } from "@/lib/format";
 import { keys } from "@/lib/queries";
-import type { OrganizationApiKey } from "@/lib/types";
+import type { TenantApiKey } from "@/lib/types";
 
 const scopeOptions = [
-  { value: "org:read", label: "Read", hint: "View this organization." },
+  { value: "org:read", label: "Read", hint: "View this tenant." },
   { value: "org:write", label: "Write", hint: "Create and update records." },
   { value: "org:admin", label: "Admin", hint: "Manage people, invitations, and API keys." },
 ] as const;
@@ -41,7 +41,7 @@ const scopeLabels: Record<string, string> = {
   "org:admin": "Admin",
 };
 
-type IssuedKey = OrganizationApiKey & { key: string };
+type IssuedKey = TenantApiKey & { key: string };
 
 function dateInputValue(iso: string | null) {
   return iso ? iso.slice(0, 10) : "";
@@ -60,16 +60,16 @@ function issuedKey(value: unknown): IssuedKey | null {
 }
 
 export function ApiKeysView() {
-  const organization = useOrganization();
+  const tenant = useTenant();
   const { viewer } = useWorkspace();
   const { apiKeys, isPending } = useApiKeys();
   const [creating, setCreating] = useState(false);
-  const [editing, setEditing] = useState<OrganizationApiKey | null>(null);
-  const [rotating, setRotating] = useState<OrganizationApiKey | null>(null);
-  const [revoking, setRevoking] = useState<OrganizationApiKey | null>(null);
+  const [editing, setEditing] = useState<TenantApiKey | null>(null);
+  const [rotating, setRotating] = useState<TenantApiKey | null>(null);
+  const [revoking, setRevoking] = useState<TenantApiKey | null>(null);
   const [revealed, setRevealed] = useState<IssuedKey | null>(null);
-  const invalidate = [keys.apiKeys(organization.id)];
-  const rotate = useActionMutation((keyId: string) => rotateApiKeyAction(organization.id, keyId), {
+  const invalidate = [keys.apiKeys(tenant.id)];
+  const rotate = useActionMutation((keyId: string) => rotateApiKeyAction(tenant.id, keyId), {
     invalidate,
     onSuccess: (data) => {
       const issued = issuedKey(data);
@@ -77,7 +77,7 @@ export function ApiKeysView() {
       setRotating(null);
     },
   });
-  const revoke = useActionMutation((keyId: string) => revokeApiKeyAction(organization.id, keyId), {
+  const revoke = useActionMutation((keyId: string) => revokeApiKeyAction(tenant.id, keyId), {
     invalidate,
     onSuccess: () => setRevoking(null),
   });
@@ -89,7 +89,7 @@ export function ApiKeysView() {
       <CardHeader>
         <CardTitle>API keys</CardTitle>
         <CardDescription>
-          Let another system read or change this organization. The secret is shown only when a key is created or rotated.
+          Let another system read or change this tenant. The secret is shown only when a key is created or rotated.
         </CardDescription>
         <CardAction>
           <Button type="button" size="sm" className="h-8" onClick={() => setCreating(true)}>
@@ -141,7 +141,7 @@ export function ApiKeysView() {
           <EmptyState
             icon={KeyRoundIcon}
             title="No API keys yet"
-            description="Create a key when another system needs access to this organization."
+            description="Create a key when another system needs access to this tenant."
             className="py-8"
           />
         )}
@@ -194,22 +194,22 @@ function KeyForm({
   onCancel,
   onIssued,
 }: {
-  apiKey?: OrganizationApiKey;
+  apiKey?: TenantApiKey;
   onCancel: () => void;
   onIssued?: (issued: IssuedKey) => void;
 }) {
-  const organization = useOrganization();
+  const tenant = useTenant();
   const formId = useId();
   const [name, setName] = useState(apiKey?.name ?? "");
   const [scopes, setScopes] = useState<string[]>(apiKey?.scopes ?? ["org:read"]);
   const [expiresOn, setExpiresOn] = useState(dateInputValue(apiKey?.expiresAt ?? null));
   const [scopeError, setScopeError] = useState<string | null>(null);
-  const invalidate = [keys.apiKeys(organization.id)];
+  const invalidate = [keys.apiKeys(tenant.id)];
   const save = useActionMutation(
     (input: { name: string; scopes: string[]; expiresAt: string | null }) =>
       apiKey
-        ? updateApiKeyAction(organization.id, apiKey.id, input)
-        : createApiKeyAction(organization.id, input),
+        ? updateApiKeyAction(tenant.id, apiKey.id, input)
+        : createApiKeyAction(tenant.id, input),
     {
       invalidate,
       onSuccess: (data) => {

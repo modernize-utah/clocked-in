@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { PageLoader } from "@/components/skeletons";
 import { brandCss, clockedInTheme } from "@/lib/brand";
 import { getAuthBrand } from "@/lib/server/auth-brand";
-import { requirePinnedOrganizationOrApex } from "@/lib/server/tenant";
+import { requirePinnedTenantOrApex } from "@/lib/server/tenant";
 import { AuthBrand } from "./auth-brand";
 
 const highlights = [
@@ -21,17 +21,17 @@ export default function AuthLayout({ children }: LayoutProps<"/">) {
 }
 
 async function AuthShell({ children }: { children: React.ReactNode }) {
-  await requirePinnedOrganizationOrApex();
-  const organization = await getAuthBrand();
-  const css = brandCss(organization?.theme ?? clockedInTheme);
+  await requirePinnedTenantOrApex();
+  const tenant = await getAuthBrand();
+  const css = brandCss(tenant?.theme ?? clockedInTheme);
 
   return (
     <div className="grid min-h-svh lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-      {organization?.isTenantHost ? <title>{organization.name}</title> : null}
+      {tenant?.isTenantHost ? <title>{tenant.name}</title> : null}
       {css ? <style dangerouslySetInnerHTML={{ __html: css }} /> : null}
       <aside className="brand-hero-navy relative hidden overflow-hidden px-10 py-12 text-white lg:flex lg:flex-col lg:px-12 lg:py-14">
         <div className="brand-rule absolute inset-x-0 top-0" />
-        <AuthBrand organization={organization} surface="dark" />
+        <AuthBrand tenant={tenant} surface="dark" />
         <div className="relative flex max-w-md flex-1 flex-col justify-center py-16">
           <h2 className="text-3xl font-semibold leading-snug tracking-tight">
             Every volunteer hour, counted and valued.
@@ -53,7 +53,7 @@ async function AuthShell({ children }: { children: React.ReactNode }) {
       </aside>
       <main className="relative flex flex-col items-center justify-center bg-muted px-4 py-12 sm:px-8">
         <div className="mb-10 lg:hidden">
-          <AuthBrand organization={organization} surface="light" />
+          <AuthBrand tenant={tenant} surface="light" />
         </div>
         <div className="w-full max-w-md">{children}</div>
       </main>

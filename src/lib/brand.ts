@@ -12,7 +12,7 @@ export const brandFontLabels: Record<(typeof brandFonts)[number], string> = {
 };
 
 const fontVars: Record<string, string> = {
-  HelveticaNeue: '"Helvetica Neue", Helvetica, Arial, var(--font-source-sans), sans-serif',
+  HelveticaNeue: 'var(--font-arimo), "Helvetica Neue", Helvetica, Arial, sans-serif',
   AvenirNext: '"Avenir Next", Avenir, var(--font-nunito), sans-serif',
   SourceSans3: "var(--font-source-sans)",
   NunitoSans: "var(--font-nunito)",
@@ -22,7 +22,7 @@ const fontVars: Record<string, string> = {
 export const clockedInTheme: ThemeJson = {
   id: "44444444-4444-4444-8444-444444444441",
   name: "VolunTime",
-  organizationId: null,
+  tenantId: null,
   primary: "#001836",
   primaryForeground: "#FFFFFF",
   highlight: "#D4AC59",
@@ -32,7 +32,7 @@ export const clockedInTheme: ThemeJson = {
   surfaceForeground: "#001836",
   foreground: "#001836",
   chartColor: "#001836",
-  headingFont: "SourceSans3",
+  headingFont: "HelveticaNeue",
   bodyFont: "NunitoSans",
   categoricalPalette: ["#001836", "#D4AC59", "#2A6F97", "#4EBFAE", "#C17B4A", "#6B7C93"],
   sequentialPalette: ["#F4F0E6", "#E8D7A8", "#D4AC59", "#8A6E2F", "#3D3014"],
@@ -84,6 +84,7 @@ export function brandStyle(theme: ThemeJson | null): CSSProperties {
     "--sidebar-accent": `color-mix(in oklch, ${theme.primaryForeground} 12%, transparent)`,
     "--sidebar-accent-foreground": theme.primaryForeground,
     "--sidebar-border": `color-mix(in oklch, ${theme.primaryForeground} 14%, transparent)`,
+    "--sidebar-ring": theme.primaryForeground,
     "--accent": `color-mix(in oklch, ${theme.accent} 14%, ${theme.surface})`,
     "--accent-foreground": theme.foreground,
     "--brand-accent": theme.accent,
@@ -150,9 +151,9 @@ function blobPathname(storedUrl: string) {
   }
 }
 
-/** Brand files live under orgs/<organizationId>/. Another organization's path must never be read or deleted. */
-export function isOwnedBrandBlob(organizationId: string, storedUrl: string) {
-  return blobPathname(storedUrl)?.startsWith(`orgs/${organizationId}/`) ?? false;
+/** Brand files live under orgs/<tenantId>/. Another tenant's path must never be read or deleted. */
+export function isOwnedBrandBlob(tenantId: string, storedUrl: string) {
+  return blobPathname(storedUrl)?.startsWith(`orgs/${tenantId}/`) ?? false;
 }
 
 /** Avatars live under avatars/<userId>/. */
@@ -173,15 +174,15 @@ export function brandAssetSrc(kind: BrandKind, storedUrl: string | null) {
 }
 
 export function wordmarkSrc(
-  organization: { wordmarkUrl: string | null; wordmarkOnLightUrl: string | null } | null,
+  tenant: { wordmarkUrl: string | null; wordmarkOnLightUrl: string | null } | null,
   surface: "dark" | "light",
 ) {
-  if (!organization) {
+  if (!tenant) {
     return null;
   }
 
-  const preferred = surface === "dark" ? organization.wordmarkUrl : organization.wordmarkOnLightUrl;
-  const fallback = surface === "dark" ? organization.wordmarkOnLightUrl : organization.wordmarkUrl;
+  const preferred = surface === "dark" ? tenant.wordmarkUrl : tenant.wordmarkOnLightUrl;
+  const fallback = surface === "dark" ? tenant.wordmarkOnLightUrl : tenant.wordmarkUrl;
   const preferredKind = surface === "dark" ? "wordmark" : "wordmarkOnLight";
   const fallbackKind = surface === "dark" ? "wordmarkOnLight" : "wordmark";
   return brandAssetSrc(preferredKind, preferred) ?? brandAssetSrc(fallbackKind, fallback);

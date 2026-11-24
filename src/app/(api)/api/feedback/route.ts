@@ -16,7 +16,7 @@ export function POST(request: Request) {
       const form = await request.formData();
       const files = form.getAll("screenshots").filter((item): item is File => item instanceof File && item.size > 0);
       const screenshotUrls = files.length > 0 ? await uploadFeedbackScreenshots(access.caller.id, files) : [];
-      const organizationId = String(form.get("organizationId") ?? "").trim();
+      const tenantId = String(form.get("tenantId") ?? "").trim();
       return createFeedback(
         access,
         parseCreateFeedback({
@@ -26,7 +26,7 @@ export function POST(request: Request) {
           title: String(form.get("title") ?? ""),
           description: String(form.get("description") ?? ""),
           screenshotUrls,
-          ...(organizationId ? { organizationId } : {}),
+          ...(tenantId ? { tenantId } : {}),
         }),
       );
     }

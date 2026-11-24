@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useLabels } from "@/hooks/use-labels";
-import { useOrganization } from "@/hooks/use-workspace";
+import { useTenant } from "@/hooks/use-workspace";
 
 const roles = [
   { key: "volunteer", label: "Volunteer" },
@@ -31,30 +31,30 @@ const ownProfile: Access = {
 };
 
 export function AboutPrototypeView() {
-  const organization = useOrganization();
+  const tenant = useTenant();
   const copy = useLabels();
-  const group = copy.department.toLowerCase();
-  const groups = copy.departments.toLowerCase();
+  const group = copy.organization.toLowerCase();
+  const groups = copy.organizations.toLowerCase();
   const project = copy.project.toLowerCase();
   const category = copy.taskCategory.toLowerCase();
   const categories = copy.taskCategories.toLowerCase();
 
   const steps = [
     {
-      title: `Name this ${copy.organization.toLowerCase()}`,
+      title: `Name this ${copy.tenant.toLowerCase()}`,
       body: "Set the name, website, and description people see on the home page.",
-      href: "/organization",
-      label: copy.organization,
+      href: "/tenant",
+      label: copy.tenant,
     },
     {
       title: `Add a ${project} and a ${category}`,
-      body: `Add both before anyone can log time. Create ${groups} on the ${copy.departments} screen when you want hours split by team.`,
+      body: `Add both before anyone can log time. Create ${groups} on the ${copy.organizations} screen when you want hours split by team.`,
       href: "/settings/lists",
       label: `${copy.projects} & lists`,
     },
     {
       title: "Invite people",
-      body: "Volunteer logs their own hours. Staff can also choose a professional rate. Admin can run the organization with you.",
+      body: "Volunteer logs their own hours. Staff can also choose a professional rate. Admin can run the tenant with you.",
       href: "/people/invites",
       label: "People",
     },
@@ -83,9 +83,9 @@ export function AboutPrototypeView() {
           summary: "Hours, in-kind value, volunteer count, your own hours, this week by project, and your recent entries.",
           access: {
             volunteer: "Your hours and entries",
-            staff: "Organization totals, plus your entries",
+            staff: "Tenant totals, plus your entries",
             coordinator: `Totals for their ${groups}`,
-            admin: "The whole organization",
+            admin: "The whole tenant",
           },
         },
         {
@@ -129,7 +129,7 @@ export function AboutPrototypeView() {
           href: "/entries",
           where: "Track · Entries",
           summary:
-            "Review, edit, and delete saved time, filtered by date. With time editing turned off in Organization, start, end, and duration stay as saved. Project, category, and notes can still change.",
+            "Review, edit, and delete saved time, filtered by date. With time editing turned off in Tenant, start, end, and duration stay as saved. Project, category, and notes can still change.",
           access: {
             volunteer: "Own rows",
             staff: "Own rows",
@@ -149,9 +149,9 @@ export function AboutPrototypeView() {
           summary: `Summary, People, Group sessions, and Staff, with breakdowns by ${group}, ${category}, ${project}, person, and month. In-kind uses the rate stored on each entry, so a later rate change leaves grant history alone. Download Volunteer Log or Summary CSV.`,
           access: {
             volunteer: "—",
-            staff: "Organization, including the Staff tab",
+            staff: "Tenant, including the Staff tab",
             coordinator: `Their ${groups}`,
-            admin: "Organization, staff, and group sessions",
+            admin: "Tenant, staff, and group sessions",
           },
         },
       ],
@@ -176,7 +176,7 @@ export function AboutPrototypeView() {
           title: `${copy.projects}, ${categories}, and tags`,
           href: "/settings/lists",
           where: `Manage · Settings · ${copy.projects} & lists`,
-          summary: `Projects and events people log against. Leave the ${group} as the whole ${copy.organization.toLowerCase()} when everyone should see it, or assign one ${group}. ${copy.taskCategories} and tags are organization-wide.`,
+          summary: `Projects and events people log against. Leave the ${group} as the whole ${copy.tenant.toLowerCase()} when everyone should see it, or assign one ${group}. ${copy.taskCategories} and tags are tenant-wide.`,
           access: {
             volunteer: "—",
             staff: "—",
@@ -185,15 +185,15 @@ export function AboutPrototypeView() {
           },
         },
         {
-          title: "Organization setup",
-          href: "/settings/organization",
+          title: "Tenant setup",
+          href: "/settings/tenant",
           where: "Manage · Settings",
-          summary: `Rate year, labels, the time-edit lock, and who is emailed when someone sends feedback. Name, website, and description are on the ${copy.organization.toLowerCase()} page in the account menu. The hourly-rate catalog holds the volunteer default and professional rates. ${copy.departments} are the teams hours roll up to. Themes set colors and fonts, including this page. Brand uploads the mark and wordmarks.`,
+          summary: `Rate year, labels, the time-edit lock, and who is emailed when someone sends feedback. Name, website, and description are on the ${copy.tenant.toLowerCase()} page in the account menu. The hourly-rate catalog holds the volunteer default and professional rates. ${copy.organizations} are the teams hours roll up to. Themes set colors and fonts, including this page. Brand uploads the mark and wordmarks.`,
           access: {
             volunteer: "—",
             staff: "—",
             coordinator: "—",
-            admin: "Organization, rates, groups, theme, and brand",
+            admin: "Tenant, rates, groups, theme, and brand",
           },
         },
         {
@@ -201,7 +201,7 @@ export function AboutPrototypeView() {
           href: "/developer/api-keys",
           where: "Manage · Developer",
           summary:
-            "Create organization API keys, copy the MCP client config and tool list, and try HTTP routes with your signed-in session. A key secret is shown only when the key is created or rotated.",
+            "Create tenant API keys, copy the MCP client config and tool list, and try HTTP routes with your signed-in session. A key secret is shown only when the key is created or rotated.",
           access: {
             volunteer: "—",
             staff: "—",
@@ -219,14 +219,14 @@ export function AboutPrototypeView() {
           href: "/profile",
           where: "Account menu",
           summary:
-            "Name, display name, timezone, phone, ZIP, notes, and password. Punch dates use the timezone. Phone, ZIP, and notes stay on the profile. The same menu opens the current organization, accepts an invite, and signs out.",
+            "Name, display name, timezone, phone, ZIP, notes, and password. Punch dates use the timezone. Phone, ZIP, and notes stay on the profile. The same menu opens the current tenant, accepts an invite, and signs out.",
           access: ownProfile,
         },
         {
           title: "Feedback",
           where: "Header, and Manage · Feedback",
           summary:
-            "Anyone can send a bug or a request from the header. People chosen under Organization get the email. A super admin is a platform flag on the user, and reviews every note in Manage → Feedback.",
+            "Anyone can send a bug or a request from the header. People chosen under Tenant get the email. A super admin is a platform flag on the user, and reviews every note in Manage → Feedback.",
           access: {
             volunteer: "Send",
             staff: "Send",
@@ -235,9 +235,9 @@ export function AboutPrototypeView() {
           },
         },
         {
-          title: "Switch organization",
+          title: "Switch tenant",
           where: "Header",
-          summary: "Move between organizations you belong to, or create one. Creating an organization opens its own page and makes you its admin.",
+          summary: "Move between tenants you belong to, or create one. Creating an tenant opens its own page and makes you its admin.",
           access: {
             volunteer: "Switch, or create and become admin",
             staff: "Switch, or create and become admin",
@@ -257,7 +257,7 @@ export function AboutPrototypeView() {
           <h1 className="mt-3 text-2xl font-semibold tracking-tight lg:hidden">Guide</h1>
           <h2 className="mt-3 max-w-3xl font-heading text-3xl font-semibold tracking-tight sm:text-4xl">How this app works</h2>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-primary-foreground/80 sm:text-base">
-            {organization.name} uses VolunTime to turn volunteer hours into in-kind value for grants. This page is the map
+            {tenant.name} uses VolunTime to turn volunteer hours into in-kind value for grants. This page is the map
             for the first person setting it up. Admins open it from Manage.
           </p>
         </div>
@@ -295,7 +295,7 @@ export function AboutPrototypeView() {
             icon={ClockIcon}
             tone="accent"
             title="Staff"
-            body="Logs their own time and can choose a professional rate. Those hours sit on the Staff report, apart from volunteer grant totals. Their other reports cover the organization."
+            body="Logs their own time and can choose a professional rate. Those hours sit on the Staff report, apart from volunteer grant totals. Their other reports cover the tenant."
           />
           <RoleCard
             icon={UsersIcon}
@@ -307,7 +307,7 @@ export function AboutPrototypeView() {
             icon={ShieldIcon}
             tone="primary"
             title="Admin"
-            body={`Covers every ${group}, plus organization settings, rates, theme, brand, and Developer. You are reading this because you are an admin.`}
+            body={`Covers every ${group}, plus tenant settings, rates, theme, brand, and Developer. You are reading this because you are an admin.`}
           />
         </div>
       </section>

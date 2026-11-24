@@ -10,9 +10,9 @@ export default function AcceptPage() {
   return (
     <AuthCard
       title="Accept an invite"
-      description="Enter the 6-digit code from your invitation email to join the organization."
+      description="Enter the 6-digit code from your invitation email to join the tenant."
       footer={
-        <Link href="/dashboard" className="font-medium text-primary hover:underline">
+        <Link href="/dashboard" className="font-medium">
           Go to dashboard
         </Link>
       }

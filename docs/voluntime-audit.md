@@ -39,16 +39,16 @@ Code: [`src/app/(workspace)/settings/import/import-view.tsx`](<../src/app/(works
 
 ### 2. Can a group coordinator manage more than one group today?
 
-**Yes.** People, invite, and access-request flows assign Member vs Group manager per group. Reports for a coordinator with several department `ADMIN` rows combine those groups.
+**Yes.** People, invite, and access-request flows assign Member vs Group manager per group. Reports for a coordinator with several organization `ADMIN` rows combine those groups.
 
 ### 3. Should the timer save without project / task category so people can classify afterward?
 
 **Yes for the timer. No for manual Duration / Total.**
 
-The brief required organization and category because Clockify left them blank. Dillon now wants an unclassified bucket plus a post-stop reminder. Both can be true:
+The brief required tenant and category because Clockify left them blank. Dillon now wants an unclassified bucket plus a post-stop reminder. Both can be true:
 
 - **Punch:** allow clock-in / clock-out with project, category, and group empty. After stop, show the placement form. Today the confirm dialog cannot edit those fields; they were locked at clock-in. Missing all three = unclassified.
-- **Duration / Total:** keep project + category required. Group may stay “Whole organization.”
+- **Duration / Total:** keep project + category required. Group may stay “Whole tenant.”
 - **Reports:** add an Unclassified bucket so those hours cannot disappear from grant totals. Notify the volunteer (and their group manager) until they classify or delete.
 
 Do not ship unclassified until notifications exist, or the Clockify “missing fields” problem returns.
@@ -57,15 +57,15 @@ Do not ship unclassified until notifications exist, or the Clockify “missing f
 
 Match volunteer language. Keep the code names. See [Role and label glossary](#role-and-label-glossary).
 
-- CASWJ → model `Organization` → UI **Organization** (CASWJ seed already uses this)
-- Symphony, Youth Theatre, and the other affiliates → model `Department` → UI **Group** (already set in [`scripts/caswj-workbook.ts`](../scripts/caswj-workbook.ts) `caswjLabels`)
+- CASWJ → model `Tenant` → UI **Tenant** (CASWJ seed already uses this)
+- Symphony, Youth Theatre, and the other affiliates → model `Organization` → UI **Group** (already set in [`scripts/caswj-workbook.ts`](../scripts/caswj-workbook.ts) `caswjLabels`)
 - Project / event → `Project` → **Project / Event**
 - Task category → `TaskCategory` → **Task Category**
 
 Role names to tell Dillon:
 
 - His **Super admin** = org `ADMIN` = UI **Admin** (CASWJ staff). Do not call this Super admin in the product; `User.isSuperAdmin` is a platform flag for ops, not a volunteer-facing role.
-- His **Group manager** = `DepartmentMembership` with role `ADMIN` = UI **Group manager** (already used in the user menu)
+- His **Group manager** = `OrganizationMembership` with role `ADMIN` = UI **Group manager** (already used in the user menu)
 - His **Volunteer** = `VOLUNTEER`
 - Extra level we have: `MEMBER` / **Staff**. Not in his three levels. Keep it as an optional customizable role, or hide it on the CASWJ portal if it confuses people.
 
@@ -83,7 +83,7 @@ Role names to tell Dillon:
 | --------------------------------------------------------------------------- | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | Replace Clockify + sheet                                                    | Met                         | Web app, timer, manual entry, reports, CSV                                                                                          |
 | In-kind $35.47 + professional rates                                         | Met, extended               | Catalog + snapshots. Seed still Volunteer-only                                                                                      |
-| CASWJ + eight affiliates                                                    | Met                         | One org, eight `Department` groups                                                                                                  |
+| CASWJ + eight affiliates                                                    | Met                         | One org, eight `Organization` groups                                                                                                  |
 | Invite or enrollment                                                        | Met                         | Invite + Add person + public signup. Portal can disable signup                                                                      |
 | Roles: volunteer + admin, no approval on entries                            | Met, then extended          | Plus Staff, Group manager, custom roles, SuperAdmin. Entries still live                                                             |
 | Settings: orgs, categories, tags                                            | Met, extended               | Projects/events, groups, rates, themes, labels, roles                                                                               |
@@ -120,10 +120,10 @@ flowchart LR
 
 | Request                                            | Status | Gap                                                                                                                                         |
 | -------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Three levels; each logs time for people below      | Met    | Admin, Staff, Volunteer, plus Group manager as department `ADMIN`                                                                           |
+| Three levels; each logs time for people below      | Met    | Admin, Staff, Volunteer, plus Group manager as organization `ADMIN`                                                                           |
 | Group manager on several groups + combined reports | Met    | People / invite assign Member vs Group manager per group. Reports use assigned groups                                                       |
-| Event-level totals without naming people           | Met    | `CollectiveTimeEntry` with `departmentId` null + `participantCount`; needs `log_event_totals`                                               |
-| Volunteer requests more access; admin decides      | Met    | Default request is Group manager + groups. Approving writes department `ADMIN` and leaves org Volunteer unless they asked for a system role |
+| Event-level totals without naming people           | Met    | `CollectiveTimeEntry` with `organizationId` null + `participantCount`; needs `log_event_totals`                                               |
+| Volunteer requests more access; admin decides      | Met    | Default request is Group manager + groups. Approving writes organization `ADMIN` and leaves org Volunteer unless they asked for a system role |
 | Custom roles / permissions table                   | Met    | `Role.scope` drives report, time, and collective list visibility                                                                            |
 
 Key files: [`src/lib/permissions.ts`](../src/lib/permissions.ts), [`src/lib/api/access.ts`](../src/lib/api/access.ts), [`src/lib/api/features/roles.ts`](../src/lib/api/features/roles.ts), [`src/lib/api/features/access-requests.ts`](../src/lib/api/features/access-requests.ts).
@@ -134,12 +134,12 @@ Key files: [`src/lib/permissions.ts`](../src/lib/permissions.ts), [`src/lib/api/
 | ------------------------------------------------------------------------ | ------------ | ------------------------------------------------------------------------------- |
 | First + last name on invite                                              | Met          |                                                                                 |
 | Username = first initial + last name; tell admin if taken; number suffix | Met          | Invite form previews `jsmith` / `jsmith1` before send                           |
-| Invite subject / preview                                                 | Met          | `{{organizationName}} invited you to join VolunTime`. The invite email includes the username |
+| Invite subject / preview                                                 | Met          | `{{tenantName}} invited you to join VolunTime`. The invite email includes the username |
 | Import review list                                                       | Met          | Per-row Import / Skip / Merge. Near-match defaults to Skip                      |
 | Duplicate + near-match                                                   | Met          | Email match or chosen near-match can merge; Skip does not create a second user  |
 | Does import send invites?                                                | Answered: no | Copy is clear                                                                   |
 | CSV templates                                                            | Met          | People and Projects                                                             |
-| Drop Groups import                                                       | Met in UI    | API `POST .../imports/departments` still exists                                 |
+| Drop Groups import                                                       | Met in UI    | API `POST .../imports/tenants` still exists                                 |
 
 Key files: [`src/lib/api/features/invitations.ts`](../src/lib/api/features/invitations.ts), [`src/lib/import/username.ts`](../src/lib/import/username.ts), [`src/lib/import/people-review.ts`](../src/lib/import/people-review.ts), [`emails/invitation.tsx`](../emails/invitation.tsx).
 
@@ -174,7 +174,7 @@ Waves 0–5 of the close-gaps plan are in the tree. What was still open on that 
 14. **Official CASWJ logo files** — do not invent a flame mark. Seed the wordmark/favicon when CASWJ provides them.
 15. **Paid staff vs volunteer in-kind** — still out of scope until asked.
 
-`POST .../imports/departments` stays for scripts; the UI does not expose it.
+`POST .../imports/tenants` stays for scripts; the UI does not expose it.
 
 ---
 
@@ -189,9 +189,9 @@ These are real. Dillon already named some of them. Do not treat “exceeded” a
 - In-app access requests (profile + admin decide + Need signup path)
 - Saved reports, report designer, dashboard layouts, three CSV endpoints
 - HTTP contract on Next.js and MCP tools
-- Themes, wordmarks, entity labels (`Group` vs `Department`)
-- JWT sessions, rotating refresh tokens, organization and platform API keys, volunteer-scoped reports
-- Multi-tenant product (any signed-in user can create an organization) with a documented CASWJ portal install
+- Themes, wordmarks, entity labels (`Group` vs `Organization`)
+- JWT sessions, rotating refresh tokens, tenant and platform API keys, volunteer-scoped reports
+- Multi-tenant product (any signed-in user can create an tenant) with a documented CASWJ portal install
 
 The internship `schema.sql` gave every signed-in user full access. VolunTime does not.
 
@@ -203,12 +203,12 @@ Volunteer words stay in the UI. Code names stay in the schema.
 
 | Volunteer language         | Model                                     | UI label (CASWJ)           |
 | -------------------------- | ----------------------------------------- | -------------------------- |
-| CASWJ                      | `Organization`                            | Organization               |
-| Symphony, Youth Theatre, … | `Department`                              | Group                      |
+| CASWJ                      | `Tenant`                            | Tenant               |
+| Symphony, Youth Theatre, … | `Organization`                              | Group                      |
 | Project / event            | `Project`                                 | Project / Event            |
 | Task category              | `TaskCategory`                            | Task Category              |
-| CASWJ staff                | `OrganizationMembership.roleId` → `ADMIN` | Admin                      |
-| Group leader               | `DepartmentMembership.roleId` → `ADMIN`   | Group manager              |
+| CASWJ staff                | `TenantMembership.roleId` → `ADMIN` | Admin                      |
+| Group leader               | `OrganizationMembership.roleId` → `ADMIN`   | Group manager              |
 | Everyone else              | `VOLUNTEER`                               | Volunteer                  |
 | Optional extra             | `MEMBER`                                  | Staff                      |
 | Platform operator          | `User.isSuperAdmin`                       | SuperAdmin (internal only) |
@@ -217,13 +217,13 @@ CASWJ entity labels are seeded in [`scripts/caswj-workbook.ts`](../scripts/caswj
 
 ```ts
 export const caswjLabels = {
-  organization: "Organization",
+  tenant: "Tenant",
   project: "Project / Event",
-  department: "Group",
+  organization: "Group",
   taskCategory: "Task Category",
 };
 ```
 
-Default product labels (non-CASWJ orgs) are Organization / Project / Department / Task category in [`src/lib/labels.ts`](../src/lib/labels.ts).
+Default product labels (non-CASWJ orgs) are Tenant / Project / Organization / Task category in [`src/lib/labels.ts`](../src/lib/labels.ts).
 
-Group-manager capabilities are not a role code. They are `DepartmentMembership` with `ADMIN` plus the merge of `groupManagerPermissions` in [`src/lib/api/access.ts`](../src/lib/api/access.ts): invite, log own and member time, log group sessions and event totals, view/export reports, create needs, create projects.
+Group-manager capabilities are not a role code. They are `OrganizationMembership` with `ADMIN` plus the merge of `groupManagerPermissions` in [`src/lib/api/access.ts`](../src/lib/api/access.ts): invite, log own and member time, log group sessions and event totals, view/export reports, create needs, create projects.

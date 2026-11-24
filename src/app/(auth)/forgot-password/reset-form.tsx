@@ -33,13 +33,12 @@ export function ResetForm() {
             type='email'
             autoComplete='email'
             required
-            className='h-10'
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />
         </Field>
         <FormMessage result={requested} />
-        <SubmitButton variant={requested?.ok ? "outline" : "default"} className='h-10 w-full'>
+        <SubmitButton variant={requested?.ok ? "outline" : "default"} className='w-full'>
           {requested?.ok ? "Send another code" : "Email me a code"}
         </SubmitButton>
       </form>
@@ -55,7 +54,7 @@ export function ResetForm() {
                 required
                 inputMode='numeric'
                 autoComplete='one-time-code'
-                className='h-10 font-mono tracking-[0.3em]'
+                className='font-mono tracking-[0.3em]'
                 value={code}
                 onChange={(event) => setCode(event.target.value)}
               />
@@ -67,11 +66,10 @@ export function ResetForm() {
                 type='password'
                 autoComplete='new-password'
                 required
-                className='h-10'
               />
             </Field>
             <FormMessage result={confirmed} />
-            <SubmitButton className='h-10 w-full'>Set new password</SubmitButton>
+            <SubmitButton className='w-full'>Set new password</SubmitButton>
           </form>
         </>
       ) : null}

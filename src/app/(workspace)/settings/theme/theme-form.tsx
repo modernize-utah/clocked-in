@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { MinusIcon, PlusIcon } from "lucide-react";
-import { applyThemeAction, deleteThemeAction, saveThemeAction } from "@/app/actions/organizations";
+import { applyThemeAction, deleteThemeAction, saveThemeAction } from "@/app/actions/tenants";
 import { Field } from "@/components/field";
 import { SelectField } from "@/components/select-field";
 import { SubmitButton } from "@/components/submit-button";
@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useActionMutation } from "@/hooks/use-action-mutation";
 import { useCardPin } from "@/hooks/use-card-pin";
-import { useOrganization } from "@/hooks/use-workspace";
+import { useTenant } from "@/hooks/use-workspace";
 import { brandFontLabels, brandFonts, brandStyle, clockedInTheme } from "@/lib/brand";
 import { keys, themesQuery } from "@/lib/queries";
 import { sequentialPaletteFrom } from "@/lib/sequential-palette";
@@ -82,14 +82,12 @@ function SequentialPaletteGenerator({
                 ...colorFields.map((field) => ({ value: field.key, label: field.label })),
                 { value: "custom", label: "Custom" },
               ]}
-              className="h-9"
             />
           </div>
         </Field>
         <Button
           type="button"
           variant="outline"
-          className="h-9"
           disabled={!ready}
           onClick={() => onGenerate(sequentialPaletteFrom(seed))}
         >
@@ -100,7 +98,7 @@ function SequentialPaletteGenerator({
         <Input
           value={custom}
           onChange={(event) => setCustom(event.target.value.toUpperCase())}
-          className="h-9 font-mono"
+          className="font-mono"
           aria-label="Custom starting color hex"
         />
       ) : null}
@@ -147,7 +145,7 @@ function PaletteEditor({
                 next[index] = event.target.value.toUpperCase();
                 onChange(next);
               }}
-              className="h-9 font-mono"
+              className="font-mono"
               aria-label={`${label} ${index + 1} hex`}
             />
             {colors.length > min ? (
@@ -168,7 +166,7 @@ function PaletteEditor({
           <Button
             type="button"
             variant="outline"
-            className="h-9 w-fit"
+            className="w-fit"
             onClick={() => onChange([...colors, colors.at(-1) ?? "#001836"])}
           >
             <PlusIcon />
@@ -181,18 +179,18 @@ function PaletteEditor({
 }
 
 export function ThemeForm() {
-  const organization = useOrganization();
-  return <ThemeFields key={`${organization.id}-${organization.themeId}`} />;
+  const tenant = useTenant();
+  return <ThemeFields key={`${tenant.id}-${tenant.themeId}`} />;
 }
 
 function ThemeFields() {
-  const organization = useOrganization();
-  const themes = useQuery(themesQuery(organization.id));
-  const [draft, setDraft] = useState<Theme>(() => cloneTheme(organization.theme));
-  const apply = useActionMutation((themeId: string) => applyThemeAction(organization.id, themeId));
+  const tenant = useTenant();
+  const themes = useQuery(themesQuery(tenant.id));
+  const [draft, setDraft] = useState<Theme>(() => cloneTheme(tenant.theme));
+  const apply = useActionMutation((themeId: string) => applyThemeAction(tenant.id, themeId));
   const save = useActionMutation(
     (next: Theme) =>
-      saveThemeAction(organization.id, next.organizationId ? next.id : null, {
+      saveThemeAction(tenant.id, next.tenantId ? next.id : null, {
         name: next.name,
         primary: next.primary,
         primaryForeground: next.primaryForeground,
@@ -210,7 +208,7 @@ function ThemeFields() {
         divergingPalette: next.divergingPalette,
       }),
     {
-      invalidate: [keys.themes(organization.id)],
+      invalidate: [keys.themes(tenant.id)],
       onSuccess: (theme) => {
         if (theme) {
           setDraft(cloneTheme(theme));
@@ -218,8 +216,8 @@ function ThemeFields() {
       },
     },
   );
-  const remove = useActionMutation((themeId: string) => deleteThemeAction(organization.id, themeId));
-  const catalog = themes.data ?? [organization.theme];
+  const remove = useActionMutation((themeId: string) => deleteThemeAction(tenant.id, themeId));
+  const catalog = themes.data ?? [tenant.theme];
   const cardRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const pin = useCardPin(cardRef, barRef);
@@ -235,7 +233,7 @@ function ThemeFields() {
           <CardHeader>
             <CardTitle>Themes</CardTitle>
             <CardDescription>
-              Choose a global theme to fill the colors, then save a named theme for this organization. Chart palettes stay
+              Choose a global theme to fill the colors, then save a named theme for this tenant. Chart palettes stay
               with the theme.
             </CardDescription>
           </CardHeader>
@@ -250,7 +248,7 @@ function ThemeFields() {
               <TabsContent value="colors" keepMounted className="grid gap-4 sm:grid-cols-2">
                 <Field label="Apply theme">
                   <SelectField
-                    value={organization.themeId}
+                    value={tenant.themeId}
                     onValueChange={(themeId) => {
                       const selected = catalog.find((theme) => theme.id === themeId);
                       if (selected) {
@@ -261,9 +259,8 @@ function ThemeFields() {
                     }}
                     options={catalog.map((theme) => ({
                       value: theme.id,
-                      label: theme.organizationId ? theme.name : `${theme.name} (global)`,
+                      label: theme.tenantId ? theme.name : `${theme.name} (global)`,
                     }))}
-                    className="h-9"
                   />
                 </Field>
                 <Field label="Theme name" htmlFor="themeName">
@@ -271,7 +268,6 @@ function ThemeFields() {
                     id="themeName"
                     value={draft.name}
                     onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-                    className="h-9"
                   />
                 </Field>
                 {colorFields.map((field) => {
@@ -289,7 +285,7 @@ function ThemeFields() {
                         <Input
                           value={value}
                           onChange={(event) => setDraft({ ...draft, [field.key]: event.target.value.toUpperCase() })}
-                          className="h-9 font-mono"
+                          className="font-mono"
                         />
                       </div>
                     </Field>
@@ -300,7 +296,6 @@ function ThemeFields() {
                     value={draft.headingFont}
                     onValueChange={(headingFont) => setDraft({ ...draft, headingFont })}
                     options={fontOptions}
-                    className="h-9"
                   />
                 </Field>
                 <Field label="Body font">
@@ -308,7 +303,6 @@ function ThemeFields() {
                     value={draft.bodyFont}
                     onValueChange={(bodyFont) => setDraft({ ...draft, bodyFont })}
                     options={fontOptions}
-                    className="h-9"
                   />
                 </Field>
               </TabsContent>
@@ -325,7 +319,7 @@ function ThemeFields() {
                     <Input
                       value={draft.chartColor}
                       onChange={(event) => setDraft({ ...draft, chartColor: event.target.value.toUpperCase() })}
-                      className="h-9 font-mono"
+                      className="font-mono"
                     />
                   </div>
                 </Field>
@@ -368,14 +362,13 @@ function ThemeFields() {
                     : { left: 0, right: 0, bottom: 0, visibility: "hidden" }
                 }
               >
-                <SubmitButton pending={save.isPending} className="h-9">
+                <SubmitButton pending={save.isPending} >
                   Save theme
                 </SubmitButton>
-                {draft.organizationId ? (
+                {draft.tenantId ? (
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-9"
                     disabled={remove.isPending}
                     onClick={() => remove.mutate(draft.id)}
                   >
@@ -385,7 +378,6 @@ function ThemeFields() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-9"
                   disabled={apply.isPending}
                   onClick={() => {
                     const def = catalog.find((theme) => theme.id === clockedInTheme.id) ?? clockedInTheme;
@@ -402,7 +394,7 @@ function ThemeFields() {
         <Card className="h-fit overflow-hidden py-0" style={brandStyle(draft)}>
           <div className="bg-sidebar px-4 py-5 text-sidebar-foreground">
             <p className="text-xs tracking-widest uppercase opacity-70">Preview</p>
-            <p className="mt-1 font-heading text-lg font-semibold">{organization.name}</p>
+            <p className="mt-1 font-heading text-lg font-semibold">{tenant.name}</p>
           </div>
           <div className="brand-rule" />
           <CardContent className="bg-card py-4 text-card-foreground">

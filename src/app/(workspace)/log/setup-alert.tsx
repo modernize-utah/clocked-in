@@ -28,7 +28,7 @@ export function SetupAlert({
       <p>
         {isAdmin
           ? `Add ${entities} before you can ${action}.`
-          : `Ask an ${copy.organization.toLowerCase()} admin to add ${entities} before you can ${action}.`}
+          : `Ask an ${copy.tenant.toLowerCase()} admin to add ${entities} before you can ${action}.`}
       </p>
     </div>
   );

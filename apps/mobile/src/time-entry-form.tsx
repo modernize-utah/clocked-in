@@ -4,7 +4,7 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } fr
 import { api } from "@/api/client";
 import type { TimeEntry } from "@/api/types";
 import { formatCurrency, formatDurationInput, fromDateOnly, localTime, minutesFromDurationInput, shiftDate, today, toDateOnly } from "@/format";
-import { organizationWide, PlacementFields, usePlacement } from "@/placement";
+import { tenantWide, PlacementFields, usePlacement } from "@/placement";
 import { useColors } from "@/theme";
 import { Button, DateField, ErrorText, FormField, Input, Muted, Select, TimeField, ToggleGroup } from "@/ui";
 import { useLookups, useRefreshTime, useWorkspace } from "@/workspace";
@@ -31,17 +31,17 @@ export function TimeEntryForm({
   pinActions?: boolean;
 }) {
   const colors = useColors();
-  const { organization, canSelectRate, labels, viewer } = useWorkspace();
+  const { tenant, canSelectRate, labels, viewer } = useWorkspace();
   const { lookups } = useLookups();
   const refresh = useRefreshTime();
   const punch = entry?.mode === "Punch";
   const [method, setMethod] = useState<Method>(entry?.mode === "Total" ? "Total" : "Duration");
   const total = entry ? entry.mode === "Total" : method === "Total";
-  const canEditTimes = !entry || organization.preferences.allowTimeEntryEditing;
+  const canEditTimes = !entry || tenant.preferences.allowTimeEntryEditing;
   const placement = usePlacement(
     entry
       ? {
-          departmentId: entry.departmentId ?? organizationWide,
+          organizationId: entry.organizationId ?? tenantWide,
           projectId: entry.projectId ?? "",
           taskCategoryId: entry.taskCategoryId ?? "",
           tagIds: entry.tagIds,
@@ -175,7 +175,7 @@ export function TimeEntryForm({
       save.mutate({
         ...base,
         ...rate,
-        organizationId: organization.id,
+        tenantId: tenant.id,
         mode: total ? "Total" : "Duration",
         entries,
       });
@@ -188,7 +188,7 @@ export function TimeEntryForm({
       ...base,
       ...rate,
       ...picked,
-      organizationId: organization.id,
+      tenantId: tenant.id,
       ...(people ? { mode: total ? "Total" : "Duration" } : {}),
     });
   }

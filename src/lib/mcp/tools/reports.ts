@@ -6,7 +6,7 @@ import { mcpAccess } from "@/lib/mcp/context";
 import { guid, tool } from "@/lib/mcp/tool";
 
 const filters = {
-  departmentId: z.string().nullable(),
+  organizationId: z.string().nullable(),
   taskCategoryId: z.string().nullable(),
   projectId: z.string().nullable(),
   userId: z.string().nullable(),
@@ -15,7 +15,7 @@ const filters = {
 };
 
 function filterQuery(args: {
-  departmentId: string | null;
+  organizationId: string | null;
   taskCategoryId: string | null;
   projectId: string | null;
   userId: string | null;
@@ -29,24 +29,24 @@ export function registerReportTools(server: McpServer) {
   tool(
     server,
     "get_report",
-    "Get volunteer and collective report aggregates for an organization. Optional departmentId, taskCategoryId, projectId, userId, from, to.",
-    { organizationId: guid, ...filters },
-    (args) => report(mcpAccess(), args.organizationId, filterQuery(args)),
+    "Get volunteer and collective report aggregates for an tenant. Optional organizationId, taskCategoryId, projectId, userId, from, to.",
+    { tenantId: guid, ...filters },
+    (args) => report(mcpAccess(), args.tenantId, filterQuery(args)),
   );
 
   tool(
     server,
     "export_time_entries_csv",
-    "Export time-entry CSV for an organization. Same optional filters as get_report.",
-    { organizationId: guid, ...filters },
-    async (args) => (await csv(mcpAccess(), args.organizationId, filterQuery(args))).text(),
+    "Export time-entry CSV for an tenant. Same optional filters as get_report.",
+    { tenantId: guid, ...filters },
+    async (args) => (await csv(mcpAccess(), args.tenantId, filterQuery(args))).text(),
   );
 
   tool(
     server,
     "export_summary_csv",
-    "Export the summary CSV for an organization. Same optional filters as get_report.",
-    { organizationId: guid, ...filters },
-    async (args) => (await summaryCsv(mcpAccess(), args.organizationId, filterQuery(args))).text(),
+    "Export the summary CSV for an tenant. Same optional filters as get_report.",
+    { tenantId: guid, ...filters },
+    async (args) => (await summaryCsv(mcpAccess(), args.tenantId, filterQuery(args))).text(),
   );
 }

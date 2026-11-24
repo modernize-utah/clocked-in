@@ -22,33 +22,33 @@ describe("hourly rates", suite, () => {
     ctx.admin = await signUp("rateadmin");
     ctx.member = await signUp("ratemember");
     ctx.volunteer = await signUp("ratevol");
-    ctx.org = await createJson(ctx.admin.accessToken, "/organizations", { name: label("Rate org") });
-    ctx.category = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/task-categories`, {
+    ctx.org = await createJson(ctx.admin.accessToken, "/tenants", { name: label("Rate org") });
+    ctx.category = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/task-categories`, {
       name: label("Rate category"),
     });
-    ctx.project = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/projects`, {
+    ctx.project = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/projects`, {
       title: label("Rate project"),
       accessType: "Public",
     });
-    await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/invitations`, {
+    await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/invitations`, {
       email: ctx.member.email,
       role: "MEMBER",
     });
     await acceptInvite(ctx.member.accessToken, ctx.member.email);
-    await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/invitations`, {
+    await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/invitations`, {
       email: ctx.volunteer.email,
       role: "VOLUNTEER",
     });
     await acceptInvite(ctx.volunteer.accessToken, ctx.volunteer.email);
   });
 
-  test("creating an organization seeds a default volunteer rate", async () => {
-    const response = await callApi(`/organizations/${ctx.org.id}/hourly-rates`, { token: ctx.admin.accessToken });
+  test("creating an tenant seeds a default volunteer rate", async () => {
+    const response = await callApi(`/tenants/${ctx.org.id}/hourly-rates`, { token: ctx.admin.accessToken });
     assertList(response.json);
     assert.equal(response.json.items.length, 1);
     ctx.defaultRate = response.json.items[0];
     assertHourlyRate(ctx.defaultRate, {
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       type: "Volunteer",
       name: "Volunteer",
       perHourRate: 35.47,
@@ -57,33 +57,33 @@ describe("hourly rates", suite, () => {
   });
 
   test("admins can add, default, archive, and delete rates", async () => {
-    ctx.professional = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/hourly-rates`, {
+    ctx.professional = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/hourly-rates`, {
       type: "Professional",
       name: "Counsel",
       perHourRate: 80,
     });
     assertHourlyRate(ctx.professional, {
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       type: "Professional",
       name: "Counsel",
       perHourRate: 80,
       isDefault: false,
     });
-    const asDefault = await callApi(`/organizations/${ctx.org.id}/hourly-rates`, {
+    const asDefault = await callApi(`/tenants/${ctx.org.id}/hourly-rates`, {
       method: "POST",
       token: ctx.admin.accessToken,
       body: { type: "Professional", name: "Default counsel", perHourRate: 90, isDefault: true },
     });
     assertError(asDefault, 400, "validation_error", "Only a volunteer rate can be the default.");
 
-    ctx.otherVolunteer = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/hourly-rates`, {
+    ctx.otherVolunteer = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/hourly-rates`, {
       type: "Volunteer",
       name: "Board",
       perHourRate: 50,
       isDefault: true,
     });
     assert.equal(ctx.otherVolunteer.isDefault, true);
-    const listed = await callApi(`/organizations/${ctx.org.id}/hourly-rates`, { token: ctx.admin.accessToken });
+    const listed = await callApi(`/tenants/${ctx.org.id}/hourly-rates`, { token: ctx.admin.accessToken });
     const previous = listed.json.items.find((item) => item.id === ctx.defaultRate.id);
     assert.equal(previous.isDefault, false);
     ctx.defaultRate = ctx.otherVolunteer;
@@ -107,13 +107,13 @@ describe("hourly rates", suite, () => {
     });
     assert.equal(archived.status, 200);
     assert.equal(archived.json.isArchived, true);
-    const stillListed = await callApi(`/organizations/${ctx.org.id}/hourly-rates`, { token: ctx.member.accessToken });
+    const stillListed = await callApi(`/tenants/${ctx.org.id}/hourly-rates`, { token: ctx.member.accessToken });
     assert.equal(stillListed.json.items.some((item) => item.id === ctx.professional.id && item.isArchived), true);
   });
 
   test("volunteers lock to the default rate and members can choose another", async () => {
     const volunteerOwn = await createJson(ctx.volunteer.accessToken, "/time/duration", {
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       durationMinutes: 60,
@@ -125,7 +125,7 @@ describe("hourly rates", suite, () => {
     assertMoney(volunteerOwn.inKindValue, 50);
 
     const memberOwn = await createJson(ctx.member.accessToken, "/time/duration", {
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       durationMinutes: 60,
@@ -141,7 +141,7 @@ describe("hourly rates", suite, () => {
     });
     assert.equal(restored.status, 200);
     const selected = await createJson(ctx.member.accessToken, "/time/duration", {
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       durationMinutes: 30,
@@ -154,7 +154,7 @@ describe("hourly rates", suite, () => {
 
     const forVolunteer = await createJson(ctx.admin.accessToken, `/users/${ctx.volunteer.user.id}/time-entries`, {
       mode: "Duration",
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       durationMinutes: 60,
@@ -173,7 +173,7 @@ describe("hourly rates", suite, () => {
       method: "POST",
       token: ctx.member.accessToken,
       body: {
-        organizationId: ctx.org.id,
+        tenantId: ctx.org.id,
         projectId: ctx.project.id,
         taskCategoryId: ctx.category.id,
         durationMinutes: 30,
@@ -185,26 +185,26 @@ describe("hourly rates", suite, () => {
   });
 
   test("patching volunteerHourlyRate updates the default rate", async () => {
-    const updated = await callApi(`/organizations/${ctx.org.id}`, {
+    const updated = await callApi(`/tenants/${ctx.org.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
       body: { volunteerHourlyRate: 41.25 },
     });
     assertMoney(updated.json.volunteerHourlyRate, 41.25);
-    const listed = await callApi(`/organizations/${ctx.org.id}/hourly-rates`, { token: ctx.admin.accessToken });
+    const listed = await callApi(`/tenants/${ctx.org.id}/hourly-rates`, { token: ctx.admin.accessToken });
     const currentDefault = listed.json.items.find((item) => item.isDefault);
     assertMoney(currentDefault.perHourRate, 41.25);
   });
 
   test("source is optional and can be cleared", async () => {
-    const cited = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/hourly-rates`, {
+    const cited = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/hourly-rates`, {
       type: "Volunteer",
       name: "Cited",
       perHourRate: 40,
       source: "  Independent Sector  ",
     });
     assertHourlyRate(cited, {
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       type: "Volunteer",
       name: "Cited",
       perHourRate: 40,
@@ -212,14 +212,14 @@ describe("hourly rates", suite, () => {
       source: "Independent Sector",
     });
 
-    const omitted = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/hourly-rates`, {
+    const omitted = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/hourly-rates`, {
       type: "Professional",
       name: "Uncited",
       perHourRate: 70,
     });
     assert.equal(omitted.source, null);
 
-    const blank = await callApi(`/organizations/${ctx.org.id}/hourly-rates`, {
+    const blank = await callApi(`/tenants/${ctx.org.id}/hourly-rates`, {
       method: "POST",
       token: ctx.admin.accessToken,
       body: { type: "Professional", name: "Blank source", perHourRate: 71, source: "   " },
@@ -227,7 +227,7 @@ describe("hourly rates", suite, () => {
     assert.equal(blank.status, 201);
     assert.equal(blank.json.source, null);
 
-    const tooLong = await callApi(`/organizations/${ctx.org.id}/hourly-rates`, {
+    const tooLong = await callApi(`/tenants/${ctx.org.id}/hourly-rates`, {
       method: "POST",
       token: ctx.admin.accessToken,
       body: { type: "Professional", name: "Long source", perHourRate: 72, source: "x".repeat(201) },
@@ -252,7 +252,7 @@ describe("hourly rates", suite, () => {
   });
 
   test("a referenced rate cannot be deleted", async () => {
-    const unused = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/hourly-rates`, {
+    const unused = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/hourly-rates`, {
       type: "Volunteer",
       name: "Unused",
       perHourRate: 20,

@@ -20,13 +20,13 @@ export function canLogMemberTime(workspace: Workspace) {
 export function canLogGroupTime(workspace: Workspace) {
   return (
     has(workspace.permissions, "log_group_sessions") ||
-    workspace.groupDepartments === "all" ||
-    workspace.groupDepartments.length > 0
+    workspace.groupOrganizations === "all" ||
+    workspace.groupOrganizations.length > 0
   );
 }
 
 export function canLogConnectionTime(workspace: Workspace, connectionCount: number) {
-  if (workspace.role === "VOLUNTEER" && (workspace.organization?.preferences.allowVolunteersToAddVolunteers || connectionCount > 0)) {
+  if (workspace.role === "VOLUNTEER" && (workspace.tenant?.preferences.allowVolunteersToAddVolunteers || connectionCount > 0)) {
     return true;
   }
   return workspace.isAdmin && connectionCount > 0;
@@ -60,9 +60,9 @@ export function canViewPayroll(workspace: Workspace) {
 
 export const permissionGroups: { label: string; items: { key: string; label: string }[] }[] = [
   {
-    label: "Organization",
+    label: "Tenant",
     items: [
-      { key: "manage_organization", label: "Manage organization settings" },
+      { key: "manage_tenant", label: "Manage tenant settings" },
       { key: "manage_roles", label: "Create and edit roles" },
       { key: "manage_members", label: "Manage people" },
       { key: "invite_members", label: "Invite people" },

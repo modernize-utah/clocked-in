@@ -18,7 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useOrganization } from "@/hooks/use-workspace";
+import { useTenant } from "@/hooks/use-workspace";
 import { patternFor } from "@/lib/number-pattern";
 import {
   chartTypes,
@@ -71,7 +71,7 @@ export function ChartCard({
   onPaletteChange?: (palette: PaletteType) => void;
 }) {
   const router = useRouter();
-  const { theme } = useOrganization();
+  const { theme } = useTenant();
   const [chartTypeState, setChartType] = useState(chartTypeProp);
   const [paletteState, setPalette] = useState<PaletteType>(() => defaultPalette(chartTypeProp, paletteProp));
   const chartType = configurable ? chartTypeState : chartTypeProp;

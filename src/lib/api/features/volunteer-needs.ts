@@ -43,7 +43,7 @@ export type StoredAnswer = { questionId: string; prompt: string; choiceIds: stri
 
 type NeedRow = {
   id: string;
-  organizationId: string;
+  tenantId: string;
   createdByUserId: string;
   publicToken: string;
   name: string;
@@ -59,7 +59,7 @@ type NeedRow = {
   questions: Prisma.JsonValue;
   projectId: string | null;
   taskCategoryId: string | null;
-  departmentId: string | null;
+  organizationId: string | null;
   status: string;
   createdAt: Date;
   updatedAt: Date;
@@ -219,7 +219,7 @@ function grade(form: NeedForm, node: unknown): { passed: boolean; answers: Store
 function needJson(need: NeedRow) {
   return {
     id: need.id,
-    organizationId: need.organizationId,
+    tenantId: need.tenantId,
     createdByUserId: need.createdByUserId,
     publicToken: need.publicToken,
     name: need.name,
@@ -236,7 +236,7 @@ function needJson(need: NeedRow) {
     questions: questionsFrom(need.questions),
     projectId: need.projectId,
     taskCategoryId: need.taskCategoryId,
-    departmentId: need.departmentId,
+    organizationId: need.organizationId,
     createdAt: need.createdAt.toISOString(),
     updatedAt: need.updatedAt.toISOString(),
   };
@@ -301,15 +301,15 @@ function rejectClosed(need: { requiredBy: Date | null; countVetted: number; coun
   if (closed === "full") conflict("This need is already filled.");
 }
 
-async function relations(organizationId: string, projectId: string | null, taskCategoryId: string | null, departmentId: string | null) {
-  if (projectId && !(await prisma.project.findFirst({ where: { id: projectId, organizationId }, select: { id: true } }))) {
+async function relations(tenantId: string, projectId: string | null, taskCategoryId: string | null, organizationId: string | null) {
+  if (projectId && !(await prisma.project.findFirst({ where: { id: projectId, tenantId }, select: { id: true } }))) {
     validation("projectId was not found.");
   }
-  if (taskCategoryId && !(await prisma.taskCategory.findFirst({ where: { id: taskCategoryId, organizationId }, select: { id: true } }))) {
+  if (taskCategoryId && !(await prisma.taskCategory.findFirst({ where: { id: taskCategoryId, tenantId }, select: { id: true } }))) {
     validation("taskCategoryId was not found.");
   }
-  if (departmentId && !(await prisma.department.findFirst({ where: { id: departmentId, organizationId }, select: { id: true } }))) {
-    validation("departmentId was not found.");
+  if (organizationId && !(await prisma.tenant.findFirst({ where: { id: organizationId, tenantId }, select: { id: true } }))) {
+    validation("organizationId was not found.");
   }
 }
 
@@ -317,10 +317,10 @@ async function managed(access: Access, needId: string) {
   const need = await prisma.volunteerNeed.findUnique({ where: { id: needId } });
   if (!need) notFound();
   if (
-    !(await access.can(need.organizationId, "create_needs", need.departmentId)) &&
-    !(await access.can(need.organizationId, "approve_needs"))
+    !(await access.can(need.tenantId, "create_needs", need.organizationId)) &&
+    !(await access.can(need.tenantId, "approve_needs"))
   ) {
-    await access.requireOrganization(need.organizationId, true);
+    await access.requireTenant(need.tenantId, true);
   }
   return need;
 }
@@ -349,7 +349,7 @@ export function parseSaveNeed(body: Body) {
     questions: has(body, "questions") ? parseQuestions(body.questions) : emptyQuestions,
     projectId: optionalUuid(body, "projectId"),
     taskCategoryId: optionalUuid(body, "taskCategoryId"),
-    departmentId: optionalUuid(body, "departmentId"),
+    organizationId: optionalUuid(body, "organizationId"),
   };
 }
 
@@ -367,7 +367,7 @@ export function parseUpdateNeed(body: Body) {
     questions: optional(body, "questions", (item, key) => parseQuestions(item[key])),
     projectId: optional(body, "projectId", optionalUuid),
     taskCategoryId: optional(body, "taskCategoryId", optionalUuid),
-    departmentId: optional(body, "departmentId", optionalUuid),
+    organizationId: optional(body, "organizationId", optionalUuid),
   };
   if (Object.values(request).every((field) => !field.set)) validation("Provide at least one field to update.");
   return request;
@@ -398,42 +398,42 @@ export async function linkGuest(db: Prisma.TransactionClient | typeof prisma, em
   await db.guest.updateMany({ where: { email, userId: null }, data: { userId } });
 }
 
-export async function listVolunteerNeeds(access: Access, organizationId: string, params: URLSearchParams) {
+export async function listVolunteerNeeds(access: Access, tenantId: string, params: URLSearchParams) {
   const paging = page(params);
-  const canApprove = await access.can(organizationId, "approve_needs");
-  if (!(await access.can(organizationId, "create_needs")) && !canApprove) {
-    await access.requireOrganization(organizationId, true);
+  const canApprove = await access.can(tenantId, "approve_needs");
+  if (!(await access.can(tenantId, "create_needs")) && !canApprove) {
+    await access.requireTenant(tenantId, true);
   }
   const q = params.get("q")?.trim();
   if (q && q.length > 200) validation("q must be 200 characters or fewer.");
   const type = params.get("type");
   const projectId = params.get("projectId");
-  const departmentId = params.get("departmentId");
+  const organizationId = params.get("organizationId");
   const allowPublic = params.get("allowPublic");
   const status = params.get("status")?.trim();
   if (projectId && !/^[0-9a-f-]{36}$/i.test(projectId)) validation("projectId must be an id.");
-  if (departmentId && !/^[0-9a-f-]{36}$/i.test(departmentId)) validation("departmentId must be an id.");
+  if (organizationId && !/^[0-9a-f-]{36}$/i.test(organizationId)) validation("organizationId must be an id.");
   if (allowPublic && allowPublic !== "true" && allowPublic !== "false") validation("allowPublic must be true or false.");
   if (status && !["pending_approval", "published", "rejected", "draft"].includes(status)) {
     validation("status must be pending_approval, published, rejected, or draft.");
   }
-  const managedIds = canApprove ? [] : await access.adminDepartmentIds(organizationId);
+  const managedIds = canApprove ? [] : await access.adminOrganizationIds(tenantId);
   const owned = canApprove
     ? {}
     : {
         OR: [
           { createdByUserId: access.actorUserId },
-          ...(managedIds.length > 0 ? [{ departmentId: { in: managedIds } }] : []),
+          ...(managedIds.length > 0 ? [{ organizationId: { in: managedIds } }] : []),
         ],
       };
   const needs = await prisma.volunteerNeed.findMany({
     where: {
-      organizationId,
+      tenantId,
       ...owned,
       ...(q ? { name: { contains: q, mode: "insensitive" } } : {}),
       ...(type ? { type: needType(type) } : {}),
       ...(projectId ? { projectId } : {}),
-      ...(departmentId ? { departmentId } : {}),
+      ...(organizationId ? { organizationId } : {}),
       ...(allowPublic ? { allowPublic: allowPublic === "true" } : {}),
       ...(status ? { status } : {}),
     },
@@ -448,18 +448,18 @@ export async function getVolunteerNeed(access: Access, needId: string) {
   return needJson(await managed(access, needId));
 }
 
-export async function createVolunteerNeed(access: Access, organizationId: string, request: ReturnType<typeof parseSaveNeed>) {
-  await access.requirePermission(organizationId, "create_needs", request.departmentId);
+export async function createVolunteerNeed(access: Access, tenantId: string, request: ReturnType<typeof parseSaveNeed>) {
+  await access.requirePermission(tenantId, "create_needs", request.organizationId);
   assertDates(request.startDate, request.endDate);
-  await relations(organizationId, request.projectId, request.taskCategoryId, request.departmentId);
+  await relations(tenantId, request.projectId, request.taskCategoryId, request.organizationId);
   const now = utcNow();
-  const publishNow = await access.can(organizationId, "approve_needs");
+  const publishNow = await access.can(tenantId, "approve_needs");
   const status = publishNow ? "published" : "pending_approval";
   const need = await guard(
     prisma.volunteerNeed.create({
       data: {
         id: randomUUID(),
-        organizationId,
+        tenantId,
         createdByUserId: access.actorUserId,
         publicToken: randomBytes(16).toString("hex"),
         name: request.name,
@@ -474,7 +474,7 @@ export async function createVolunteerNeed(access: Access, organizationId: string
         questions: request.questions,
         projectId: request.projectId,
         taskCategoryId: request.taskCategoryId,
-        departmentId: request.departmentId,
+        organizationId: request.organizationId,
         status,
         createdAt: now,
         updatedAt: now,
@@ -482,19 +482,19 @@ export async function createVolunteerNeed(access: Access, organizationId: string
     }),
   );
   if (!publishNow) {
-    const organization = await prisma.organization.findUnique({ where: { id: organizationId }, select: { name: true } });
-    const admins = await prisma.organizationMembership.findMany({
-      where: { organizationId, isActive: true, role: { code: "ADMIN" } },
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true } });
+    const admins = await prisma.tenantMembership.findMany({
+      where: { tenantId, isActive: true, role: { code: "ADMIN" } },
       include: { user: { select: { email: true } } },
     });
     await Promise.all(
       admins.map((admin) =>
         sendEmail({
           to: admin.user.email,
-          organizationId,
+          tenantId,
           for: "NeedSubmitted",
           context: {
-            organization: { name: organization?.name ?? "VolunTime" },
+            tenant: { name: tenant?.name ?? "VolunTime" },
             need: { name: need.name, managerName: access.caller.profile?.firstName || access.caller.username },
           },
         }).catch(() => undefined),
@@ -513,8 +513,8 @@ export async function updateVolunteerNeed(access: Access, needId: string, reques
   assertDates(startDate, endDate);
   const projectId = request.projectId.set ? request.projectId.value : current.projectId;
   const taskCategoryId = request.taskCategoryId.set ? request.taskCategoryId.value : current.taskCategoryId;
-  const departmentId = request.departmentId.set ? request.departmentId.value : current.departmentId;
-  await relations(current.organizationId, projectId, taskCategoryId, departmentId);
+  const organizationId = request.organizationId.set ? request.organizationId.value : current.organizationId;
+  await relations(current.tenantId, projectId, taskCategoryId, organizationId);
   const need = await guard(
     prisma.volunteerNeed.update({
       where: { id: needId },
@@ -531,7 +531,7 @@ export async function updateVolunteerNeed(access: Access, needId: string, reques
         ...(request.questions.set ? { questions: request.questions.value } : {}),
         ...(request.projectId.set ? { projectId: request.projectId.value } : {}),
         ...(request.taskCategoryId.set ? { taskCategoryId: request.taskCategoryId.value } : {}),
-        ...(request.departmentId.set ? { departmentId: request.departmentId.value } : {}),
+        ...(request.organizationId.set ? { organizationId: request.organizationId.value } : {}),
         updatedAt: utcNow(),
       },
     }),
@@ -554,19 +554,19 @@ export async function listSignups(access: Access, needId: string) {
   return { items: signups.map(signupJson), limit: signups.length, offset: 0 };
 }
 
-async function pinnedOrganizationId(tenantSlug?: string | null) {
+async function pinnedTenantId(tenantSlug?: string | null) {
   const normalized = tenantSlug?.trim().toLowerCase() || null;
   if (!normalized) return undefined;
-  const pinned = await prisma.organization.findFirst({ where: { slug: normalized }, select: { id: true } });
+  const pinned = await prisma.tenant.findFirst({ where: { slug: normalized }, select: { id: true } });
   if (!pinned) notFound();
   return pinned.id;
 }
 
 export async function publicVolunteerNeed(token: string, options?: { tenantSlug?: string | null }) {
-  const organizationId = await pinnedOrganizationId(options?.tenantSlug);
+  const tenantId = await pinnedTenantId(options?.tenantSlug);
   const need = await prisma.volunteerNeed.findFirst({
-    where: { publicToken: token, allowPublic: true, status: "published", ...(organizationId ? { organizationId } : {}) },
-    include: { Organization: true },
+    where: { publicToken: token, allowPublic: true, status: "published", ...(tenantId ? { tenantId } : {}) },
+    include: { Tenant: true },
   });
   if (!need) notFound();
   const closed = closedReason(need);
@@ -583,7 +583,7 @@ export async function publicVolunteerNeed(token: string, options?: { tenantSlug?
     requireVetting: need.requireVetting,
     closed,
     questions: publicQuestions(questionsFrom(need.questions)),
-    organizationName: need.Organization.name,
+    tenantName: need.Tenant.name,
   };
 }
 
@@ -593,13 +593,13 @@ export async function signUpForNeed(
   request: ReturnType<typeof parsePublicSignup>,
   options?: { tenantSlug?: string | null },
 ) {
-  const organizationId = await pinnedOrganizationId(options?.tenantSlug ?? access?.tenantSlug);
+  const tenantId = await pinnedTenantId(options?.tenantSlug ?? access?.tenantSlug);
   if (!request.acknowledged) validation("Acknowledge how your email will be used.");
   await verifyCaptcha(request.captchaToken);
   const user = access && !access.isApiKey ? access.caller : null;
   const signupId = await transaction(async (tx) => {
     const need = await tx.volunteerNeed.findFirst({
-      where: { publicToken: token, allowPublic: true, status: "published", ...(organizationId ? { organizationId } : {}) },
+      where: { publicToken: token, allowPublic: true, status: "published", ...(tenantId ? { tenantId } : {}) },
     });
     if (!need) notFound();
     await tx.$queryRaw`SELECT "id" FROM "VolunteerNeed" WHERE "id" = CAST(${need.id} AS uuid) FOR UPDATE`;
@@ -667,10 +667,10 @@ export async function signUpForNeed(
   const signup = await prisma.volunteerSignup.findUniqueOrThrow({ where: { id: signupId }, include: signupInclude });
   const json = signupJson(signup);
   if (request.requestAccess) {
-    const need = await prisma.volunteerNeed.findFirst({ where: { publicToken: token }, select: { organizationId: true, id: true } });
+    const need = await prisma.volunteerNeed.findFirst({ where: { publicToken: token }, select: { tenantId: true, id: true } });
     if (need) {
       const { createPublicAccessRequest } = await import("@/lib/api/features/access-requests");
-      await createPublicAccessRequest(need.organizationId, {
+      await createPublicAccessRequest(need.tenantId, {
         email: json.email,
         name: json.name,
         guestId: json.guestId,
@@ -685,7 +685,7 @@ async function changeVetting(access: Access, needId: string, signupId: string, v
   // Access checks use the global client, so they run before the transaction holds the connection.
   const need = await prisma.volunteerNeed.findUnique({ where: { id: needId } });
   if (!need) notFound();
-  await access.requireOrganization(need.organizationId, true);
+  await access.requireTenant(need.tenantId, true);
   await transaction(async (tx) => {
     await tx.$queryRaw`SELECT "id" FROM "VolunteerNeed" WHERE "id" = CAST(${need.id} AS uuid) FOR UPDATE`;
     const locked = await tx.volunteerNeed.findUniqueOrThrow({ where: { id: need.id } });
@@ -714,7 +714,7 @@ export function unvetSignup(access: Access, needId: string, signupId: string) {
 export async function deleteSignup(access: Access, needId: string, signupId: string) {
   const need = await prisma.volunteerNeed.findUnique({ where: { id: needId } });
   if (!need) notFound();
-  await access.requireOrganization(need.organizationId, true);
+  await access.requireTenant(need.tenantId, true);
   await transaction(async (tx) => {
     await tx.$queryRaw`SELECT "id" FROM "VolunteerNeed" WHERE "id" = CAST(${need.id} AS uuid) FOR UPDATE`;
     const locked = await tx.volunteerNeed.findUniqueOrThrow({ where: { id: need.id } });
@@ -742,7 +742,7 @@ export async function emailVolunteers(access: Access, needId: string, request: R
     const person = signupJson(signup);
     await sendEmail({
       to: person.email,
-      organizationId: need.organizationId,
+      tenantId: need.tenantId,
       for: "VolunteerMessage",
       context: { message: { subject: request.subject, body: request.message }, need: { name: need.name } },
     });
@@ -751,19 +751,19 @@ export async function emailVolunteers(access: Access, needId: string, request: R
 }
 
 export async function listPublicNeeds(slug: string, options?: { tenantSlug?: string | null }) {
-  const pinnedId = await pinnedOrganizationId(options?.tenantSlug);
-  const organization = await prisma.organization.findFirst({
+  const pinnedId = await pinnedTenantId(options?.tenantSlug);
+  const tenant = await prisma.tenant.findFirst({
     where: { publicSlug: slug.toLowerCase(), ...(pinnedId ? { id: pinnedId } : {}) },
     select: { id: true, name: true, publicSlug: true },
   });
-  if (!organization) notFound();
+  if (!tenant) notFound();
   const needs = await prisma.volunteerNeed.findMany({
-    where: { organizationId: organization.id, allowPublic: true, status: "published" },
+    where: { tenantId: tenant.id, allowPublic: true, status: "published" },
     orderBy: { startDate: "asc" },
   });
   return {
-    organizationName: organization.name,
-    slug: organization.publicSlug,
+    tenantName: tenant.name,
+    slug: tenant.publicSlug,
     items: needs.map((need) => ({
       id: need.id,
       name: need.name,
@@ -781,19 +781,19 @@ export async function listPublicNeeds(slug: string, options?: { tenantSlug?: str
 
 export async function decideNeed(access: Access, needId: string, status: "published" | "rejected") {
   const need = await managed(access, needId);
-  await access.requirePermission(need.organizationId, "approve_needs");
+  await access.requirePermission(need.tenantId, "approve_needs");
   const updated = await prisma.volunteerNeed.update({
     where: { id: needId },
     data: { status, updatedAt: utcNow() },
   });
   const creator = await prisma.user.findUnique({ where: { id: need.createdByUserId }, select: { email: true } });
-  const organization = await prisma.organization.findUnique({ where: { id: need.organizationId }, select: { name: true } });
+  const tenant = await prisma.tenant.findUnique({ where: { id: need.tenantId }, select: { name: true } });
   if (creator) {
     await sendEmail({
       to: creator.email,
-      organizationId: need.organizationId,
+      tenantId: need.tenantId,
       for: "NeedDecided",
-      context: { organization: { name: organization?.name ?? "VolunTime" }, need: { name: need.name, decision: status } },
+      context: { tenant: { name: tenant?.name ?? "VolunTime" }, need: { name: need.name, decision: status } },
     }).catch(() => undefined);
   }
   return needJson(updated);

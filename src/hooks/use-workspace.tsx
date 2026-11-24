@@ -3,20 +3,20 @@
 import { createContext, useContext } from "react";
 import type { RoleCode } from "@/lib/api/json";
 import { isCoordinator } from "@/lib/roles";
-import type { GroupDepartments, Organization, Viewer } from "@/lib/types";
+import type { GroupOrganizations, Tenant, Viewer } from "@/lib/types";
 
 export type Workspace = {
   viewer: Viewer;
-  organizations: Organization[];
-  organization: Organization | null;
+  tenants: Tenant[];
+  tenant: Tenant | null;
   isAdmin: boolean;
   isCoordinator: boolean;
   canSelectRate: boolean;
   role: RoleCode | null;
   permissions: string[];
-  groupDepartments: GroupDepartments;
+  groupOrganizations: GroupOrganizations;
   isTenantHost?: boolean;
-  pinnedOrganizationName?: string | null;
+  pinnedTenantName?: string | null;
   appOrigin?: string;
 };
 
@@ -27,7 +27,7 @@ export function WorkspaceProvider({ value, children }: { value: Workspace; child
     <WorkspaceContext
       value={{
         ...value,
-        isCoordinator: value.isCoordinator || isCoordinator(value.groupDepartments),
+        isCoordinator: value.isCoordinator || isCoordinator(value.groupOrganizations),
         permissions: value.permissions ?? [],
       }}
     >
@@ -45,11 +45,11 @@ export function useWorkspace() {
   return workspace;
 }
 
-export function useOrganization() {
-  const { organization } = useWorkspace();
-  if (!organization) {
-    throw new Error("This view needs an active organization.");
+export function useTenant() {
+  const { tenant } = useWorkspace();
+  if (!tenant) {
+    throw new Error("This view needs an active tenant.");
   }
 
-  return organization;
+  return tenant;
 }

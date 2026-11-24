@@ -21,7 +21,7 @@ export async function createFeedbackAction(formData: FormData): Promise<ActionRe
     isSuperAdmin = access.caller.isSuperAdmin;
     const files = formData.getAll("screenshots").filter((item): item is File => item instanceof File && item.size > 0);
     const screenshotUrls = files.length > 0 ? await uploadFeedbackScreenshots(access.caller.id, files) : [];
-    const organizationId = String(formData.get("organizationId") ?? "").trim();
+    const tenantId = String(formData.get("tenantId") ?? "").trim();
     return createFeedback(
       access,
       parseCreateFeedback({
@@ -31,7 +31,7 @@ export async function createFeedbackAction(formData: FormData): Promise<ActionRe
         title: String(formData.get("title") ?? ""),
         description: String(formData.get("description") ?? ""),
         screenshotUrls,
-        ...(organizationId ? { organizationId } : {}),
+        ...(tenantId ? { tenantId } : {}),
       }),
     );
   }, "Thanks for the feedback.");

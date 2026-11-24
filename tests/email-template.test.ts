@@ -86,7 +86,7 @@ test("every email type has a default that only uses its catalog fields", () => {
     assert.deepEqual(unknownPlaceholders(kind, item.subject, item.heading, item.preview, item.html), [], item.for);
     assert.equal(sanitizeEmailHtml(item.html), item.html, item.for);
   }
-  for (const field of ["entry.hours", "entry.date", "user.firstName", "organization.name"]) {
+  for (const field of ["entry.hours", "entry.date", "user.firstName", "tenant.name"]) {
     assert.ok(field in emailTemplateFields.LoggedTime);
   }
 });
@@ -113,9 +113,9 @@ test("rendered defaults keep the mailed code lines and code box", () => {
   assert.equal(reset.subject, "Your VolunTime password reset code");
 
   const invite = renderEmail(content("Invite"), {
-    organization: { name: "North <Org>" },
+    tenant: { name: "North <Org>" },
     invite: {
-      targetKind: "Organization",
+      targetKind: "Tenant",
       targetName: "North <Org>",
       roleName: "Staff",
       code: "invite-9",
@@ -134,7 +134,7 @@ test("rendered defaults keep the mailed code lines and code box", () => {
 test("LoggedTime default renders hours and date", () => {
   const filled = renderEmail(content("LoggedTime"), {
     user: { firstName: "Jamie" },
-    organization: { name: "Harbor" },
+    tenant: { name: "Harbor" },
     entry: { hours: "2.5", date: "Tue, Oct 27, 2026", url: "https://x.example/log" },
   });
   assert.equal(filled.subject, "Your hours for Harbor were saved");

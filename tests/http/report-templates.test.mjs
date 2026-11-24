@@ -34,9 +34,9 @@ describe("report templates", suite, () => {
     ctx.outsider = await signUp("tmplout");
     ctx.superAdmin = await signUp("tmplsuper");
     await grantSuperAdmin(ctx.superAdmin.user.id);
-    ctx.org = await createJson(ctx.admin.accessToken, "/organizations", { name: label("Template org") });
+    ctx.org = await createJson(ctx.admin.accessToken, "/tenants", { name: label("Template org") });
     await joinOrg(ctx.admin.accessToken, ctx.org.id, ctx.member, { role: "MEMBER" });
-    ctx.path = `/organizations/${ctx.org.id}/report-templates`;
+    ctx.path = `/tenants/${ctx.org.id}/report-templates`;
   });
 
   test("members list the globals in key order", async () => {
@@ -48,7 +48,7 @@ describe("report templates", suite, () => {
       ["summary", "people", "groups", "staff"],
     );
     for (const item of globals) {
-      assert.equal(item.organizationId, null);
+      assert.equal(item.tenantId, null);
       assert.equal(item.layout.version, 1);
     }
     ctx.summary = globals[0];
@@ -57,7 +57,7 @@ describe("report templates", suite, () => {
     assertError(outsider, 403, "forbidden", "Forbidden.");
   });
 
-  test("an admin creates an organization template; members and duplicates are refused", async () => {
+  test("an admin creates an tenant template; members and duplicates are refused", async () => {
     const denied = await callApi(ctx.path, {
       method: "POST",
       token: ctx.member.accessToken,
@@ -72,8 +72,8 @@ describe("report templates", suite, () => {
     });
     assert.equal(created.status, 201, created.text);
     assertUuid(created.json.id);
-    assert.equal(created.json.scope, "organization");
-    assert.equal(created.json.organizationId, ctx.org.id);
+    assert.equal(created.json.scope, "tenant");
+    assert.equal(created.json.tenantId, ctx.org.id);
     assert.equal(created.json.key, null);
     ctx.owned = created.json;
 
@@ -99,7 +99,7 @@ describe("report templates", suite, () => {
     assertError(noLayout, 400, "validation_error", "layout is required.");
   });
 
-  test("an override replaces the global for that organization until it is deleted", async () => {
+  test("an override replaces the global for that tenant until it is deleted", async () => {
     const override = await callApi(ctx.path, {
       method: "POST",
       token: ctx.admin.accessToken,
@@ -145,8 +145,8 @@ describe("report templates", suite, () => {
     });
     assertError(orgAdmin, 403, "forbidden", "Forbidden.");
 
-    const superAdminOrgs = await createJson(ctx.superAdmin.accessToken, "/organizations", { name: label("Super org") });
-    const superPath = `/organizations/${superAdminOrgs.id}/report-templates`;
+    const superAdminOrgs = await createJson(ctx.superAdmin.accessToken, "/tenants", { name: label("Super org") });
+    const superPath = `/tenants/${superAdminOrgs.id}/report-templates`;
     const patched = await callApi(`${superPath}/${ctx.summary.id}`, {
       method: "PATCH",
       token: ctx.superAdmin.accessToken,
@@ -159,7 +159,7 @@ describe("report templates", suite, () => {
     assertError(deleteGlobal, 403, "forbidden", "Forbidden.");
   });
 
-  test("an admin renames and deletes an organization template", async () => {
+  test("an admin renames and deletes an tenant template", async () => {
     const renamed = await callApi(`${ctx.path}/${ctx.owned.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,

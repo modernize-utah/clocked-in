@@ -3,7 +3,7 @@ import { respond } from "@/lib/api/respond";
 import { isBrandKind, isOwnedBrandBlob, isVercelBlobUrl } from "@/lib/brand";
 import { getAuthBrand } from "@/lib/server/auth-brand";
 import { encodePng, readBrandAsset, storedBrandUrl } from "@/lib/server/brand-assets";
-import { getCurrentOrganization } from "@/lib/server/dal";
+import { getCurrentTenant } from "@/lib/server/dal";
 import { getAccess } from "@/lib/server/session";
 
 export async function GET(request: Request, context: { params: Promise<{ kind: string }> }) {
@@ -14,10 +14,10 @@ export async function GET(request: Request, context: { params: Promise<{ kind: s
     }
 
     // The login screen paints these marks with no session. Signed-in requests
-    // stay limited to an organization the caller belongs to.
-    const organization = (await getAccess()) ? await getCurrentOrganization() : await getAuthBrand();
-    const storedUrl = organization ? storedBrandUrl(organization, kind) : null;
-    if (!organization || !storedUrl) {
+    // stay limited to an tenant the caller belongs to.
+    const tenant = (await getAccess()) ? await getCurrentTenant() : await getAuthBrand();
+    const storedUrl = tenant ? storedBrandUrl(tenant, kind) : null;
+    if (!tenant || !storedUrl) {
       return emptyNotFound();
     }
 
@@ -25,7 +25,7 @@ export async function GET(request: Request, context: { params: Promise<{ kind: s
       return Response.redirect(storedUrl, 302);
     }
 
-    if (!isOwnedBrandBlob(organization.id, storedUrl)) {
+    if (!isOwnedBrandBlob(tenant.id, storedUrl)) {
       return emptyNotFound();
     }
 

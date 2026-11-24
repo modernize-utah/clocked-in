@@ -1,14 +1,14 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useOrganization } from "@/hooks/use-workspace";
+import { useTenant } from "@/hooks/use-workspace";
 import { reportQuery } from "@/lib/queries";
 import type { ReportFilters } from "@/lib/report-layout";
 
 export function useReport(filter: ReportFilters) {
-  const organization = useOrganization();
+  const tenant = useTenant();
   return useQuery({
-    ...reportQuery(organization.id, filter),
+    ...reportQuery(tenant.id, filter),
     placeholderData: keepPreviousData,
   });
 }

@@ -20,7 +20,7 @@ type Row = Prisma.EmailTemplateGetPayload<object>;
 
 export type EmailTemplateJson = {
   id: string;
-  organizationId: string;
+  tenantId: string;
   name: string;
   version: number;
   for: EmailTemplateFor;
@@ -46,7 +46,7 @@ export function emailTemplateJson(row: Row): EmailTemplateJson {
   const kind = kindOf(row);
   return {
     id: row.id,
-    organizationId: row.organizationId,
+    tenantId: row.tenantId,
     name: row.name,
     version: row.version,
     for: kind,
@@ -62,7 +62,7 @@ export function emailTemplateJson(row: Row): EmailTemplateJson {
   };
 }
 
-/** Rows for every default, used when an organization is created. */
+/** Rows for every default, used when an tenant is created. */
 export function defaultEmailTemplateRows(now = new Date()) {
   return emailTemplateDefaults.map((item) => ({
     name: item.name,
@@ -78,36 +78,36 @@ export function defaultEmailTemplateRows(now = new Date()) {
   }));
 }
 
-/** Adds any default template the organization is missing. */
-async function ensureSeeded(organizationId: string) {
-  const existing = await prisma.emailTemplate.findMany({ where: { organizationId }, select: { for: true } });
+/** Adds any default template the tenant is missing. */
+async function ensureSeeded(tenantId: string) {
+  const existing = await prisma.emailTemplate.findMany({ where: { tenantId }, select: { for: true } });
   const have = new Set(existing.map((row) => row.for));
   const missing = defaultEmailTemplateRows().filter((row) => !have.has(row.for));
   if (missing.length === 0) return;
   await prisma.emailTemplate.createMany({
-    data: missing.map((row) => ({ id: crypto.randomUUID(), organizationId, ...row })),
+    data: missing.map((row) => ({ id: crypto.randomUUID(), tenantId, ...row })),
     skipDuplicates: true,
   });
 }
 
-async function find(organizationId: string, templateId: string) {
-  const row = await prisma.emailTemplate.findFirst({ where: { id: templateId, organizationId } });
+async function find(tenantId: string, templateId: string) {
+  const row = await prisma.emailTemplate.findFirst({ where: { id: templateId, tenantId } });
   if (!row) notFound();
   return row;
 }
 
-export async function listEmailTemplates(access: Access, organizationId: string) {
-  await access.requireOrganization(organizationId, false);
-  await ensureSeeded(organizationId);
-  const rows = await prisma.emailTemplate.findMany({ where: { organizationId } });
+export async function listEmailTemplates(access: Access, tenantId: string) {
+  await access.requireTenant(tenantId, false);
+  await ensureSeeded(tenantId);
+  const rows = await prisma.emailTemplate.findMany({ where: { tenantId } });
   const order = (row: Row) => emailTemplateFors.indexOf(kindOf(row));
   const items = rows.sort((a, b) => order(a) - order(b)).map(emailTemplateJson);
   return list(items, { limit: 100, offset: 0 });
 }
 
-export async function getEmailTemplate(access: Access, organizationId: string, templateId: string) {
-  await access.requireOrganization(organizationId, false);
-  return emailTemplateJson(await find(organizationId, templateId));
+export async function getEmailTemplate(access: Access, tenantId: string, templateId: string) {
+  await access.requireTenant(tenantId, false);
+  return emailTemplateJson(await find(tenantId, templateId));
 }
 
 function text(body: Body, key: string, max: number, required: boolean) {
@@ -146,12 +146,12 @@ export function parseEmailTemplatePatch(body: Body): EmailTemplatePatch {
 
 export async function updateEmailTemplate(
   access: Access,
-  organizationId: string,
+  tenantId: string,
   templateId: string,
   patch: EmailTemplatePatch,
 ) {
-  await access.requireOrganizationAdmin(organizationId);
-  const row = await find(organizationId, templateId);
+  await access.requireTenantAdmin(tenantId);
+  const row = await find(tenantId, templateId);
   const kind = kindOf(row);
   if (patch.isEnabled === false && !optionalEmailTemplates.includes(kind)) {
     validation("This email cannot be turned off.");
@@ -175,9 +175,9 @@ export async function updateEmailTemplate(
   return emailTemplateJson(updated);
 }
 
-export async function resetEmailTemplate(access: Access, organizationId: string, templateId: string) {
-  await access.requireOrganizationAdmin(organizationId);
-  const row = await find(organizationId, templateId);
+export async function resetEmailTemplate(access: Access, tenantId: string, templateId: string) {
+  await access.requireTenantAdmin(tenantId);
+  const row = await find(tenantId, templateId);
   const item = emailTemplateDefault(kindOf(row));
   const updated = await prisma.emailTemplate.update({
     where: { id: row.id },

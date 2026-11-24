@@ -16,8 +16,8 @@ describe("roles / list", suite, () => {
 
   before(async () => {
     admin = await signUp("roles");
-    const org = await createJson(admin.accessToken, "/organizations", { name: label("Role isolation") });
-    await createJson(admin.accessToken, `/organizations/${org.id}/roles`, {
+    const org = await createJson(admin.accessToken, "/tenants", { name: label("Role isolation") });
+    await createJson(admin.accessToken, `/tenants/${org.id}/roles`, {
       code: "EVENT_LEAD", name: "Event lead", scope: "self", permissions: ["log_own_time"],
     });
   });

@@ -1,5 +1,5 @@
 /**
- * Default copy for organization email templates. Bodies are the TipTap-safe HTML an admin edits
+ * Default copy for tenant email templates. Bodies are the TipTap-safe HTML an admin edits
  * (no inline styles); `wrapEmailHtml` adds the VolunTime chrome and styles at send time.
  * Keep wording in step with the React Email previews in this folder.
  */
@@ -16,11 +16,11 @@ export const emailTemplateDefaults: EmailTemplateDefault[] = [
   {
     for: "Invite",
     name: "Invitation",
-    subject: "{{organization.name}} invited you to join VolunTime",
+    subject: "{{tenant.name}} invited you to join VolunTime",
     heading: "You have an invite",
-    preview: "Log your volunteer hours with {{organization.name}}.",
+    preview: "Log your volunteer hours with {{tenant.name}}.",
     html: [
-      "<p>{{organization.name}} invited you to join the {{invite.targetKind}} {{invite.targetName}} as {{invite.roleName}}.</p>",
+      "<p>{{tenant.name}} invited you to join the {{invite.targetKind}} {{invite.targetName}} as {{invite.roleName}}.</p>",
       "<p>Your username will be {{user.username}}.</p>",
       "<p>Use this code to accept the invite:</p>",
       "<p>{{invite.code}}</p>",
@@ -31,11 +31,11 @@ export const emailTemplateDefaults: EmailTemplateDefault[] = [
   {
     for: "Welcome",
     name: "Account welcome",
-    subject: "Your account for {{organization.name}}",
+    subject: "Your account for {{tenant.name}}",
     heading: "Your account is ready",
-    preview: "Your temporary password for {{organization.name}} is inside.",
+    preview: "Your temporary password for {{tenant.name}} is inside.",
     html: [
-      "<p>An administrator created a VolunTime account for you at {{organization.name}}.</p>",
+      "<p>An administrator created a VolunTime account for you at {{tenant.name}}.</p>",
       "<p>Username: {{user.username}}</p>",
       "<p>Temporary password: {{user.password}}</p>",
       "<p><em>You will choose a new password the first time you sign in.</em></p>",
@@ -58,7 +58,7 @@ export const emailTemplateDefaults: EmailTemplateDefault[] = [
   {
     for: "LoggedTime",
     name: "Hours logged",
-    subject: "Your hours for {{organization.name}} were saved",
+    subject: "Your hours for {{tenant.name}} were saved",
     heading: "Hours logged",
     preview: "{{entry.hours}} hours were saved on {{entry.date}}.",
     html: [
@@ -119,18 +119,18 @@ export const emailTemplateDefaults: EmailTemplateDefault[] = [
   {
     for: "AccessRequestReceived",
     name: "Access request (admins)",
-    subject: "Access request for {{organization.name}}",
+    subject: "Access request for {{tenant.name}}",
     heading: "Access request",
-    preview: "{{request.requesterEmail}} asked for more access in {{organization.name}}.",
-    html: "<p>{{request.requesterEmail}} requested more access in {{organization.name}}. Review the request in People settings.</p>",
+    preview: "{{request.requesterEmail}} asked for more access in {{tenant.name}}.",
+    html: "<p>{{request.requesterEmail}} requested more access in {{tenant.name}}. Review the request in People settings.</p>",
   },
   {
     for: "AccessRequestDecided",
     name: "Access request decided",
     subject: "Your access request was {{request.decision}}",
     heading: "Access request update",
-    preview: "Your request for more access in {{organization.name}} was {{request.decision}}.",
-    html: "<p>Hi {{user.name}}, your request for more access in {{organization.name}} was {{request.decision}}.</p>",
+    preview: "Your request for more access in {{tenant.name}} was {{request.decision}}.",
+    html: "<p>Hi {{user.name}}, your request for more access in {{tenant.name}} was {{request.decision}}.</p>",
   },
   {
     for: "NeedSubmitted",
@@ -138,7 +138,7 @@ export const emailTemplateDefaults: EmailTemplateDefault[] = [
     subject: "Need waiting for approval: {{need.name}}",
     heading: "Need submitted",
     preview: "{{need.managerName}} submitted {{need.name}} for approval.",
-    html: "<p>{{need.managerName}} submitted “{{need.name}}” in {{organization.name}} for admin approval.</p>",
+    html: "<p>{{need.managerName}} submitted “{{need.name}}” in {{tenant.name}} for admin approval.</p>",
   },
   {
     for: "NeedDecided",
@@ -146,7 +146,7 @@ export const emailTemplateDefaults: EmailTemplateDefault[] = [
     subject: "Your need was {{need.decision}}: {{need.name}}",
     heading: "Need update",
     preview: "“{{need.name}}” was {{need.decision}}.",
-    html: "<p>Your need “{{need.name}}” in {{organization.name}} was {{need.decision}}.</p>",
+    html: "<p>Your need “{{need.name}}” in {{tenant.name}} was {{need.decision}}.</p>",
   },
   {
     for: "VolunteerMessage",

@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { fetchJson } from "@/lib/fetch-json";
-import { useOrganization } from "@/hooks/use-workspace";
+import { useTenant } from "@/hooks/use-workspace";
 
 export function UnclassifiedBanner() {
-  const organization = useOrganization();
+  const tenant = useTenant();
   const { data } = useQuery({
-    queryKey: ["org", organization.id, "unclassified-count"],
-    queryFn: ({ signal }) => fetchJson<{ count: number }>(`/organizations/${organization.id}/unclassified-count`, signal),
+    queryKey: ["org", tenant.id, "unclassified-count"],
+    queryFn: ({ signal }) => fetchJson<{ count: number }>(`/tenants/${tenant.id}/unclassified-count`, signal),
   });
   const count = data?.count ?? 0;
   if (count === 0) return null;

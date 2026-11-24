@@ -11,7 +11,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { useLabels } from "@/hooks/use-labels";
-import { useOrganization } from "@/hooks/use-workspace";
+import { useTenant } from "@/hooks/use-workspace";
 import type { ReportTemplate } from "@/lib/api/features/report-templates";
 import { createReportAction } from "@/app/actions/reports";
 import { reportTemplatesQuery } from "@/lib/queries";
@@ -27,13 +27,13 @@ import { slugForSavedReport } from "@/lib/report-slug";
 import { cn } from "cn";
 
 export function builtinTemplates(copy: {
-  department: string;
+  organization: string;
   taskCategory: string;
   project: string;
 }): ReportTemplate[] {
   return reportTemplateIds.map((id) => ({
     id: builtinTemplateIds[id],
-    organizationId: null,
+    tenantId: null,
     key: id,
     name: reportTemplateLabel(id),
     layout: reportTemplate(id, copy),
@@ -45,23 +45,23 @@ export function builtinTemplates(copy: {
 }
 
 export function useTemplateChoices() {
-  const organization = useOrganization();
-  const { department, taskCategory, project } = useLabels();
+  const tenant = useTenant();
+  const { organization, taskCategory, project } = useLabels();
   const builtin = useMemo(
-    () => builtinTemplates({ department, taskCategory, project }),
-    [department, taskCategory, project],
+    () => builtinTemplates({ organization, taskCategory, project }),
+    [organization, taskCategory, project],
   );
   const templates = useQuery({
-    ...reportTemplatesQuery(organization.id),
+    ...reportTemplatesQuery(tenant.id),
     placeholderData: builtin,
   });
-  return { organization, templates, choices: templates.data?.length ? templates.data : builtin };
+  return { tenant, templates, choices: templates.data?.length ? templates.data : builtin };
 }
 
 export function ReportSetup() {
   const router = useRouter();
   const search = useSearchParams();
-  const { organization, choices } = useTemplateChoices();
+  const { tenant, choices } = useTemplateChoices();
   const [name, setName] = useState("");
   const [isDefault, setIsDefault] = useState(false);
   const [startFrom, setStartFrom] = useState(() => search.get("startFrom") ?? "blank");
@@ -71,7 +71,7 @@ export function ReportSetup() {
   const save = useMutation({
     mutationFn: async () => {
       const chosen = choices.find((item) => item.id === startFrom) ?? matchedStart;
-      const result = await createReportAction(organization.id, {
+      const result = await createReportAction(tenant.id, {
         name,
         isDefault,
         layout: chosen?.layout ?? emptyLayout(),

@@ -9,7 +9,7 @@ test.afterEach(async ({ request }) => {
 });
 
 test("total hours saves a Total row without clock times", async ({ page }) => {
-  const organization = await loginAsAdmin(page);
+  const tenant = await loginAsAdmin(page);
   await page.goto("/log/own");
   await page.getByRole("tab", { name: "Manual" }).click();
   await expect(page.getByText("Add time manually")).toBeVisible();
@@ -30,7 +30,7 @@ test("total hours saves a Total row without clock times", async ({ page }) => {
   const today = new Date();
   const occurredOn = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
   const listed = await page.request.get(
-    `/users/${session.user.id}/time-entries?organizationId=${organization.id}&from=${occurredOn}&to=${occurredOn}&limit=100`,
+    `/users/${session.user.id}/time-entries?tenantId=${tenant.id}&from=${occurredOn}&to=${occurredOn}&limit=100`,
     { headers: { authorization: `Bearer ${session.accessToken}` } },
   );
   expect(listed.ok(), await listed.text()).toBeTruthy();

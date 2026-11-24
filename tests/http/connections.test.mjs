@@ -10,15 +10,15 @@ describe("member connections", suite, () => {
     ctx.volunteer = await signUp("connvol");
     ctx.other = await signUp("connother");
     ctx.member = await signUp("connmember");
-    ctx.org = await createJson(ctx.admin.accessToken, "/organizations", { name: label("Connection org") });
-    ctx.category = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/task-categories`, {
+    ctx.org = await createJson(ctx.admin.accessToken, "/tenants", { name: label("Connection org") });
+    ctx.category = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/task-categories`, {
       name: label("Category"),
     });
-    ctx.project = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/projects`, {
+    ctx.project = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/projects`, {
       title: label("Project"),
       accessType: "Public",
     });
-    ctx.professional = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/hourly-rates`, {
+    ctx.professional = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/hourly-rates`, {
       type: "Professional",
       name: label("Professional"),
       perHourRate: 80,
@@ -27,14 +27,14 @@ describe("member connections", suite, () => {
       await joinOrg(ctx.admin.accessToken, ctx.org.id, person, { role: "VOLUNTEER" });
     }
     await joinOrg(ctx.admin.accessToken, ctx.org.id, ctx.member, { role: "MEMBER" });
-    const rates = await callApi(`/organizations/${ctx.org.id}/hourly-rates`, { token: ctx.admin.accessToken });
+    const rates = await callApi(`/tenants/${ctx.org.id}/hourly-rates`, { token: ctx.admin.accessToken });
     ctx.defaultRate = rates.json.items.find((item) => item.isDefault);
   });
 
-  test("volunteers cannot add people until the organization allows it", async () => {
+  test("volunteers cannot add people until the tenant allows it", async () => {
     assert.equal(ctx.org.preferences.allowVolunteersToAddVolunteers, false);
     const person = identity("blocked");
-    const denied = await callApi(`/organizations/${ctx.org.id}/memberships`, {
+    const denied = await callApi(`/tenants/${ctx.org.id}/memberships`, {
       method: "POST",
       token: ctx.volunteer.accessToken,
       body: {
@@ -49,7 +49,7 @@ describe("member connections", suite, () => {
     });
     assertError(denied, 403, "forbidden", "Forbidden.");
 
-    const enabled = await callApi(`/organizations/${ctx.org.id}`, {
+    const enabled = await callApi(`/tenants/${ctx.org.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
       body: { preferences: { allowTimeEntryEditing: false, allowVolunteersToAddVolunteers: true } },
@@ -60,7 +60,7 @@ describe("member connections", suite, () => {
 
   test("a volunteer can add only a volunteer and stores the relationship", async () => {
     const staff = identity("stafftry");
-    const rejected = await callApi(`/organizations/${ctx.org.id}/memberships`, {
+    const rejected = await callApi(`/tenants/${ctx.org.id}/memberships`, {
       method: "POST",
       token: ctx.volunteer.accessToken,
       body: {
@@ -76,7 +76,7 @@ describe("member connections", suite, () => {
     assertError(rejected, 400, "validation_error", "Volunteers can only add volunteers.");
 
     const person = identity("addedvol");
-    const created = await createJson(ctx.volunteer.accessToken, `/organizations/${ctx.org.id}/memberships`, {
+    const created = await createJson(ctx.volunteer.accessToken, `/tenants/${ctx.org.id}/memberships`, {
       email: person.email,
       username: person.username,
       password: person.password,
@@ -88,7 +88,7 @@ describe("member connections", suite, () => {
     assert.equal(created.role.code, "VOLUNTEER");
     ctx.added = created;
 
-    const listed = await callApi(`/organizations/${ctx.org.id}/connections`, { token: ctx.volunteer.accessToken });
+    const listed = await callApi(`/tenants/${ctx.org.id}/connections`, { token: ctx.volunteer.accessToken });
     assert.equal(listed.status, 200);
     assertList(listed.json);
     assert.equal(listed.json.items.length, 1);
@@ -100,7 +100,7 @@ describe("member connections", suite, () => {
     assert.ok([connection.userAId, connection.userBId].includes(created.userId));
     ctx.addedConnection = connection;
 
-    const hidden = await callApi(`/organizations/${ctx.org.id}/connections`, { token: ctx.member.accessToken });
+    const hidden = await callApi(`/tenants/${ctx.org.id}/connections`, { token: ctx.member.accessToken });
     assert.equal(hidden.status, 200);
     assert.equal(hidden.json.items.length, 0);
   });
@@ -108,7 +108,7 @@ describe("member connections", suite, () => {
   test("a volunteer can log time for a connection and not for anyone else", async () => {
     const entry = await createJson(ctx.volunteer.accessToken, `/users/${ctx.added.userId}/time-entries`, {
       mode: "Duration",
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       durationMinutes: 60,
@@ -124,7 +124,7 @@ describe("member connections", suite, () => {
       token: ctx.volunteer.accessToken,
       body: {
         mode: "Duration",
-        organizationId: ctx.org.id,
+        tenantId: ctx.org.id,
         projectId: ctx.project.id,
         taskCategoryId: ctx.category.id,
         durationMinutes: 30,
@@ -135,7 +135,7 @@ describe("member connections", suite, () => {
   });
 
   test("admins connect existing members and removing the connection removes write access", async () => {
-    const created = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/connections`, {
+    const created = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/connections`, {
       userId: ctx.volunteer.user.id,
       connectedUserId: ctx.other.user.id,
       relationship: "Spouse",
@@ -143,7 +143,7 @@ describe("member connections", suite, () => {
     assert.equal(created.relationship, "Spouse");
     const forVolunteer = await createJson(ctx.other.accessToken, `/users/${ctx.volunteer.user.id}/time-entries`, {
       mode: "Total",
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       durationMinutes: 90,
@@ -153,7 +153,7 @@ describe("member connections", suite, () => {
     assert.equal(forVolunteer.enteredByUserId, ctx.other.user.id);
     assert.equal(forVolunteer.hourlyRateId, ctx.defaultRate.id);
 
-    const removed = await callApi(`/organizations/${ctx.org.id}/connections/${created.id}`, {
+    const removed = await callApi(`/tenants/${ctx.org.id}/connections/${created.id}`, {
       method: "DELETE",
       token: ctx.admin.accessToken,
     });
@@ -163,7 +163,7 @@ describe("member connections", suite, () => {
       token: ctx.other.accessToken,
       body: {
         mode: "Total",
-        organizationId: ctx.org.id,
+        tenantId: ctx.org.id,
         projectId: ctx.project.id,
         taskCategoryId: ctx.category.id,
         durationMinutes: 30,

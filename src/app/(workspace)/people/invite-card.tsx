@@ -4,9 +4,9 @@ import { MailIcon } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  inviteDepartmentMemberAction,
+  inviteOrganizationMemberAction,
   inviteMemberAction,
-  revokeDepartmentInvitationAction,
+  revokeOrganizationInvitationAction,
   resendInvitationAction,
   revokeInvitationAction,
 } from "@/app/actions/members";
@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { useActionMutation } from "@/hooks/use-action-mutation";
 import { useInvitations } from "@/hooks/use-invitations";
 import { useLookups } from "@/hooks/use-lookups";
-import { useOrganization, useWorkspace } from "@/hooks/use-workspace";
+import { useTenant, useWorkspace } from "@/hooks/use-workspace";
 import { fetchJson } from "@/lib/fetch-json";
 import { formatInstant } from "@/lib/format";
 import { keys } from "@/lib/queries";
@@ -30,10 +30,10 @@ import { roleLabel, useOrgRoleOptions, useUsernamePreview } from "./member-share
 import { EmptyState } from "@/components/empty-state";
 
 export function InviteForm() {
-  const organization = useOrganization();
-  const { isCoordinator, groupDepartments } = useWorkspace();
+  const tenant = useTenant();
+  const { isCoordinator, groupOrganizations } = useWorkspace();
   const { lookups } = useLookups();
-  const coordinated = lookups.departments.filter((department) => groupDepartments.includes(department.id));
+  const coordinated = lookups.organizations.filter((organization) => groupOrganizations.includes(organization.id));
   const roleOptions = useOrgRoleOptions();
   const coordinatorRoles = [
     { value: "VOLUNTEER", label: "Volunteer" },
@@ -43,30 +43,30 @@ export function InviteForm() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [role, setRole] = useState("VOLUNTEER");
-  const [departmentId, setDepartmentId] = useState(coordinated[0]?.id ?? "");
+  const [organizationId, setOrganizationId] = useState(coordinated[0]?.id ?? "");
   const usernamePreview = useUsernamePreview(firstName, lastName);
   const { invitations } = useInvitations();
   const invalidate = [
-    keys.invitations(organization.id),
-    ...coordinated.map((department) => keys.departmentInvitations(department.id)),
-    keys.members(organization.id),
+    keys.invitations(tenant.id),
+    ...coordinated.map((organization) => keys.organizationInvitations(organization.id)),
+    keys.members(tenant.id),
   ];
   const invite = useActionMutation(
-    (input: { email: string; role: string; firstName: string; lastName: string; departmentId?: string }) =>
-      input.departmentId
-        ? inviteDepartmentMemberAction(input.departmentId, input)
-        : inviteMemberAction(organization.id, input),
+    (input: { email: string; role: string; firstName: string; lastName: string; organizationId?: string }) =>
+      input.organizationId
+        ? inviteOrganizationMemberAction(input.organizationId, input)
+        : inviteMemberAction(tenant.id, input),
     { invalidate, onSuccess: () => { setEmail(""); setFirstName(""); setLastName(""); } },
   );
   const revoke = useActionMutation(
     (invitation: Invitation) =>
-      invitation.departmentId
-        ? revokeDepartmentInvitationAction(invitation.departmentId, invitation.id)
-        : revokeInvitationAction(organization.id, invitation.id),
+      invitation.organizationId
+        ? revokeOrganizationInvitationAction(invitation.organizationId, invitation.id)
+        : revokeInvitationAction(tenant.id, invitation.id),
     { invalidate },
   );
   const resend = useActionMutation(
-    (invitation: Invitation) => resendInvitationAction(organization.id, invitation.id, invitation.email),
+    (invitation: Invitation) => resendInvitationAction(tenant.id, invitation.id, invitation.email),
     { invalidate },
   );
 
@@ -86,7 +86,7 @@ export function InviteForm() {
               firstName,
               lastName,
               role,
-              departmentId: isCoordinator ? departmentId || coordinated[0]?.id : undefined,
+              organizationId: isCoordinator ? organizationId || coordinated[0]?.id : undefined,
             });
           }}
         >
@@ -110,9 +110,9 @@ export function InviteForm() {
             <Field label="Group" htmlFor="invite-group">
               <SelectField
                 id="invite-group"
-                value={departmentId || coordinated[0]?.id || ""}
-                onValueChange={setDepartmentId}
-                options={coordinated.map((department) => ({ value: department.id, label: department.name }))}
+                value={organizationId || coordinated[0]?.id || ""}
+                onValueChange={setOrganizationId}
+                options={coordinated.map((organization) => ({ value: organization.id, label: organization.name }))}
                 className="h-9"
               />
             </Field>
@@ -145,7 +145,7 @@ export function InviteForm() {
                 invitation={invitation}
                 pending={revoke.isPending || resend.isPending}
                 onRevoke={() => revoke.mutate(invitation)}
-                onResend={invitation.departmentId ? undefined : () => resend.mutate(invitation)}
+                onResend={invitation.organizationId ? undefined : () => resend.mutate(invitation)}
               />
             ))}
           </ul>
@@ -158,10 +158,10 @@ export function InviteForm() {
 }
 
 export function AccessRequestsCard() {
-  const organization = useOrganization();
+  const tenant = useTenant();
   const { lookups } = useLookups();
   const { data } = useQuery({
-    queryKey: ["org", organization.id, "access-requests"],
+    queryKey: ["org", tenant.id, "access-requests"],
     queryFn: ({ signal }) =>
       fetchJson<
         Paged<{
@@ -171,13 +171,13 @@ export function AccessRequestsCard() {
           status: string;
           message: string | null;
           requestedRole: { code: string; name: string } | null;
-          requestedDepartmentIds: string[];
+          requestedOrganizationIds: string[];
         }>
-      >(`/organizations/${organization.id}/access-requests?limit=50`, signal),
+      >(`/tenants/${tenant.id}/access-requests?limit=50`, signal),
   });
   const decide = useActionMutation(
-    ({ id, status }: { id: string; status: "approved" | "declined" }) => decideAccessRequestAction(organization.id, id, status),
-    { invalidate: [["org", organization.id, "access-requests"], keys.members(organization.id)] },
+    ({ id, status }: { id: string; status: "approved" | "declined" }) => decideAccessRequestAction(tenant.id, id, status),
+    { invalidate: [["org", tenant.id, "access-requests"], keys.members(tenant.id)] },
   );
   const pending = (data?.items ?? []).filter((item) => item.status === "pending");
   if (pending.length === 0) return null;
@@ -196,9 +196,9 @@ export function AccessRequestsCard() {
                 <p className="text-xs text-muted-foreground">
                   {item.email}
                   {item.requestedRole ? ` · ${item.requestedRole.name}` : ""}
-                  {item.requestedDepartmentIds.length
-                    ? ` · ${item.requestedDepartmentIds
-                        .map((id) => lookups.departments.find((department) => department.id === id)?.name)
+                  {item.requestedOrganizationIds.length
+                    ? ` · ${item.requestedOrganizationIds
+                        .map((id) => lookups.organizations.find((organization) => organization.id === id)?.name)
                         .filter(Boolean)
                         .join(", ")}`
                     : ""}

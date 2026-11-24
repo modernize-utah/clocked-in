@@ -55,5 +55,5 @@ test("download this view follows the card layout and columns", () => {
   assert.match(csv, /By project/);
   assert.match(csv, /Name,Hours,In-kind/);
   assert.ok(csv.indexOf("Show night") < csv.indexOf("Rehearsal"));
-  assert.doesNotMatch(csv, /By department/);
+  assert.doesNotMatch(csv, /By organization/);
 });

@@ -2,18 +2,18 @@ import "server-only";
 import { cookies, headers } from "next/headers";
 import { cache } from "react";
 import { listCollective } from "@/lib/api/features/collective";
-import { listOrganizationInvitations } from "@/lib/api/features/invitations";
+import { listTenantInvitations } from "@/lib/api/features/invitations";
 import { loadLookups } from "@/lib/api/features/lookups";
 import { listOrgMemberships } from "@/lib/api/features/memberships";
-import { listOrganizations } from "@/lib/api/features/organizations";
+import { listTenants } from "@/lib/api/features/tenants";
 import { report } from "@/lib/api/features/reports";
 import { listTimeEntries } from "@/lib/api/features/time-entries";
 import { displayAppOrigin } from "@/lib/portal";
-import { organizationCookie } from "@/lib/server/session-cookies";
+import { tenantCookie } from "@/lib/server/session-cookies";
 import { getAccess, requireAccess } from "@/lib/server/session";
-import { getPinnedOrganization, requirePinnedOrganizationOrApex } from "@/lib/server/tenant";
+import { getPinnedTenant, requirePinnedTenantOrApex } from "@/lib/server/tenant";
 import { isCoordinator } from "@/lib/roles";
-import type { DateRange, GroupDepartments, Lookups, Viewer } from "@/lib/types";
+import type { DateRange, GroupOrganizations, Lookups, Viewer } from "@/lib/types";
 
 export function searchParamsFor(values: Record<string, string | number | undefined | null>) {
   const params = new URLSearchParams();
@@ -48,48 +48,48 @@ export const getViewer = cache(async (): Promise<Viewer> => {
   };
 });
 
-export const getOrganizations = cache(async () => {
-  await requirePinnedOrganizationOrApex();
+export const getTenants = cache(async () => {
+  await requirePinnedTenantOrApex();
   const access = await requireAccess();
-  return (await listOrganizations(access, searchParamsFor({ limit: 100 }))).items;
+  return (await listTenants(access, searchParamsFor({ limit: 100 }))).items;
 });
 
 export const getWorkspace = cache(async () => {
   const access = await requireAccess();
-  const [viewer, organizations, store, pinned, headerList] = await Promise.all([
+  const [viewer, tenants, store, pinned, headerList] = await Promise.all([
     getViewer(),
-    getOrganizations(),
+    getTenants(),
     cookies(),
-    requirePinnedOrganizationOrApex(),
+    requirePinnedTenantOrApex(),
     headers(),
   ]);
-  const stored = store.get(organizationCookie)?.value;
-  const organization = pinned.pinned
-    ? (organizations.find((item) => item.id === pinned.organization?.id) ?? null)
-    : (organizations.find((item) => item.id === stored) ?? organizations[0] ?? null);
-  const role = organization ? await access.organizationRole(organization.id) : null;
-  const permissions = organization ? [...(await access.permissionsFor(organization.id))] : [];
-  const isAdmin = organization
-    ? (!pinned.pinned && viewer.isSuperAdmin) || (await access.can(organization.id, "manage_organization"))
+  const stored = store.get(tenantCookie)?.value;
+  const tenant = pinned.pinned
+    ? (tenants.find((item) => item.id === pinned.tenant?.id) ?? null)
+    : (tenants.find((item) => item.id === stored) ?? tenants[0] ?? null);
+  const role = tenant ? await access.tenantRole(tenant.id) : null;
+  const permissions = tenant ? [...(await access.permissionsFor(tenant.id))] : [];
+  const isAdmin = tenant
+    ? (!pinned.pinned && viewer.isSuperAdmin) || (await access.can(tenant.id, "manage_tenant"))
     : false;
-  const canSelectRate = organization ? role === "ADMIN" || role === "MEMBER" || isAdmin : false;
-  const groupDepartments: GroupDepartments = !organization
+  const canSelectRate = tenant ? role === "ADMIN" || role === "MEMBER" || isAdmin : false;
+  const groupOrganizations: GroupOrganizations = !tenant
     ? []
     : isAdmin
       ? "all"
-      : await access.adminDepartmentIds(organization.id);
+      : await access.adminOrganizationIds(tenant.id);
   return {
     viewer,
-    organizations,
-    organization,
+    tenants,
+    tenant,
     isAdmin,
-    isCoordinator: isCoordinator(groupDepartments),
+    isCoordinator: isCoordinator(groupOrganizations),
     canSelectRate,
     role,
     permissions,
-    groupDepartments,
+    groupOrganizations,
     isTenantHost: pinned.pinned,
-    pinnedOrganizationName: pinned.organization?.name ?? null,
+    pinnedTenantName: pinned.tenant?.name ?? null,
     appOrigin: displayAppOrigin({
       requestHost: headerList.get("x-forwarded-host") ?? headerList.get("host"),
       requestProtocol: headerList.get("x-forwarded-proto"),
@@ -97,57 +97,57 @@ export const getWorkspace = cache(async () => {
   };
 });
 
-export const getCurrentOrganization = cache(async () => {
+export const getCurrentTenant = cache(async () => {
   const access = await getAccess();
   if (!access) {
     return null;
   }
 
-  const [organizations, store, pinned] = await Promise.all([
-    listOrganizations(access, searchParamsFor({ limit: 100 })),
+  const [tenants, store, pinned] = await Promise.all([
+    listTenants(access, searchParamsFor({ limit: 100 })),
     cookies(),
-    getPinnedOrganization(),
+    getPinnedTenant(),
   ]);
   if (pinned.pinned) {
-    if (!pinned.organization) {
+    if (!pinned.tenant) {
       return null;
     }
 
-    return organizations.items.find((item) => item.id === pinned.organization?.id) ?? null;
+    return tenants.items.find((item) => item.id === pinned.tenant?.id) ?? null;
   }
 
-  const stored = store.get(organizationCookie)?.value;
-  return organizations.items.find((item) => item.id === stored) ?? organizations.items[0] ?? null;
+  const stored = store.get(tenantCookie)?.value;
+  return tenants.items.find((item) => item.id === stored) ?? tenants.items[0] ?? null;
 });
 
-export const getLookups = cache(async (organizationId: string): Promise<Lookups> =>
-  loadLookups(await requireAccess(), organizationId),
+export const getLookups = cache(async (tenantId: string): Promise<Lookups> =>
+  loadLookups(await requireAccess(), tenantId),
 );
 
-export const getMembers = cache(async (organizationId: string) => {
+export const getMembers = cache(async (tenantId: string) => {
   const access = await requireAccess();
-  return (await listOrgMemberships(access, organizationId, searchParamsFor({ limit: 100 }))).items;
+  return (await listOrgMemberships(access, tenantId, searchParamsFor({ limit: 100 }))).items;
 });
 
-export const getInvitations = cache(async (organizationId: string) => {
+export const getInvitations = cache(async (tenantId: string) => {
   const access = await requireAccess();
-  return (await listOrganizationInvitations(access, organizationId, searchParamsFor({ limit: 100 }))).items;
+  return (await listTenantInvitations(access, tenantId, searchParamsFor({ limit: 100 }))).items;
 });
 
 export async function getEntries(
-  organizationId: string,
+  tenantId: string,
   userId: string,
   range: DateRange = {},
   offset = 0,
   limit = 50,
 ) {
   const access = await requireAccess();
-  return listTimeEntries(access, userId, searchParamsFor({ organizationId, ...range, offset, limit }));
+  return listTimeEntries(access, userId, searchParamsFor({ tenantId, ...range, offset, limit }));
 }
 
-export async function getGroupSessions(organizationId: string, offset = 0, limit = 50) {
+export async function getGroupSessions(tenantId: string, offset = 0, limit = 50) {
   const access = await requireAccess();
-  return listCollective(access, searchParamsFor({ organizationId, offset, limit }));
+  return listCollective(access, searchParamsFor({ tenantId, offset, limit }));
 }
 
 export async function getOpenPunch() {
@@ -156,7 +156,7 @@ export async function getOpenPunch() {
   return recent.items.find((entry) => entry.mode === "Punch" && !entry.endedAt) ?? null;
 }
 
-export const getReport = cache(async (organizationId: string, from?: string, to?: string) => {
+export const getReport = cache(async (tenantId: string, from?: string, to?: string) => {
   const access = await requireAccess();
-  return report(access, organizationId, searchParamsFor({ from, to }));
+  return report(access, tenantId, searchParamsFor({ from, to }));
 });

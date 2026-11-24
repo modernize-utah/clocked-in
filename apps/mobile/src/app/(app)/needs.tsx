@@ -29,9 +29,9 @@ function statusLabel(status: string | undefined) {
 }
 
 export default function NeedsScreen() {
-  const { organization, permissions } = useWorkspace();
+  const { tenant, permissions } = useWorkspace();
   const client = useQueryClient();
-  const needs = useOrgQuery("needs", (organizationId) => api.needs(organizationId));
+  const needs = useOrgQuery("needs", (tenantId) => api.needs(tenantId));
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
@@ -41,11 +41,11 @@ export default function NeedsScreen() {
   const canApprove = permissions.includes("approve_needs");
   const remove = useMutation({
     mutationFn: (id: string) => api.deleteNeed(id),
-    onSuccess: () => client.invalidateQueries({ queryKey: ["needs", organization.id] }),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["needs", tenant.id] }),
   });
   const decide = useMutation({
     mutationFn: (input: { id: string; status: "published" | "rejected" }) => api.decideNeed(input.id, input.status),
-    onSuccess: () => client.invalidateQueries({ queryKey: ["needs", organization.id] }),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["needs", tenant.id] }),
   });
 
   const items = useMemo(() => {

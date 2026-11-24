@@ -21,7 +21,7 @@ import {
 
 const needKeys = [
   "id",
-  "organizationId",
+  "tenantId",
   "createdByUserId",
   "publicToken",
   "name",
@@ -37,7 +37,7 @@ const needKeys = [
   "questions",
   "projectId",
   "taskCategoryId",
-  "departmentId",
+  "organizationId",
   "status",
   "createdAt",
   "updatedAt",
@@ -88,10 +88,10 @@ describe("volunteer needs", suite, () => {
   before(async () => {
     ctx.admin = await signUp("needadmin");
     ctx.member = await signUp("needmember");
-    ctx.org = await createJson(ctx.admin.accessToken, "/organizations", { name: label("Need org") });
+    ctx.org = await createJson(ctx.admin.accessToken, "/tenants", { name: label("Need org") });
     await joinOrg(ctx.admin.accessToken, ctx.org.id, ctx.member, { role: "MEMBER" });
     ctx.form = question();
-    ctx.need = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/volunteer-needs`, {
+    ctx.need = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/volunteer-needs`, {
       name: label("Setup"),
       description: "Move chairs.",
       type: "Task",
@@ -104,21 +104,21 @@ describe("volunteer needs", suite, () => {
 
   test("admins manage needs and members cannot", async () => {
     assertKeys(ctx.need, needKeys);
-    assert.equal(ctx.need.organizationId, ctx.org.id);
+    assert.equal(ctx.need.tenantId, ctx.org.id);
     assert.equal(ctx.need.type, "Task");
     assert.equal(ctx.need.countVetted, 0);
     assert.equal(ctx.need.questions.items[0].correctChoiceIds[0], ctx.form.yes);
     assert.match(ctx.need.publicToken, /^[0-9a-f]{32}$/);
-    const listed = await callApi(`/organizations/${ctx.org.id}/volunteer-needs`, {
+    const listed = await callApi(`/tenants/${ctx.org.id}/volunteer-needs`, {
       token: ctx.admin.accessToken,
       query: { type: "Task", sort: "name" },
     });
     assertStatus(listed, 200);
     assertList(listed.json);
     assert.ok(listed.json.items.some((item) => item.id === ctx.need.id));
-    const forbidden = await callApi(`/organizations/${ctx.org.id}/volunteer-needs`, { token: ctx.member.accessToken });
+    const forbidden = await callApi(`/tenants/${ctx.org.id}/volunteer-needs`, { token: ctx.member.accessToken });
     assertError(forbidden, 403, "forbidden");
-    const anonymous = await callApi(`/organizations/${ctx.org.id}/volunteer-needs`);
+    const anonymous = await callApi(`/tenants/${ctx.org.id}/volunteer-needs`);
     assertError(anonymous, 401, "unauthorized");
     const renamed = await callApi(`/volunteer-needs/${ctx.need.id}`, {
       method: "PATCH",
@@ -134,10 +134,10 @@ describe("volunteer needs", suite, () => {
     assertStatus(open, 200);
     assert.equal(open.json.name, ctx.need.name);
     assert.equal(open.json.closed, null);
-    assert.equal(open.json.organizationName, ctx.org.name);
+    assert.equal(open.json.tenantName, ctx.org.name);
     assert.equal(open.json.questions[0].prompt, "Can you lift 25 pounds?");
     assert.equal("correctChoiceIds" in open.json.questions[0], false);
-    const hidden = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/volunteer-needs`, {
+    const hidden = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/volunteer-needs`, {
       name: label("Private"),
       type: "Position",
       countNeeded: 1,
@@ -212,7 +212,7 @@ describe("volunteer needs", suite, () => {
     });
     assertError(full, 409, "conflict", "This need is already filled.");
     const closedForm = question("Can you stay until noon?");
-    const closed = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/volunteer-needs`, {
+    const closed = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/volunteer-needs`, {
       name: label("Closed"),
       type: "Position",
       countNeeded: 3,
@@ -231,7 +231,7 @@ describe("volunteer needs", suite, () => {
 
   test("vetting waits for an admin", async () => {
     const form = question("Have you volunteered here before?");
-    const need = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/volunteer-needs`, {
+    const need = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/volunteer-needs`, {
       name: label("Reviewed"),
       type: "Position",
       countNeeded: 1,
@@ -301,13 +301,13 @@ describe("volunteer needs", suite, () => {
   test("missing need and bad questions fail", async () => {
     const missing = await callApi(`/volunteer-needs/${missingId()}`, { token: ctx.admin.accessToken });
     assertError(missing, 404, "not_found");
-    const bad = await callApi(`/organizations/${ctx.org.id}/volunteer-needs`, {
+    const bad = await callApi(`/tenants/${ctx.org.id}/volunteer-needs`, {
       method: "POST",
       token: ctx.admin.accessToken,
       body: { name: label("Bad"), type: "Task", countNeeded: 1, questions: { version: 1, items: [] } },
     });
     assertStatus(bad, 201);
-    const invalid = await callApi(`/organizations/${ctx.org.id}/volunteer-needs`, {
+    const invalid = await callApi(`/tenants/${ctx.org.id}/volunteer-needs`, {
       method: "POST",
       token: ctx.admin.accessToken,
       body: { name: label("Invalid"), type: "Shift", countNeeded: 1 },

@@ -28,7 +28,6 @@ export function NavLink({
         isActive={active}
         tooltip={label}
         render={<Link href={href} onClick={() => setOpenMobile(false)} />}
-        className="data-active:bg-sidebar-accent data-active:text-sidebar-primary"
       >
         {children}
         <span>{label}</span>

@@ -80,7 +80,7 @@ export type ConnectionPerson = {
 
 export type MemberConnectionRecord = {
   id: string;
-  organizationId: string;
+  tenantId: string;
   userAId: string;
   userBId: string;
   relationship: string;

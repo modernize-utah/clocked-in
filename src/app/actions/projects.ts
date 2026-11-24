@@ -7,28 +7,28 @@ import { requireAccess } from "@/lib/server/session";
 export type ProjectInput = {
   title: string;
   projectType: "Project" | "Event";
-  departmentId: string | null;
+  organizationId: string | null;
   startDate: string | null;
   endDate: string | null;
 };
 
-function placement(departmentId: string | null) {
-  return departmentId
-    ? { accessType: "Department" as const, departmentId }
-    : { accessType: "Public" as const, departmentId: null };
+function placement(organizationId: string | null) {
+  return organizationId
+    ? { accessType: "Organization" as const, organizationId }
+    : { accessType: "Public" as const, organizationId: null };
 }
 
-export async function createProjectAction(organizationId: string, input: ProjectInput) {
+export async function createProjectAction(tenantId: string, input: ProjectInput) {
   return run(async () => {
     const access = await requireAccess();
     return createProject(
       access,
-      organizationId,
+      tenantId,
       parseCreateProject(
         body({
           title: input.title,
           projectType: input.projectType,
-          ...placement(input.departmentId),
+          ...placement(input.organizationId),
           startDate: input.startDate,
           endDate: input.endDate,
         }),
@@ -47,7 +47,7 @@ export async function updateProjectAction(projectId: string, input: ProjectInput
         body({
           title: input.title,
           projectType: input.projectType,
-          ...placement(input.departmentId),
+          ...placement(input.organizationId),
           startDate: input.startDate,
           endDate: input.endDate,
         }),

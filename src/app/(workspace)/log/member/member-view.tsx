@@ -13,13 +13,13 @@ import { PageSkeleton } from "@/components/skeletons";
 import { logScrollClass } from "../pane";
 
 export function MemberTimeView() {
-  const { viewer, isAdmin, isCoordinator, groupDepartments } = useWorkspace();
-  const canLog = canLogMemberTime(isAdmin, groupDepartments);
+  const { viewer, isAdmin, isCoordinator, groupOrganizations } = useWorkspace();
+  const canLog = canLogMemberTime(isAdmin, groupOrganizations);
   useClientRedirect(!canLog, "/log/own");
   const { members, isPending } = useMembers({ enabled: canLog });
   if (!canLog) return null;
   const scoped = isCoordinator
-    ? members.filter((member) => (member.departmentIds ?? []).some((id) => groupDepartments.includes(id)))
+    ? members.filter((member) => (member.organizationIds ?? []).some((id) => groupOrganizations.includes(id)))
     : members;
   const eligible = selectableMembers(scoped, viewer.id, { excludeSelf: true, activeOnly: true });
 

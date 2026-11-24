@@ -14,10 +14,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useActionMutation } from "@/hooks/use-action-mutation";
-import { useOrganization } from "@/hooks/use-workspace";
+import { useTenant } from "@/hooks/use-workspace";
 import { keys, userQuery } from "@/lib/queries";
 import type { Membership } from "@/lib/types";
-import { DepartmentChecks, GroupAssignment, useOrgRoleOptions } from "./member-shared";
+import { OrganizationChecks, GroupAssignment, useOrgRoleOptions } from "./member-shared";
 import { PersonIdentityFields, readPersonIdentity } from "@/components/entity-forms/person-identity-fields";
 
 export function PersonDialog({
@@ -47,13 +47,13 @@ export function PersonDialog({
 }
 
 export function AddPersonForm({ onCancel, onSaved }: { onCancel: () => void; onSaved: () => void }) {
-  const organization = useOrganization();
+  const tenant = useTenant();
   const roleOptions = useOrgRoleOptions();
   const [role, setRole] = useState("VOLUNTEER");
   const [groups, setGroups] = useState<GroupAssignment[]>([]);
   const [emailUser, setEmailUser] = useState(true);
-  const create = useActionMutation((input: NewPerson) => createPersonAction(organization.id, input), {
-    invalidate: [keys.members(organization.id)],
+  const create = useActionMutation((input: NewPerson) => createPersonAction(tenant.id, input), {
+    invalidate: [keys.members(tenant.id)],
     errorToast: false,
     onSuccess: onSaved,
   });
@@ -68,8 +68,8 @@ export function AddPersonForm({ onCancel, onSaved }: { onCancel: () => void; onS
         create.mutate({
           ...readPersonIdentity(data),
           role,
-          departmentIds: groups.map((group) => group.departmentId),
-          managedDepartmentIds: groups.filter((group) => group.manager).map((group) => group.departmentId),
+          organizationIds: groups.map((group) => group.organizationId),
+          managedOrganizationIds: groups.filter((group) => group.manager).map((group) => group.organizationId),
           emailUser,
         });
       }}
@@ -89,7 +89,7 @@ export function AddPersonForm({ onCancel, onSaved }: { onCancel: () => void; onS
           <SelectField value={role} onValueChange={setRole} options={roleOptions} className="h-9" />
         </Field>
       </div>
-      <DepartmentChecks value={groups} onChange={setGroups} />
+      <OrganizationChecks value={groups} onChange={setGroups} />
       <FormMessage result={create.error ? { ok: false, error: create.error.message } : null} />
       <DialogActions form="add-person-form">
         <Button type="button" variant="outline" onClick={onCancel}>
@@ -110,13 +110,13 @@ export function EditPersonForm({
   onCancel: () => void;
   onSaved: () => void;
 }) {
-  const organization = useOrganization();
+  const tenant = useTenant();
   const roleOptions = useOrgRoleOptions();
   const [role, setRole] = useState(member.role.code);
   const [groups, setGroups] = useState<GroupAssignment[]>(
-    (member.departmentIds ?? []).map((departmentId) => ({
-      departmentId,
-      manager: (member.managedDepartmentIds ?? []).includes(departmentId),
+    (member.organizationIds ?? []).map((organizationId) => ({
+      organizationId,
+      manager: (member.managedOrganizationIds ?? []).includes(organizationId),
     })),
   );
   const [profile, setProfile] = useState({
@@ -130,8 +130,8 @@ export function EditPersonForm({
     notes: "",
   });
   const save = useActionMutation(
-    (patch: MemberPatch) => updateMemberAction(organization.id, member.id, patch),
-    { invalidate: [keys.members(organization.id), keys.user(member.userId)], errorToast: false, onSuccess: onSaved },
+    (patch: MemberPatch) => updateMemberAction(tenant.id, member.id, patch),
+    { invalidate: [keys.members(tenant.id), keys.user(member.userId)], errorToast: false, onSuccess: onSaved },
   );
 
   const userDetail = useQuery(userQuery(member.userId));
@@ -159,8 +159,8 @@ export function EditPersonForm({
         event.preventDefault();
         save.mutate({
           role,
-          departmentIds: groups.map((group) => group.departmentId),
-          managedDepartmentIds: groups.filter((group) => group.manager).map((group) => group.departmentId),
+          organizationIds: groups.map((group) => group.organizationId),
+          managedOrganizationIds: groups.filter((group) => group.manager).map((group) => group.organizationId),
           email: profile.email,
           firstName: profile.firstName,
           lastName: profile.lastName,
@@ -181,7 +181,7 @@ export function EditPersonForm({
           <Field label="Role">
             <SelectField value={role} onValueChange={setRole} options={roleOptions} className="h-9" />
           </Field>
-          <DepartmentChecks value={groups} onChange={setGroups} />
+          <OrganizationChecks value={groups} onChange={setGroups} />
         </TabsContent>
         <TabsContent value="profile" className="mt-4 grid gap-4 sm:grid-cols-2">
           <Field label="Email" htmlFor="edit-email" className="sm:col-span-2" hint="Invite and password codes go to this address.">

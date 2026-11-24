@@ -18,19 +18,19 @@ describe("reports", suite, () => {
     ctx.admin = await signUp("reportadmin");
     ctx.member = await signUp("reportmember");
     ctx.outsider = await signUp("reportout");
-    ctx.org = await createJson(ctx.admin.accessToken, "/organizations", { name: label("Report org") });
-    ctx.department = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/departments`, {
-      name: label("Report department"),
+    ctx.org = await createJson(ctx.admin.accessToken, "/tenants", { name: label("Report org") });
+    ctx.tenant = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/tenants`, {
+      name: label("Report organization"),
     });
-    ctx.category = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/task-categories`, {
+    ctx.category = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/task-categories`, {
       name: label("Report category"),
     });
-    ctx.project = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/projects`, {
+    ctx.project = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/projects`, {
       title: label("Report project"),
       accessType: "Public",
     });
-    ctx.tag = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/tags`, { name: label("Report tag") });
-    await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/invitations`, {
+    ctx.tag = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/tags`, { name: label("Report tag") });
+    await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/invitations`, {
       email: ctx.member.email,
       role: "MEMBER",
     });
@@ -38,7 +38,7 @@ describe("reports", suite, () => {
   });
 
   test("report separates user totals from collective totals", async () => {
-    const empty = await callApi(`/organizations/${ctx.org.id}/report`, { token: ctx.member.accessToken });
+    const empty = await callApi(`/tenants/${ctx.org.id}/report`, { token: ctx.member.accessToken });
     assert.equal(empty.status, 200);
     assert.equal(empty.json.user.hours, 0);
     assert.equal(empty.json.user.entries, 0);
@@ -54,8 +54,8 @@ describe("reports", suite, () => {
     assert.equal(empty.json.collective.byPerson, undefined);
 
     await createJson(ctx.member.accessToken, "/time/duration", {
-      organizationId: ctx.org.id,
-      departmentId: ctx.department.id,
+      tenantId: ctx.org.id,
+      organizationId: ctx.tenant.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       durationMinutes: 90,
@@ -64,14 +64,14 @@ describe("reports", suite, () => {
       tagIds: [ctx.tag.id],
     });
     await createJson(ctx.admin.accessToken, "/collective-time-entries", {
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       startedAt: "2026-10-01T12:00:00.000Z",
       endedAt: "2026-10-01T14:00:00.000Z",
       participantCount: 1,
     });
-    const response = await callApi(`/organizations/${ctx.org.id}/report`, {
+    const response = await callApi(`/tenants/${ctx.org.id}/report`, {
       token: ctx.member.accessToken,
       query: { from: "2026-10-01", to: "2026-10-31", userId: ctx.member.user.id },
     });
@@ -81,7 +81,7 @@ describe("reports", suite, () => {
     assert.equal(response.json.user.volunteers, 1);
     assertMoney(response.json.user.inKind, 53.21);
     assert.equal(response.json.user.byPerson[0].label, "Ada Lovelace");
-    assert.equal(response.json.user.byDepartment[0].label, ctx.department.name);
+    assert.equal(response.json.user.byOrganization[0].label, ctx.tenant.name);
     assert.equal(response.json.user.byProject[0].label, ctx.project.title);
     assert.equal(response.json.user.byProject[0].projectType, "Project");
     assert.equal(response.json.user.byCategory[0].id, ctx.category.id);
@@ -94,19 +94,19 @@ describe("reports", suite, () => {
     assertMoney(response.json.collective.inKind, 70.94);
     assert.equal(response.json.collective.byProject[0].label, ctx.project.title);
     assert.equal(response.json.collective.byProject[0].projectType, "Project");
-    const outsider = await callApi(`/organizations/${ctx.org.id}/report`, { token: ctx.outsider.accessToken });
-    const badDate = await callApi(`/organizations/${ctx.org.id}/report`, {
+    const outsider = await callApi(`/tenants/${ctx.org.id}/report`, { token: ctx.outsider.accessToken });
+    const badDate = await callApi(`/tenants/${ctx.org.id}/report`, {
       token: ctx.member.accessToken,
       query: { from: "October" },
     });
-    const unauthenticated = await callApi(`/organizations/${ctx.org.id}/report`);
+    const unauthenticated = await callApi(`/tenants/${ctx.org.id}/report`);
     assertError(outsider, 403, "forbidden", "Forbidden.");
     assertError(badDate, 400, "validation_error", "from must be a date.");
     assertError(unauthenticated, 401, "unauthorized", "Authentication is required.");
   });
 
   test("csv exports the filtered user log", async () => {
-    const response = await callApi(`/organizations/${ctx.org.id}/time-entries.csv`, {
+    const response = await callApi(`/tenants/${ctx.org.id}/time-entries.csv`, {
       token: ctx.member.accessToken,
       query: { projectId: ctx.project.id },
     });
@@ -115,7 +115,7 @@ describe("reports", suite, () => {
     const lines = response.text.trim().split(/\r?\n/);
     assert.equal(
       lines[0],
-      "Date,Project,Volunteer,Department / Organization,Task category,Entry Method,Start Time,End Time,Manual Duration,Hours,Rate Type,Hourly Rate,In-Kind Value,Tags,Entered By,Date Entered,Hour Attribution,Notes,Volunteer ID",
+      "Date,Project,Volunteer,Organization / Tenant,Task category,Entry Method,Start Time,End Time,Manual Duration,Hours,Rate Type,Hourly Rate,In-Kind Value,Tags,Entered By,Date Entered,Hour Attribution,Notes,Volunteer ID",
     );
     const row = lines.find((line) => line.startsWith("10/1/2026,"));
     assert.ok(row, response.text);
@@ -129,12 +129,12 @@ describe("reports", suite, () => {
     assert.match(row, /53\.21/);
     assert.match(row, new RegExp(escapeRegExp(ctx.tag.name)));
     assert.match(row, /Notes/);
-    const outsider = await callApi(`/organizations/${ctx.org.id}/time-entries.csv`, { token: ctx.outsider.accessToken });
+    const outsider = await callApi(`/tenants/${ctx.org.id}/time-entries.csv`, { token: ctx.outsider.accessToken });
     assertError(outsider, 403, "forbidden", "Forbidden.");
   });
 
   test("summary csv stacks the workbook tables", async () => {
-    const response = await callApi(`/organizations/${ctx.org.id}/summary.csv`, {
+    const response = await callApi(`/tenants/${ctx.org.id}/summary.csv`, {
       token: ctx.admin.accessToken,
       query: { from: "2026-10-01", to: "2026-10-31" },
     });
@@ -144,33 +144,33 @@ describe("reports", suite, () => {
     assert.match(response.text, /Total In-Kind Value,53\.21/);
     assert.match(response.text, /Unique Volunteers,1/);
     assert.match(response.text, /Total Entries,1/);
-    assert.match(response.text, /Organization,Volunteer Hours,In-Kind Value/);
+    assert.match(response.text, /Tenant,Volunteer Hours,In-Kind Value/);
     assert.match(response.text, /Task category,Volunteer Hours,In-Kind Value/);
     assert.match(response.text, /Month,Volunteer Hours,In-Kind Value/);
     assert.match(response.text, /Volunteer,Total Hours,In-Kind Value/);
     assert.match(response.text, /Project,Volunteer Hours,In-Kind Value/);
     assert.match(response.text, /October,1\.5,53\.21/);
-    const outsider = await callApi(`/organizations/${ctx.org.id}/summary.csv`, { token: ctx.outsider.accessToken });
+    const outsider = await callApi(`/tenants/${ctx.org.id}/summary.csv`, { token: ctx.outsider.accessToken });
     assertError(outsider, 403, "forbidden", "Forbidden.");
   });
 
   test("professional hours stay out of volunteer KPIs", async () => {
-    const professional = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/hourly-rates`, {
+    const professional = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/hourly-rates`, {
       type: "Professional",
       name: label("Counsel rate"),
       perHourRate: 90,
     });
     await createJson(ctx.admin.accessToken, "/time/duration", {
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       userId: ctx.member.user.id,
-      departmentId: ctx.department.id,
+      organizationId: ctx.tenant.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       durationMinutes: 60,
       occurredOn: "2026-10-02",
       hourlyRateId: professional.id,
     });
-    const response = await callApi(`/organizations/${ctx.org.id}/report`, {
+    const response = await callApi(`/tenants/${ctx.org.id}/report`, {
       token: ctx.admin.accessToken,
       query: { from: "2026-10-01", to: "2026-10-31" },
     });
@@ -182,30 +182,30 @@ describe("reports", suite, () => {
     assertMoney(response.json.staff.inKind, 90);
   });
 
-  test("a department admin only sees that department in reports", async () => {
+  test("a organization admin only sees that organization in reports", async () => {
     const coordinator = await signUp("reportcoord");
-    await createJson(ctx.admin.accessToken, `/departments/${ctx.department.id}/invitations`, {
+    await createJson(ctx.admin.accessToken, `/tenants/${ctx.tenant.id}/invitations`, {
       email: coordinator.email,
       role: "ADMIN",
     });
     await acceptInvite(coordinator.accessToken, coordinator.email);
-    const scoped = await callApi(`/organizations/${ctx.org.id}/report`, { token: coordinator.accessToken });
+    const scoped = await callApi(`/tenants/${ctx.org.id}/report`, { token: coordinator.accessToken });
     assert.equal(scoped.status, 200);
     assert.equal(scoped.json.user.hours, 1.5);
     assert.equal(scoped.json.user.entries, 1);
     assert.equal(scoped.json.collective.entries, 0);
-    const other = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/departments`, {
-      name: label("Other report department"),
+    const other = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/tenants`, {
+      name: label("Other report organization"),
     });
-    const forbiddenDept = await callApi(`/organizations/${ctx.org.id}/report`, {
+    const forbiddenDept = await callApi(`/tenants/${ctx.org.id}/report`, {
       token: coordinator.accessToken,
-      query: { departmentId: other.id },
+      query: { organizationId: other.id },
     });
     assertError(forbiddenDept, 403, "forbidden", "Forbidden.");
   });
 
   test("view csv exports the current report breakdown", async () => {
-    const response = await callApi(`/organizations/${ctx.org.id}/view.csv`, {
+    const response = await callApi(`/tenants/${ctx.org.id}/view.csv`, {
       token: ctx.admin.accessToken,
       query: { from: "2026-10-01", to: "2026-10-31" },
     });
@@ -215,31 +215,31 @@ describe("reports", suite, () => {
     assert.match(response.text, new RegExp(escapeRegExp(ctx.project.title)));
   });
 
-  test("comma-separated department ids return the union", async () => {
-    const first = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/departments`, {
-      name: label("Union department A"),
+  test("comma-separated organization ids return the union", async () => {
+    const first = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/tenants`, {
+      name: label("Union organization A"),
     });
-    const second = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/departments`, {
-      name: label("Union department B"),
+    const second = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/tenants`, {
+      name: label("Union organization B"),
     });
-    for (const [department, minutes] of [
+    for (const [organization, minutes] of [
       [first, 60],
       [second, 30],
     ]) {
       await createJson(ctx.admin.accessToken, "/time/duration", {
-        organizationId: ctx.org.id,
+        tenantId: ctx.org.id,
         userId: ctx.member.user.id,
-        departmentId: department.id,
+        organizationId: organization.id,
         projectId: ctx.project.id,
         taskCategoryId: ctx.category.id,
         durationMinutes: minutes,
         occurredOn: "2027-03-02",
       });
     }
-    const hours = async (departmentId) => {
-      const response = await callApi(`/organizations/${ctx.org.id}/report`, {
+    const hours = async (organizationId) => {
+      const response = await callApi(`/tenants/${ctx.org.id}/report`, {
         token: ctx.admin.accessToken,
-        query: { from: "2027-03-01", to: "2027-03-31", departmentId },
+        query: { from: "2027-03-01", to: "2027-03-31", organizationId },
       });
       assert.equal(response.status, 200, response.text);
       return response.json.user.hours;
@@ -247,11 +247,11 @@ describe("reports", suite, () => {
     assert.equal(await hours(first.id), 1);
     assert.equal(await hours(second.id), 0.5);
     assert.equal(await hours(`${first.id},${second.id}`), 1.5);
-    const invalid = await callApi(`/organizations/${ctx.org.id}/report`, {
+    const invalid = await callApi(`/tenants/${ctx.org.id}/report`, {
       token: ctx.admin.accessToken,
-      query: { departmentId: `${first.id},nope` },
+      query: { organizationId: `${first.id},nope` },
     });
-    assertError(invalid, 400, "validation_error", "departmentId must be an id.");
+    assertError(invalid, 400, "validation_error", "organizationId must be an id.");
   });
 });
 

@@ -17,7 +17,7 @@ export type ReportSide = {
   volunteers?: number;
   entries: number;
   inKind: number;
-  byDepartment: ReportGroup[];
+  byOrganization: ReportGroup[];
   byCategory: ReportGroup[];
   byPerson?: ReportGroup[];
   byVolunteer?: ReportGroup[];
@@ -34,7 +34,7 @@ export type UserReportSide = ReportSide & {
 
 export type ReportPayload = { user: UserReportSide; staff: UserReportSide; collective: ReportSide };
 
-export type Organization = { id: string; name: string };
+export type Tenant = { id: string; name: string };
 
 export function adminPassword() {
   const password = process.env.SEED_SUPERADMIN_PASSWORD?.trim();
@@ -58,17 +58,17 @@ export async function loginAs(page: Page, username: string, password: string) {
       throw new Error((await formError.innerText()).trim());
     }),
   ]);
-  const organization = await sessionOrganization(page.request);
+  const tenant = await sessionTenant(page.request);
   await page.context().addCookies([
     {
       name: "clocked-in-org",
-      value: organization.id,
+      value: tenant.id,
       url: page.url(),
       httpOnly: true,
       sameSite: "Lax",
     },
   ]);
-  return organization;
+  return tenant;
 }
 
 export async function loginAsAdmin(page: Page) {
@@ -84,13 +84,13 @@ export async function createOrgPerson(
     username: string;
     password: string;
     role?: "VOLUNTEER" | "MEMBER" | "ADMIN";
-    departmentIds?: string[];
+    organizationIds?: string[];
   },
 ) {
   const session = await loginBearer(request);
   const headers = { authorization: `Bearer ${session.accessToken}` };
-  const organization = await caswjOrganization(request, session.accessToken);
-  const created = await request.post(`/organizations/${organization.id}/memberships`, {
+  const tenant = await caswjTenant(request, session.accessToken);
+  const created = await request.post(`/tenants/${tenant.id}/memberships`, {
     headers,
     data: {
       firstName: input.firstName,
@@ -100,7 +100,7 @@ export async function createOrgPerson(
       username: input.username,
       password: `${input.password}-temporary`,
       role: input.role ?? "VOLUNTEER",
-      departmentIds: input.departmentIds ?? [],
+      organizationIds: input.organizationIds ?? [],
     },
   });
   expect(created.ok(), await created.text()).toBeTruthy();
@@ -116,17 +116,17 @@ export async function createOrgPerson(
   expect(activated.ok(), await activated.text()).toBeTruthy();
   return {
     membership: (await created.json()) as { id: string; userId: string; user: { email: string } },
-    organization,
+    tenant,
     session,
   };
 }
 
-export async function makeCoordinator(request: APIRequestContext, userId: string, departmentId: string) {
+export async function makeCoordinator(request: APIRequestContext, userId: string, organizationId: string) {
   const session = await loginBearer(request);
   const headers = { authorization: `Bearer ${session.accessToken}` };
   let membership: { id: string; userId: string } | undefined;
   for (let offset = 0; !membership; offset += 100) {
-    const listed = await request.get(`/departments/${departmentId}/memberships?limit=100&offset=${offset}`, {
+    const listed = await request.get(`/tenants/${organizationId}/memberships?limit=100&offset=${offset}`, {
       headers,
     });
     expect(listed.ok(), await listed.text()).toBeTruthy();
@@ -134,58 +134,58 @@ export async function makeCoordinator(request: APIRequestContext, userId: string
     membership = body.items.find((item) => item.userId === userId);
     if (body.items.length < 100) break;
   }
-  expect(membership, "department membership").toBeTruthy();
-  const updated = await request.patch(`/departments/${departmentId}/memberships/${membership!.id}`, {
+  expect(membership, "organization membership").toBeTruthy();
+  const updated = await request.patch(`/tenants/${organizationId}/memberships/${membership!.id}`, {
     headers,
     data: { role: "ADMIN" },
   });
   expect(updated.ok(), await updated.text()).toBeTruthy();
 }
 
-export async function caswjOrganization(request: APIRequestContext, token?: string) {
-  const organization = (await organizations(request, token)).find((item) => item.name === orgName);
-  if (!organization) {
-    throw new Error("CASWJ organization was not found. Run npm run db:seed:caswj.");
+export async function caswjTenant(request: APIRequestContext, token?: string) {
+  const tenant = (await tenants(request, token)).find((item) => item.name === orgName);
+  if (!tenant) {
+    throw new Error("CASWJ tenant was not found. Run npm run db:seed:caswj.");
   }
 
-  return organization;
+  return tenant;
 }
 
-export async function sessionOrganization(request: APIRequestContext, token?: string) {
+export async function sessionTenant(request: APIRequestContext, token?: string) {
   if (process.env.E2E_ENV?.toUpperCase() !== "STAGING") {
-    return caswjOrganization(request, token);
+    return caswjTenant(request, token);
   }
 
   try {
-    return await caswjOrganization(request, token);
+    return await caswjTenant(request, token);
   } catch {
-    const organization = (await organizations(request, token))[0];
-    if (!organization) {
-      throw new Error("The signed-in user has no organization.");
+    const tenant = (await tenants(request, token))[0];
+    if (!tenant) {
+      throw new Error("The signed-in user has no tenant.");
     }
 
-    return organization;
+    return tenant;
   }
 }
 
-async function organizations(request: APIRequestContext, token?: string) {
+async function tenants(request: APIRequestContext, token?: string) {
   const headers = token ? { authorization: `Bearer ${token}` } : undefined;
-  const response = await request.get("/organizations?limit=100", { headers });
+  const response = await request.get("/tenants?limit=100", { headers });
   expect(response.ok(), await response.text()).toBeTruthy();
-  const body = (await response.json()) as { items: Organization[] };
+  const body = (await response.json()) as { items: Tenant[] };
   return body.items;
 }
 
-export async function getReport(request: APIRequestContext, organizationId: string, token?: string) {
+export async function getReport(request: APIRequestContext, tenantId: string, token?: string) {
   const headers = token ? { authorization: `Bearer ${token}` } : undefined;
-  const response = await request.get(`/organizations/${organizationId}/report?_=${Date.now()}`, { headers });
+  const response = await request.get(`/tenants/${tenantId}/report?_=${Date.now()}`, { headers });
   expect(response.ok(), await response.text()).toBeTruthy();
   return (await response.json()) as ReportPayload;
 }
 
-export async function getCsv(request: APIRequestContext, organizationId: string, kind: "log" | "summary") {
+export async function getCsv(request: APIRequestContext, tenantId: string, kind: "log" | "summary") {
   const path = kind === "log" ? "time-entries.csv" : "summary.csv";
-  const response = await request.get(`/organizations/${organizationId}/${path}`);
+  const response = await request.get(`/tenants/${tenantId}/${path}`);
   expect(response.ok(), await response.text()).toBeTruthy();
   return response.text();
 }
@@ -202,17 +202,17 @@ export async function loginBearer(request: APIRequestContext) {
 export async function deleteMembershipByEmail(request: APIRequestContext, email: string) {
   const session = await loginBearer(request);
   const headers = { authorization: `Bearer ${session.accessToken}` };
-  const organization = await caswjOrganization(request, session.accessToken);
+  const tenant = await caswjTenant(request, session.accessToken);
   const needle = email.trim().toLowerCase();
   for (let offset = 0; ; offset += 100) {
-    const listed = await request.get(`/organizations/${organization.id}/memberships?limit=100&offset=${offset}`, {
+    const listed = await request.get(`/tenants/${tenant.id}/memberships?limit=100&offset=${offset}`, {
       headers,
     });
     expect(listed.ok(), await listed.text()).toBeTruthy();
     const body = (await listed.json()) as { items: { id: string; user: { email: string } }[] };
     const match = body.items.find((item) => item.user.email.toLowerCase() === needle);
     if (match) {
-      const deleted = await request.delete(`/organizations/${organization.id}/memberships/${match.id}`, { headers });
+      const deleted = await request.delete(`/tenants/${tenant.id}/memberships/${match.id}`, { headers });
       expect(deleted.ok(), await deleted.text()).toBeTruthy();
       return;
     }
@@ -226,10 +226,10 @@ export async function deleteMembershipByEmail(request: APIRequestContext, email:
 export async function deleteE2eEntries(request: APIRequestContext) {
   const session = await loginBearer(request);
   const headers = { authorization: `Bearer ${session.accessToken}` };
-  const organization = await sessionOrganization(request, session.accessToken);
+  const tenant = await sessionTenant(request, session.accessToken);
   const entryIds: string[] = [];
   for (let offset = 0; ; offset += 100) {
-    const listed = await request.get(`/organizations/${organization.id}/time-entries?limit=100&offset=${offset}`, {
+    const listed = await request.get(`/tenants/${tenant.id}/time-entries?limit=100&offset=${offset}`, {
       headers,
     });
     expect(listed.ok(), await listed.text()).toBeTruthy();
@@ -296,7 +296,7 @@ export function groupsByLabel(rows: ReportGroup[]) {
 export function expectGroups(
   actual: ReportGroup[],
   expected: ReportGroup[],
-  options: { volunteers?: boolean; id?: "label" | "month" | "department" } = {},
+  options: { volunteers?: boolean; id?: "label" | "month" | "organization" } = {},
 ) {
   expect(actual, "group count").toHaveLength(expected.length);
   const found = groupsByLabel(actual);
@@ -318,19 +318,19 @@ export function expectGroups(
       expect(match.id, `${row.label} month id`).toBe(row.id);
     }
 
-    if (options.id === "department" && row.id === "organization") {
-      expect(match.id).toBe("organization");
+    if (options.id === "organization" && row.id === "tenant") {
+      expect(match.id).toBe("tenant");
     }
   }
 }
 
 export async function openReports(page: Page) {
-  const organization = await loginAsAdmin(page);
+  const tenant = await loginAsAdmin(page);
   await page.goto("/reports/summary");
   await expect(page.getByRole("button", { name: "Choose report" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Reports menu" })).toBeVisible();
   await expect(page.getByText("Updating…")).toHaveCount(0);
-  return organization;
+  return tenant;
 }
 
 export function cardNamed(page: Page, title: string) {

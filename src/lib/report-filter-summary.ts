@@ -2,7 +2,7 @@ import { formatDate, formatPersonName } from "@/lib/format";
 import type { ReportFilters } from "@/lib/report-layout";
 
 export type FilterNames = {
-  department: Map<string, string>;
+  organization: Map<string, string>;
   project: Map<string, string>;
   category: Map<string, string>;
   person: Map<string, string>;
@@ -28,19 +28,19 @@ function datePart(filters: ReportFilters) {
 export function reportFilterSummary(
   filters: ReportFilters,
   names: FilterNames,
-  copy: { department: string; project: string; taskCategory: string; departments: string },
+  copy: { organization: string; project: string; taskCategory: string; organizations: string },
 ) {
   const parts = [datePart(filters)];
   const named = (ids: string[] | undefined, lookup: Map<string, string>, fallback: string) => {
     if (!ids || ids.length === 0) return;
     parts.push(ids.map((id) => lookup.get(id) ?? fallback).join(", "));
   };
-  named(filters.departmentId, names.department, copy.department);
+  named(filters.organizationId, names.organization, copy.organization);
   named(filters.taskCategoryId, names.category, copy.taskCategory);
   named(filters.projectId, names.project, copy.project);
   named(filters.userId, names.person, "Person");
   if (parts.length === 1 && parts[0] === "All time") {
-    parts.push(`All ${copy.departments.toLowerCase()}`);
+    parts.push(`All ${copy.organizations.toLowerCase()}`);
   }
   return parts.join(" · ");
 }

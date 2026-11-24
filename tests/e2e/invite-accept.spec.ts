@@ -37,7 +37,7 @@ test("admin invite is accepted and the person appears on People", async ({ page,
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL((url) => !url.pathname.startsWith("/login"));
   await page.goto(`/accept?code=${code}`);
-  await page.getByRole("button", { name: "Join organization" }).click();
+  await page.getByRole("button", { name: "Join tenant" }).click();
   await expect(page).toHaveURL(/dashboard/);
 
   const admin = await loginBearer(request);

@@ -5,14 +5,14 @@ import { run } from "@/lib/server/action";
 import { requireAccess } from "@/lib/server/session";
 
 export async function createApiKeyAction(
-  organizationId: string,
+  tenantId: string,
   input: { name: string; scopes: string[]; expiresAt: string | null },
 ) {
   return run(async () => {
     const access = await requireAccess();
     return createApiKey(
       access,
-      organizationId,
+      tenantId,
       parseCreateApiKey({
         name: input.name,
         scopes: input.scopes,
@@ -23,7 +23,7 @@ export async function createApiKeyAction(
 }
 
 export async function updateApiKeyAction(
-  organizationId: string,
+  tenantId: string,
   keyId: string,
   input: { name: string; scopes: string[]; expiresAt: string | null },
 ) {
@@ -31,23 +31,23 @@ export async function updateApiKeyAction(
     const access = await requireAccess();
     return updateApiKey(
       access,
-      organizationId,
+      tenantId,
       keyId,
       parseUpdateApiKey({ name: input.name, scopes: input.scopes, expiresAt: input.expiresAt }),
     );
   }, "API key saved.");
 }
 
-export async function rotateApiKeyAction(organizationId: string, keyId: string) {
+export async function rotateApiKeyAction(tenantId: string, keyId: string) {
   return run(async () => {
     const access = await requireAccess();
-    return rotateApiKey(access, organizationId, keyId);
+    return rotateApiKey(access, tenantId, keyId);
   }, "API key rotated.");
 }
 
-export async function revokeApiKeyAction(organizationId: string, keyId: string) {
+export async function revokeApiKeyAction(tenantId: string, keyId: string) {
   return run(async () => {
     const access = await requireAccess();
-    await revokeApiKey(access, organizationId, keyId);
+    await revokeApiKey(access, tenantId, keyId);
   }, "API key revoked.");
 }

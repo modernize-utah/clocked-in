@@ -9,7 +9,7 @@ export const clockedInThemeId = "44444444-4444-4444-8444-444444444441";
 export type ThemeJson = {
   id: string;
   name: string;
-  organizationId: string | null;
+  tenantId: string | null;
   primary: string;
   primaryForeground: string;
   highlight: string;
@@ -40,7 +40,7 @@ function parsePaletteJson(value: string) {
 export function themeJson(theme: {
   id: string;
   name: string;
-  organizationId: string | null;
+  tenantId: string | null;
   primary: string;
   primaryForeground: string;
   highlight: string;
@@ -59,7 +59,7 @@ export function themeJson(theme: {
   return {
     id: theme.id,
     name: theme.name,
-    organizationId: theme.organizationId,
+    tenantId: theme.tenantId,
     primary: theme.primary,
     primaryForeground: theme.primaryForeground,
     highlight: theme.highlight,
@@ -176,24 +176,24 @@ function themeData(request: ThemeWriteRequest) {
   };
 }
 
-export async function listThemes(access: Access, organizationId: string) {
-  await access.requireOrganization(organizationId, false);
+export async function listThemes(access: Access, tenantId: string) {
+  await access.requireTenant(tenantId, false);
   const items = await prisma.theme.findMany({
-    where: { OR: [{ organizationId: null }, { organizationId }] },
-    orderBy: [{ organizationId: "asc" }, { name: "asc" }],
+    where: { OR: [{ tenantId: null }, { tenantId }] },
+    orderBy: [{ tenantId: "asc" }, { name: "asc" }],
   });
   return list(items.map(themeJson), { limit: items.length, offset: 0 });
 }
 
-export async function createTheme(access: Access, organizationId: string, request: ThemeWriteRequest) {
-  await access.requireOrganizationAdmin(organizationId);
-  const theme = await guard(prisma.theme.create({ data: { organizationId, ...themeData(request) } }));
+export async function createTheme(access: Access, tenantId: string, request: ThemeWriteRequest) {
+  await access.requireTenantAdmin(tenantId);
+  const theme = await guard(prisma.theme.create({ data: { tenantId, ...themeData(request) } }));
   return themeJson(theme);
 }
 
-export async function updateTheme(access: Access, organizationId: string, themeId: string, request: ThemeWriteRequest) {
-  await access.requireOrganizationAdmin(organizationId);
-  const theme = await prisma.theme.findFirst({ where: { id: themeId, organizationId } });
+export async function updateTheme(access: Access, tenantId: string, themeId: string, request: ThemeWriteRequest) {
+  await access.requireTenantAdmin(tenantId);
+  const theme = await prisma.theme.findFirst({ where: { id: themeId, tenantId } });
   if (!theme) {
     notFound();
   }
@@ -201,16 +201,16 @@ export async function updateTheme(access: Access, organizationId: string, themeI
   return themeJson(await guard(prisma.theme.update({ where: { id: themeId }, data: themeData(request) })));
 }
 
-export async function deleteTheme(access: Access, organizationId: string, themeId: string) {
-  await access.requireOrganizationAdmin(organizationId);
-  const theme = await prisma.theme.findFirst({ where: { id: themeId, organizationId } });
+export async function deleteTheme(access: Access, tenantId: string, themeId: string) {
+  await access.requireTenantAdmin(tenantId);
+  const theme = await prisma.theme.findFirst({ where: { id: themeId, tenantId } });
   if (!theme) {
     notFound();
   }
 
   await transaction(async (tx) => {
-    await tx.organization.updateMany({
-      where: { id: organizationId, themeId },
+    await tx.tenant.updateMany({
+      where: { id: tenantId, themeId },
       data: { themeId: clockedInThemeId },
     });
     await tx.theme.delete({ where: { id: themeId } });

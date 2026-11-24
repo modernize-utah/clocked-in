@@ -60,7 +60,7 @@ export function EntitySelect({
           onValueChange={onValueChange}
           options={options}
           placeholder={placeholder}
-          className="h-10 min-w-0"
+          className="min-w-0"
         />
       ) : (
         <SelectField
@@ -69,7 +69,7 @@ export function EntitySelect({
           onValueChange={onValueChange}
           options={options}
           placeholder={placeholder}
-          className="h-10 min-w-0"
+          className="min-w-0"
         />
       )}
     </Field>

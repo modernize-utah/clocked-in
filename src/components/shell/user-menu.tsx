@@ -18,7 +18,7 @@ import {
 import { useWorkspace } from "@/hooks/use-workspace";
 
 export function UserMenu() {
-  const { viewer, organization, isAdmin, isCoordinator } = useWorkspace();
+  const { viewer, tenant, isAdmin, isCoordinator } = useWorkspace();
   const avatarSrc = avatarImageSrc(viewer.id, viewer.avatarUrl);
   return (
     <DropdownMenu>
@@ -37,7 +37,7 @@ export function UserMenu() {
           <DropdownMenuLabel className="flex flex-col gap-0.5">
             <span className="truncate text-sm font-medium text-foreground">{viewer.name}</span>
             <span className="truncate text-xs font-normal">{viewer.email}</span>
-            {isAdmin ? <span className="text-xs font-normal text-highlight">Organization admin</span> : null}
+            {isAdmin ? <span className="text-xs font-normal text-highlight">Tenant admin</span> : null}
             {!isAdmin && isCoordinator ? <span className="text-xs font-normal text-highlight">Group manager</span> : null}
           </DropdownMenuLabel>
         </DropdownMenuGroup>
@@ -46,10 +46,10 @@ export function UserMenu() {
           <UserRoundIcon />
           Profile
         </DropdownMenuItem>
-        {organization ? (
-          <DropdownMenuItem render={<Link href="/organization" />} className="min-w-0">
+        {tenant ? (
+          <DropdownMenuItem render={<Link href="/tenant" />} className="min-w-0">
             <BuildingIcon />
-            <span className="truncate">{organization.name}</span>
+            <span className="truncate">{tenant.name}</span>
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuItem render={<Link href="/accept" />}>

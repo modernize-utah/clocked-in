@@ -13,11 +13,11 @@ export function namedEntity(value: unknown): value is NamedEntity {
 export function savedProject(value: unknown): value is Project {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
-  return typeof record.id === "string" && typeof record.title === "string" && typeof record.organizationId === "string";
+  return typeof record.id === "string" && typeof record.title === "string" && typeof record.tenantId === "string";
 }
 
-export function rememberLookup(queryClient: QueryClient, organizationId: string, update: (current: Lookups) => Lookups) {
-  queryClient.setQueriesData<Lookups>({ queryKey: keys.lookups(organizationId) }, (current) =>
+export function rememberLookup(queryClient: QueryClient, tenantId: string, update: (current: Lookups) => Lookups) {
+  queryClient.setQueriesData<Lookups>({ queryKey: keys.lookups(tenantId) }, (current) =>
     current ? update(current) : current,
   );
 }

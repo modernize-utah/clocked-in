@@ -21,7 +21,7 @@ import { prisma } from "@/lib/prisma";
 
 function rateJson(rate: {
   id: string;
-  organizationId: string;
+  tenantId: string;
   type: string;
   name: string;
   perHourRate: Prisma.Decimal;
@@ -31,7 +31,7 @@ function rateJson(rate: {
 }) {
   return {
     id: rate.id,
-    organizationId: rate.organizationId,
+    tenantId: rate.tenantId,
     type: rate.type,
     name: rate.name,
     perHourRate: Number(rate.perHourRate),
@@ -41,9 +41,9 @@ function rateJson(rate: {
   };
 }
 
-export function seedDefaultHourlyRate(organizationId: string) {
+export function seedDefaultHourlyRate(tenantId: string) {
   return {
-    organizationId,
+    tenantId,
     type: "Volunteer" as const,
     name: "Volunteer",
     perHourRate: 35.47,
@@ -52,12 +52,12 @@ export function seedDefaultHourlyRate(organizationId: string) {
   };
 }
 
-export async function defaultVolunteerRate(organizationId: string) {
+export async function defaultVolunteerRate(tenantId: string) {
   const rate = await prisma.hourlyRate.findFirst({
-    where: { organizationId, isDefault: true },
+    where: { tenantId, isDefault: true },
   });
   if (!rate) {
-    validation("This organization needs a default volunteer rate.");
+    validation("This tenant needs a default volunteer rate.");
   }
 
   return { id: rate.id, rate: Number(rate.perHourRate) };
@@ -136,11 +136,11 @@ export function parseUpdateHourlyRate(body: Body): UpdateHourlyRateRequest {
   return request;
 }
 
-export async function listHourlyRates(access: Access, organizationId: string, params: URLSearchParams) {
+export async function listHourlyRates(access: Access, tenantId: string, params: URLSearchParams) {
   const paging = page(params);
-  await access.requireOrganization(organizationId, false);
+  await access.requireTenant(tenantId, false);
   const rates = await prisma.hourlyRate.findMany({
-    where: { organizationId },
+    where: { tenantId },
     orderBy: [{ isDefault: "desc" }, { type: "asc" }, { name: "asc" }],
     skip: paging.offset,
     take: paging.limit,
@@ -154,29 +154,29 @@ async function managed(access: Access, rateId: string) {
     notFound();
   }
 
-  await access.requireOrganizationAdmin(rate.organizationId);
+  await access.requireTenantAdmin(rate.tenantId);
   return rate;
 }
 
-async function clearDefault(tx: Prisma.TransactionClient, organizationId: string, exceptRateId?: string) {
+async function clearDefault(tx: Prisma.TransactionClient, tenantId: string, exceptRateId?: string) {
   await tx.hourlyRate.updateMany({
-    where: { organizationId, isDefault: true, ...(exceptRateId ? { id: { not: exceptRateId } } : {}) },
+    where: { tenantId, isDefault: true, ...(exceptRateId ? { id: { not: exceptRateId } } : {}) },
     data: { isDefault: false },
   });
 }
 
-export async function createHourlyRate(access: Access, organizationId: string, request: CreateHourlyRateRequest) {
-  await access.requireOrganizationAdmin(organizationId);
+export async function createHourlyRate(access: Access, tenantId: string, request: CreateHourlyRateRequest) {
+  await access.requireTenantAdmin(tenantId);
   return rateJson(
     await transaction(async (tx) => {
       if (request.isDefault) {
-        await clearDefault(tx, organizationId);
+        await clearDefault(tx, tenantId);
       }
 
       return guard(
         tx.hourlyRate.create({
           data: {
-            organizationId,
+            tenantId,
             type: request.type,
             name: request.name,
             perHourRate: request.perHourRate,
@@ -210,7 +210,7 @@ export async function updateHourlyRate(access: Access, rateId: string, request: 
       }
 
       if (isDefault && !rate.isDefault) {
-        await clearDefault(tx, rate.organizationId, rate.id);
+        await clearDefault(tx, rate.tenantId, rate.id);
       }
 
       return guard(

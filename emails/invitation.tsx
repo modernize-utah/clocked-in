@@ -3,14 +3,14 @@ import { bodyText, codeBox, codeText, EmailLayout, linkText, quietText } from ".
 
 export const invitation = {
   id: "invitation",
-  subject: "{{organizationName}} invited you to join VolunTime",
-  variables: ["targetKind", "targetName", "organizationName", "roleName", "username", "code", "url"],
+  subject: "{{tenantName}} invited you to join VolunTime",
+  variables: ["targetKind", "targetName", "tenantName", "roleName", "username", "code", "url"],
 };
 
 export default function InvitationEmail({
-  targetKind = "Organization",
+  targetKind = "Tenant",
   targetName = "Harbor Volunteers",
-  organizationName = "Harbor Volunteers",
+  tenantName = "Harbor Volunteers",
   roleName = "Staff",
   username = "jsmith",
   code = "482913",
@@ -18,7 +18,7 @@ export default function InvitationEmail({
 }: {
   targetKind?: string;
   targetName?: string;
-  organizationName?: string;
+  tenantName?: string;
   roleName?: string;
   username?: string;
   code?: string;
@@ -26,11 +26,11 @@ export default function InvitationEmail({
 }) {
   return (
     <EmailLayout
-      preview={`Log your volunteer hours with ${organizationName}.`}
+      preview={`Log your volunteer hours with ${tenantName}.`}
       title="You have an invite"
     >
       <Text style={bodyText}>
-        {organizationName} invited you to join the {targetKind} {targetName} as {roleName}.
+        {tenantName} invited you to join the {targetKind} {targetName} as {roleName}.
       </Text>
       <Text style={bodyText}>Your username will be {username}.</Text>
       <Text style={bodyText}>Use this code to accept the invite:</Text>

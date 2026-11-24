@@ -89,8 +89,8 @@ export function newReportPath(search?: URLSearchParams | string | null, startFro
   return query ? `/reports/new?${query}` : "/reports/new";
 }
 
-export function lastReportStorageKey(organizationId: string) {
-  return `clocked-in.last-report:${organizationId}`;
+export function lastReportStorageKey(tenantId: string) {
+  return `clocked-in.last-report:${tenantId}`;
 }
 
 export function isReportViewerPath(pathname: string) {

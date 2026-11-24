@@ -26,7 +26,7 @@ export type PublicNeed = {
   requireVetting: boolean;
   closed: "deadline" | "full" | null;
   questions: Question[];
-  organizationName: string;
+  tenantName: string;
 };
 
 const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;

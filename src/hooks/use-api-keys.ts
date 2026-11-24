@@ -1,11 +1,11 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useOrganization } from "@/hooks/use-workspace";
+import { useTenant } from "@/hooks/use-workspace";
 import { apiKeysQuery } from "@/lib/queries";
 
 export function useApiKeys() {
-  const organization = useOrganization();
-  const query = useQuery(apiKeysQuery(organization.id));
+  const tenant = useTenant();
+  const query = useQuery(apiKeysQuery(tenant.id));
   return { ...query, apiKeys: query.data ?? [] };
 }

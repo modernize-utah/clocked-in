@@ -9,7 +9,7 @@ const toolNames = [
   "clock_out",
   "create_collective_entry",
   "create_connection",
-  "create_department",
+  "create_tenant",
   "create_hourly_rate",
   "create_invitation",
   "create_member",
@@ -21,7 +21,7 @@ const toolNames = [
   "create_volunteer_need",
   "delete_collective_entry",
   "delete_connection",
-  "delete_department",
+  "delete_tenant",
   "delete_hourly_rate",
   "delete_membership",
   "delete_memberships",
@@ -34,38 +34,48 @@ const toolNames = [
   "export_summary_csv",
   "export_time_entries_csv",
   "get_collective_entry",
-  "get_organization",
+  "get_tenant",
+  "get_tenant_groups_sync_contract",
+  "get_people_roles_sync_contract",
   "get_project",
   "get_report",
   "get_time_entry",
   "get_volunteer_need",
   "list_collective_entries",
   "list_connections",
-  "list_departments",
+  "list_tenants",
   "list_hourly_rates",
   "list_invitations",
   "list_members",
-  "list_organizations",
+  "list_tenants",
   "list_projects",
   "list_tags",
   "list_task_categories",
   "list_themes",
   "list_time_entries",
   "list_volunteer_needs",
+  "pull_tenant_groups_sync",
+  "pull_people_roles_sync",
   "reset_clock",
   "revoke_invitation",
+  "rotate_tenant_groups_webhook_secret",
+  "rotate_people_roles_webhook_secret",
+  "set_tenant_groups_outbound_token",
+  "set_people_roles_outbound_token",
   "update_collective_entry",
   "update_connection",
-  "update_department",
+  "update_tenant",
   "update_hourly_rate",
   "update_membership",
-  "update_organization",
+  "update_tenant",
   "update_project",
   "update_tag",
   "update_task_category",
   "update_theme",
   "update_time_entry",
   "update_volunteer_need",
+  "validate_tenant_groups_sync",
+  "validate_people_roles_sync",
 ];
 
 function rpcMessage(text) {
@@ -125,20 +135,20 @@ describe("mcp", suite, () => {
     assert.equal(listed.status, 200, listed.text.slice(0, 600));
     const names = listed.json.result.tools.map((tool) => tool.name).sort();
     assert.deepEqual(names, toolNames);
-    const organizations = listed.json.result.tools.find((tool) => tool.name === "list_organizations");
-    assert.deepEqual([...organizations.inputSchema.required].sort(), ["limit", "offset"]);
+    const tenants = listed.json.result.tools.find((tool) => tool.name === "list_tenants");
+    assert.deepEqual([...tenants.inputSchema.required].sort(), ["limit", "offset"]);
     const clockOut = listed.json.result.tools.find((tool) => tool.name === "clock_out");
     assert.deepEqual([...clockOut.inputSchema.required].sort(), ["description", "tagIds", "userId"]);
   });
 
-  test("list_organizations matches the REST list", async () => {
-    const rest = await callApi("/organizations", { token: ctx.user.accessToken });
+  test("list_tenants matches the REST list", async () => {
+    const rest = await callApi("/tenants", { token: ctx.user.accessToken });
     assert.equal(rest.status, 200);
     const called = await mcp(ctx.user.accessToken, {
       jsonrpc: "2.0",
       id: 2,
       method: "tools/call",
-      params: { name: "list_organizations", arguments: { limit: null, offset: null } },
+      params: { name: "list_tenants", arguments: { limit: null, offset: null } },
     });
     assert.equal(called.status, 200, called.text.slice(0, 600));
     assert.equal(called.json.result.isError, undefined);
@@ -146,9 +156,9 @@ describe("mcp", suite, () => {
     assert.deepEqual(JSON.parse(text), rest.json);
   });
 
-  test("organization API keys authenticate MCP tool calls", async () => {
-    const org = await createJson(ctx.user.accessToken, "/organizations", { name: label("MCP key org") });
-    const key = await createJson(ctx.user.accessToken, `/organizations/${org.id}/api-keys`, {
+  test("tenant API keys authenticate MCP tool calls", async () => {
+    const org = await createJson(ctx.user.accessToken, "/tenants", { name: label("MCP key org") });
+    const key = await createJson(ctx.user.accessToken, `/tenants/${org.id}/api-keys`, {
       name: "MCP reader",
       scopes: ["org:read"],
     });
@@ -156,7 +166,7 @@ describe("mcp", suite, () => {
       jsonrpc: "2.0",
       id: 3,
       method: "tools/call",
-      params: { name: "get_organization", arguments: { organizationId: org.id } },
+      params: { name: "get_tenant", arguments: { tenantId: org.id } },
     });
     assert.equal(called.status, 200);
     assert.equal(called.json.result.isError, undefined);

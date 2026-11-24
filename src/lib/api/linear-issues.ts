@@ -13,7 +13,7 @@ export type LinearIssueDraft = {
   screenshotUrls: string[];
   submitterName: string;
   submitterUsername: string;
-  organizationName: string | null;
+  tenantName: string | null;
   adminUrl: string;
 };
 
@@ -33,7 +33,7 @@ export type SlackFeedbackAlert = {
   screenshotUrls: string[];
   submitterName: string;
   submitterUsername: string;
-  organizationName: string | null;
+  tenantName: string | null;
   adminUrl: string;
   linearIssueIdentifier: string | null;
   ticketUrl: string | null;
@@ -185,8 +185,8 @@ export function formatLinearDescription(draft: LinearIssueDraft) {
     `**Area:** ${draft.area === "LogTime" ? "Log time" : draft.area}`,
     `**From:** ${draft.submitterName} (\`${draft.submitterUsername}\`)`,
   ];
-  if (draft.organizationName) {
-    lines.push(`**Organization:** ${draft.organizationName}`);
+  if (draft.tenantName) {
+    lines.push(`**Tenant:** ${draft.tenantName}`);
   }
 
   lines.push(`**VolunTime:** ${draft.adminUrl}`, "", draft.description);
@@ -600,10 +600,10 @@ export function formatSlackFeedbackPayload(alert: SlackFeedbackAlert) {
     },
   ];
 
-  if (alert.organizationName) {
+  if (alert.tenantName) {
     fields.push({
       type: "mrkdwn",
-      text: `*Organization:*\n${escapeSlackMrkdwn(alert.organizationName)}`,
+      text: `*Tenant:*\n${escapeSlackMrkdwn(alert.tenantName)}`,
     });
   }
 

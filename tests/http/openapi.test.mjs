@@ -26,20 +26,20 @@ describe("OpenAPI snapshot", () => {
   test("documents BindAsync request bodies", () => {
     assert.ok(operation("post", "/auth/user").requestBody.content["application/json"].schema.properties.username);
     assert.ok(operation("patch", "/users/me").requestBody);
-    assert.ok(operation("delete", "/organizations/{id}/memberships").requestBody);
-    assert.equal(operation("delete", "/organizations/{id}").requestBody, undefined);
+    assert.ok(operation("delete", "/tenants/{id}/memberships").requestBody);
+    assert.equal(operation("delete", "/tenants/{id}").requestBody, undefined);
     assert.ok(operation("post", "/time/clock-in").requestBody);
-    assert.equal(operation("post", "/organizations/{id}/api-keys/{keyId}/rotate").requestBody, undefined);
-    assert.ok(operation("post", "/organizations/{id}/imports/people").requestBody.content["application/json"].schema.properties.rows);
+    assert.equal(operation("post", "/tenants/{id}/api-keys/{keyId}/rotate").requestBody, undefined);
+    assert.ok(operation("post", "/tenants/{id}/imports/people").requestBody.content["application/json"].schema.properties.rows);
     assert.ok(operation("patch", "/feedback/{id}").requestBody.content["application/json"].schema.oneOf);
   });
 
   test("documents errors, csv, query names, and security", () => {
-    const list = operation("get", "/organizations");
+    const list = operation("get", "/tenants");
     assert.ok(list.security?.some((item) => item.bearerAuth || item.apiKeyAuth));
     assert.equal(operation("post", "/auth/login").security, undefined);
-    assert.ok(operation("post", "/organizations").responses["400"]);
-    assert.ok(operation("get", "/organizations/{id}/time-entries.csv").responses["200"].content["text/csv"]);
+    assert.ok(operation("post", "/tenants").responses["400"]);
+    assert.ok(operation("get", "/tenants/{id}/time-entries.csv").responses["200"].content["text/csv"]);
     assert.ok(list.parameters.some((parameter) => parameter.name === "limit"));
     assert.equal(spec.components.schemas.TimeEntryDto.properties.startedAt.format, "date-time");
     assert.ok(spec.components.schemas.TimeEntryDto.properties.startedAt.type.includes("null"));

@@ -23,7 +23,7 @@ import { useClientRedirect } from "@/hooks/use-client-redirect";
 import { useGroupSessions } from "@/hooks/use-group-sessions";
 import { useLabels } from "@/hooks/use-labels";
 import { useLookups } from "@/hooks/use-lookups";
-import { useOrganization, useWorkspace } from "@/hooks/use-workspace";
+import { useTenant, useWorkspace } from "@/hooks/use-workspace";
 import { dayLabel, formatCurrency, formatMinutes, formatTime, toDateOnly } from "@/lib/format";
 import { keys } from "@/lib/queries";
 import { canLogGroupTime } from "@/lib/roles";
@@ -36,27 +36,27 @@ function sessionMinutes(session: GroupSession) {
 }
 
 export function GroupTimeView() {
-  const organization = useOrganization();
-  const { isAdmin, groupDepartments, permissions } = useWorkspace();
-  const allowed = canLogGroupTime(groupDepartments, permissions) || permissions.includes("log_event_totals");
+  const tenant = useTenant();
+  const { isAdmin, groupOrganizations, permissions } = useWorkspace();
+  const allowed = canLogGroupTime(groupOrganizations, permissions) || permissions.includes("log_event_totals");
   useClientRedirect(!allowed, "/log/own");
   const { lookups, isSuccess } = useLookups();
   const queryClient = useQueryClient();
   const { sessions, fetchNextPage, hasNextPage, isFetchingNextPage, isPending } = useGroupSessions();
   const [pendingEdit, setPendingEdit] = useState<GroupSession | null>(null);
   const [pendingDelete, setPendingDelete] = useState<GroupSession | null>(null);
-  const departmentIds = groupDepartments === "all" ? undefined : groupDepartments;
+  const organizationIds = groupOrganizations === "all" ? undefined : groupOrganizations;
   const missingProject = isSuccess && lookups.projects.length === 0;
   const missingCategory = isSuccess && lookups.categories.length === 0;
-  const sessionsKey = keys.groupSessions(organization.id);
+  const sessionsKey = keys.groupSessions(tenant.id);
 
   function canEdit(session: GroupSession) {
-    if (groupDepartments === "all") return true;
-    return session.departmentId !== null && groupDepartments.includes(session.departmentId);
+    if (groupOrganizations === "all") return true;
+    return session.organizationId !== null && groupOrganizations.includes(session.organizationId);
   }
 
   const remove = useActionMutation((session: GroupSession) => deleteGroupSessionAction(session.id), {
-    invalidate: [keys.organization(organization.id)],
+    invalidate: [keys.tenant(tenant.id)],
     onMutate: (session) => {
       queryClient.setQueryData<InfiniteData<Paged<GroupSession>>>(sessionsKey, (data) =>
         data
@@ -100,7 +100,7 @@ export function GroupTimeView() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <GroupSessionForm key={departmentIds?.join(",") ?? "all"} departmentIds={departmentIds} />
+              <GroupSessionForm key={organizationIds?.join(",") ?? "all"} organizationIds={organizationIds} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -156,7 +156,7 @@ export function GroupTimeView() {
       <GroupSessionDialog
         open={pendingEdit !== null}
         session={pendingEdit}
-        departmentIds={departmentIds}
+        organizationIds={organizationIds}
         onOpenChange={(open) => !open && setPendingEdit(null)}
       />
       <ConfirmDialog
@@ -183,9 +183,9 @@ function SessionRow({
   const copy = useLabels();
   const project = names.project.get(session.projectId) ?? copy.project;
   const category = names.category.get(session.taskCategoryId);
-  const department = session.departmentId
-    ? (names.department.get(session.departmentId) ?? copy.department)
-    : `Whole ${copy.organization.toLowerCase()}`;
+  const organization = session.organizationId
+    ? (names.organization.get(session.organizationId) ?? copy.organization)
+    : `Whole ${copy.tenant.toLowerCase()}`;
   const when = `${formatTime(session.startedAt)} – ${formatTime(session.endedAt)}`;
 
   return (
@@ -193,7 +193,7 @@ function SessionRow({
       <div className="min-w-0 flex-1">
         <p className="truncate font-medium">{session.description || project}</p>
         <p className="truncate text-xs text-muted-foreground" suppressHydrationWarning>
-          {[session.description ? project : null, category, department, when].filter(Boolean).join(" · ")}
+          {[session.description ? project : null, category, organization, when].filter(Boolean).join(" · ")}
           <span className="@md:hidden">
             {" · "}
             {session.participantCount} {session.participantCount === 1 ? "person" : "people"}

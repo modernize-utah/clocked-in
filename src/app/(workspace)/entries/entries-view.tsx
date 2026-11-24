@@ -18,7 +18,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useActionMutation } from "@/hooks/use-action-mutation";
 import { useEntries } from "@/hooks/use-entries";
-import { useOrganization, useWorkspace } from "@/hooks/use-workspace";
+import { useTenant, useWorkspace } from "@/hooks/use-workspace";
 import { dayLabel, formatCurrency, formatMinutes } from "@/lib/format";
 import { keys, type EntriesListFilter } from "@/lib/queries";
 import type { Paged, TimeEntry } from "@/lib/types";
@@ -31,7 +31,7 @@ function readId(search: { get: (key: string) => string | null }, key: string) {
 }
 
 export function EntriesView() {
-  const organization = useOrganization();
+  const tenant = useTenant();
   const { viewer, isAdmin, isCoordinator } = useWorkspace();
   const search = useSearchParams();
   const range = rangeFromSearch(search);
@@ -43,7 +43,7 @@ export function EntriesView() {
     ...range,
     projectId: readId(search, "projectId"),
     taskCategoryId: readId(search, "taskCategoryId"),
-    departmentId: readId(search, "departmentId"),
+    organizationId: readId(search, "organizationId"),
     unclassified: search.get("unclassified") === "1",
     everyone,
   };
@@ -58,14 +58,14 @@ export function EntriesView() {
     everyone: everyone ? "1" : undefined,
     projectId: filter.projectId,
     taskCategoryId: filter.taskCategoryId,
-    departmentId: filter.departmentId,
+    organizationId: filter.organizationId,
     unclassified: filter.unclassified ? "1" : undefined,
   };
   const { update } = useUrlParams(urlParams);
-  const entriesKey = keys.entries(organization.id, personId, filter);
+  const entriesKey = keys.entries(tenant.id, personId, filter);
 
   const remove = useActionMutation((entry: TimeEntry) => deleteEntryAction(entry.id), {
-    invalidate: [keys.organization(organization.id)],
+    invalidate: [keys.tenant(tenant.id)],
     onMutate: (entry) => {
       queryClient.setQueryData<InfiniteData<Paged<TimeEntry>>>(entriesKey, (data) =>
         data

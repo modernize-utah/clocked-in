@@ -50,7 +50,7 @@ test("admin logs member time and Entered By is not the volunteer", async ({ page
   await expect(page.getByText("entered by an admin")).toBeVisible();
 
   const session = await loginBearer(request);
-  const csv = await page.request.get(`/organizations/${created.organization.id}/time-entries.csv`, {
+  const csv = await page.request.get(`/tenants/${created.tenant.id}/time-entries.csv`, {
     headers: { authorization: `Bearer ${session.accessToken}` },
   });
   expect(csv.ok(), await csv.text()).toBeTruthy();

@@ -10,22 +10,22 @@ export const getTenantSlug = cache(async (): Promise<string | null> => {
   return resolveRequestTenantSlug(store);
 });
 
-export const getPinnedOrganization = cache(async () => {
+export const getPinnedTenant = cache(async () => {
   const slug = await getTenantSlug();
   if (!slug) {
-    return { pinned: false as const, slug: null, organization: null };
+    return { pinned: false as const, slug: null, tenant: null };
   }
 
-  const organization = await prisma.organization.findFirst({
+  const tenant = await prisma.tenant.findFirst({
     where: { slug },
     include: { theme: true },
   });
-  return { pinned: true as const, slug, organization };
+  return { pinned: true as const, slug, tenant };
 });
 
-export async function requirePinnedOrganizationOrApex() {
-  const state = await getPinnedOrganization();
-  if (state.pinned && !state.organization) {
+export async function requirePinnedTenantOrApex() {
+  const state = await getPinnedTenant();
+  if (state.pinned && !state.tenant) {
     notFound();
   }
 

@@ -46,7 +46,7 @@ function formatValue(value: number, format: string | undefined) {
 function filterFor(accessor: string, id: string) {
   if (accessor.endsWith("byProject")) return { projectId: id };
   if (accessor.endsWith("byCategory")) return { taskCategoryId: id };
-  if (accessor.endsWith("byDepartment")) return { departmentId: id };
+  if (accessor.endsWith("byOrganization")) return { organizationId: id };
   if (accessor.endsWith("byPerson") || accessor.endsWith("byVolunteer")) return { person: id };
   return null;
 }
@@ -58,21 +58,21 @@ export function defaultDashboardCards(): ReportCard[] {
     { id: "people", kind: "value", title: "Volunteers", description: "", accessor: "user.volunteers", format: "number", color: "highlight", icon: "users" },
     { id: "entries", kind: "value", title: "Entries", description: "", accessor: "user.entries", format: "number", color: "accent", icon: "list-checks" },
     { id: "category", kind: "chart", title: "Hours by task category", description: "", accessor: "user.byCategory", chartType: "donut", valueKey: "hours", format: "hours" },
-    { id: "group", kind: "chart", title: "Hours by group", description: "", accessor: "user.byDepartment", chartType: "bar", valueKey: "hours", format: "hours" },
+    { id: "group", kind: "chart", title: "Hours by group", description: "", accessor: "user.byOrganization", chartType: "bar", valueKey: "hours", format: "hours" },
     { id: "recent", kind: "entries", title: "Recent entries", description: "", accessor: "", scope: "mine", limit: 6 },
   ];
 }
 
-export function standardCards(id: string, labels: { project: string; department: string; taskCategory: string }): ReportCard[] {
+export function standardCards(id: string, labels: { project: string; organization: string; taskCategory: string }): ReportCard[] {
   const project = labels.project.toLowerCase();
-  const department = labels.department.toLowerCase();
+  const organization = labels.organization.toLowerCase();
   const category = labels.taskCategory.toLowerCase();
   if (id === "people") {
     return [
       ...defaultDashboardCards().filter((card) => card.kind === "value"),
       { id: "p1", kind: "list", title: `By ${project}`, description: "", accessor: "user.byProject", visibleColumns: ["name", "hours", "inKind"] },
       { id: "p2", kind: "list", title: "By person", description: "", accessor: "user.byPerson", visibleColumns: ["name", "hours", "inKind"] },
-      { id: "p3", kind: "list", title: `By ${department}`, description: "", accessor: "user.byDepartment", visibleColumns: ["name", "hours", "inKind"] },
+      { id: "p3", kind: "list", title: `By ${organization}`, description: "", accessor: "user.byOrganization", visibleColumns: ["name", "hours", "inKind"] },
       { id: "p4", kind: "list", title: `By ${category}`, description: "", accessor: "user.byCategory", visibleColumns: ["name", "hours", "inKind"] },
     ];
   }
@@ -82,7 +82,7 @@ export function standardCards(id: string, labels: { project: string; department:
       { id: "g2", kind: "value", title: "In-kind value", description: "", accessor: "collective.inKind", format: "currency", color: "success", icon: "hand-coins" },
       { id: "g3", kind: "value", title: "Sessions", description: "", accessor: "collective.entries", format: "number", color: "accent", icon: "list-checks" },
       { id: "g4", kind: "list", title: `By ${project}`, description: "", accessor: "collective.byProject", visibleColumns: ["name", "hours", "inKind"] },
-      { id: "g5", kind: "list", title: `By ${department}`, description: "", accessor: "collective.byDepartment", visibleColumns: ["name", "hours", "inKind"] },
+      { id: "g5", kind: "list", title: `By ${organization}`, description: "", accessor: "collective.byOrganization", visibleColumns: ["name", "hours", "inKind"] },
     ];
   }
   if (id === "staff") {
@@ -91,14 +91,14 @@ export function standardCards(id: string, labels: { project: string; department:
       { id: "s2", kind: "value", title: "In-kind value", description: "", accessor: "staff.inKind", format: "currency", color: "success", icon: "hand-coins" },
       { id: "s3", kind: "value", title: "Staff", description: "", accessor: "staff.volunteers", format: "number", color: "highlight", icon: "users" },
       { id: "s4", kind: "value", title: "Entries", description: "", accessor: "staff.entries", format: "number", color: "accent", icon: "list-checks" },
-      { id: "s5", kind: "list", title: `By ${department}`, description: "", accessor: "staff.byDepartment", visibleColumns: ["name", "hours", "inKind"] },
+      { id: "s5", kind: "list", title: `By ${organization}`, description: "", accessor: "staff.byOrganization", visibleColumns: ["name", "hours", "inKind"] },
       { id: "s6", kind: "list", title: `By ${project}`, description: "", accessor: "staff.byProject", visibleColumns: ["name", "hours", "inKind"] },
       { id: "s7", kind: "list", title: "By person", description: "", accessor: "staff.byPerson", visibleColumns: ["name", "hours", "inKind"] },
     ];
   }
   return [
     ...defaultDashboardCards().filter((card) => card.kind === "value"),
-    { id: "c1", kind: "chart", title: `Hours by ${department}`, description: "", accessor: "user.byDepartment", chartType: "column", valueKey: "hours", format: "hours" },
+    { id: "c1", kind: "chart", title: `Hours by ${organization}`, description: "", accessor: "user.byOrganization", chartType: "column", valueKey: "hours", format: "hours" },
     { id: "c2", kind: "chart", title: `Hours by ${category}`, description: "", accessor: "user.byCategory", chartType: "donut", valueKey: "hours", format: "hours" },
     { id: "c3", kind: "chart", title: `Hours by ${project}`, description: "", accessor: "user.byProject", chartType: "bar", valueKey: "hours", format: "hours" },
   ];
@@ -302,14 +302,14 @@ function ListCard({ card, data }: { card: ReportCard; data: Report | undefined }
 }
 
 function EntriesCard({ card }: { card: ReportCard }) {
-  const { organization, viewer } = useWorkspace();
-  const mine = card.scope !== "organization";
+  const { tenant, viewer } = useWorkspace();
+  const mine = card.scope !== "tenant";
   const entries = useQuery({
-    queryKey: ["report-entries", organization.id, mine ? viewer.id : "org", card.limit ?? 6],
+    queryKey: ["report-entries", tenant.id, mine ? viewer.id : "org", card.limit ?? 6],
     queryFn: () =>
       mine
-        ? api.entries(viewer.id, { organizationId: organization.id, limit: card.limit ?? 6 })
-        : api.orgEntries(organization.id, { limit: card.limit ?? 6 }),
+        ? api.entries(viewer.id, { tenantId: tenant.id, limit: card.limit ?? 6 })
+        : api.orgEntries(tenant.id, { limit: card.limit ?? 6 }),
   });
   return (
     <Panel>

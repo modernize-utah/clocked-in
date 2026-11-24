@@ -26,7 +26,7 @@ import { useState } from "react";
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "@/api/client";
-import type { Organization } from "@/api/types";
+import type { Tenant } from "@/api/types";
 import { FeedbackButton } from "@/feedback-dialog";
 import { formatClock } from "@/format";
 import { canManageSettings, canSeeReports } from "@/gates";
@@ -113,15 +113,15 @@ export function BrandRule() {
   );
 }
 
-function markSource(organization: Pick<Organization, "markUrl">) {
-  const url = organization.markUrl;
+function markSource(tenant: Pick<Tenant, "markUrl">) {
+  const url = tenant.markUrl;
   if (!url || !/^https?:\/\//i.test(url) || /blob\.vercel-storage\.com/i.test(url)) return null;
   return { uri: url };
 }
 
-function OrgMark({ organization, size = 32, onDark = false }: { organization: Organization; size?: number; onDark?: boolean }) {
+function OrgMark({ tenant, size = 32, onDark = false }: { tenant: Tenant; size?: number; onDark?: boolean }) {
   const colors = useColors();
-  const source = markSource(organization);
+  const source = markSource(tenant);
   if (source) return <Image resizeMode="contain" source={source} style={{ width: size, height: size, borderRadius: 8 }} />;
   return (
     <View
@@ -141,24 +141,24 @@ function OrgMark({ organization, size = 32, onDark = false }: { organization: Or
 
 function OrgSwitcher({ onDark = false, onNavigate }: { onDark?: boolean; onNavigate?: () => void }) {
   const colors = useColors();
-  const { organization, organizations, switchOrganization, switching } = useWorkspace();
+  const { tenant, tenants, switchTenant, switching } = useWorkspace();
   const foreground = onDark ? colors.primaryForeground : colors.foreground;
   return (
     <Menu
       items={[
-        { kind: "label", label: "Organizations" },
-        ...organizations.map((item) => ({
+        { kind: "label", label: "Tenants" },
+        ...tenants.map((item) => ({
           label: item.name,
-          checked: item.id === organization.id,
-          leading: <OrgMark organization={item} size={20} />,
+          checked: item.id === tenant.id,
+          leading: <OrgMark tenant={item} size={20} />,
           onPress: () => {
             onNavigate?.();
-            if (item.id !== organization.id) void switchOrganization(item.id);
+            if (item.id !== tenant.id) void switchTenant(item.id);
           },
         })),
         { kind: "separator" as const },
         {
-          label: "New organization",
+          label: "New tenant",
           icon: PlusIcon,
           onPress: () => {
             onNavigate?.();
@@ -168,15 +168,15 @@ function OrgSwitcher({ onDark = false, onNavigate }: { onDark?: boolean; onNavig
       ]}
       trigger={(show) => (
         <Pressable
-          accessibilityLabel="Switch organization"
+          accessibilityLabel="Switch tenant"
           accessibilityRole="button"
           disabled={switching}
           onPress={show}
           style={[styles.orgTrigger, { opacity: switching ? 0.5 : 1 }]}
         >
-          <OrgMark onDark={onDark} organization={organization} />
+          <OrgMark onDark={onDark} tenant={tenant} />
           <Text numberOfLines={1} style={[styles.orgName, { color: foreground }]}>
-            {organization.name}
+            {tenant.name}
           </Text>
           <ChevronDownIcon color={onDark ? colors.sidebarMuted : colors.mutedForeground} size={14} />
         </Pressable>
@@ -227,7 +227,7 @@ function TimerChip() {
 
 function UserMenu() {
   const colors = useColors();
-  const { viewer, organization, isAdmin, isCoordinator } = useWorkspace();
+  const { viewer, tenant, isAdmin, isCoordinator } = useWorkspace();
   const { logout } = useSession();
   return (
     <Menu
@@ -240,14 +240,14 @@ function UserMenu() {
           <Text numberOfLines={1} style={{ color: colors.mutedForeground, fontSize: 12 }}>
             {viewer.email}
           </Text>
-          {isAdmin ? <Text style={{ color: colors.highlight, fontSize: 12 }}>Organization admin</Text> : null}
+          {isAdmin ? <Text style={{ color: colors.highlight, fontSize: 12 }}>Tenant admin</Text> : null}
           {!isAdmin && isCoordinator ? <Text style={{ color: colors.highlight, fontSize: 12 }}>Group manager</Text> : null}
         </View>
       }
       items={[
         { kind: "separator" },
         { label: "Profile", icon: UserRoundIcon, onPress: () => router.navigate("/profile") },
-        { label: organization.name, icon: BuildingIcon, onPress: () => router.navigate("/organization") },
+        { label: tenant.name, icon: BuildingIcon, onPress: () => router.navigate("/tenant") },
         { label: "Accept an invite", icon: UserRoundIcon, onPress: () => router.navigate("/accept") },
         { kind: "separator" as const },
         { label: "Sign out", icon: LogOutIcon, destructive: true, onPress: () => void logout() },

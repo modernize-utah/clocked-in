@@ -26,14 +26,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useActionMutation } from "@/hooks/use-action-mutation";
 import { useClientRedirect } from "@/hooks/use-client-redirect";
-import { useOrganization, useWorkspace } from "@/hooks/use-workspace";
+import { useTenant, useWorkspace } from "@/hooks/use-workspace";
 import { needStatusLabel, needStatusVariant } from "@/lib/need-status";
 import { keys, needQuery, signupsQuery } from "@/lib/queries";
 import type { VolunteerSignup } from "@/lib/types";
 
 export function NeedDetail({ needId }: { needId: string }) {
   const router = useRouter();
-  const organization = useOrganization();
+  const tenant = useTenant();
   const { isAdmin, isCoordinator, permissions } = useWorkspace();
   const canManage = isAdmin || isCoordinator || permissions.includes("create_needs") || permissions.includes("approve_needs");
   useClientRedirect(!canManage, "/dashboard");
@@ -44,9 +44,9 @@ export function NeedDetail({ needId }: { needId: string }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
-  const invalidate = [keys.needs(organization.id), keys.need(needId), keys.signups(needId)];
+  const invalidate = [keys.needs(tenant.id), keys.need(needId), keys.signups(needId)];
   const remove = useActionMutation(() => deleteNeedAction(needId), {
-    invalidate: [keys.needs(organization.id)],
+    invalidate: [keys.needs(tenant.id)],
     onSuccess: () => router.push("/needs"),
   });
   const vet = useActionMutation((signupId: string) => vetSignupAction(needId, signupId), { invalidate });

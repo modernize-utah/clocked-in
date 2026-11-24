@@ -259,10 +259,10 @@ function FeedbackTable({ active }: { active: boolean }) {
       cell: (row) => formatPersonName(row.user),
     },
     {
-      key: "organization",
-      header: "Organization",
+      key: "tenant",
+      header: "Tenant",
       wrap: true,
-      cell: (row) => row.organization?.name ?? "—",
+      cell: (row) => row.tenant?.name ?? "—",
     },
     {
       key: "ticket",

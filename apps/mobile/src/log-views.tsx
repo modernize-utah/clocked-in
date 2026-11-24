@@ -7,7 +7,7 @@ import { api } from "@/api/client";
 import type { CollectiveEntry, Connection } from "@/api/types";
 import { EntryDays } from "@/entries";
 import { dayLabel, formatClock, formatCurrency, formatMinutes, formatPersonName, formatTime, localTime, rangeLabel, today, toDateOnly, type DateRange } from "@/format";
-import { organizationWide, PlacementFields, usePlacement } from "@/placement";
+import { tenantWide, PlacementFields, usePlacement } from "@/placement";
 import { useColors } from "@/theme";
 import { TimeEntryForm } from "@/time-entry-form";
 import {
@@ -34,10 +34,10 @@ import { useElapsed, useLookups, useOpenPunch, useRefreshTime, useWorkspace } fr
 
 export function UnclassifiedBanner() {
   const colors = useColors();
-  const { organization } = useWorkspace();
+  const { tenant } = useWorkspace();
   const count = useQuery({
-    queryKey: ["unclassified-count", organization.id],
-    queryFn: () => api.unclassifiedCount(organization.id),
+    queryKey: ["unclassified-count", tenant.id],
+    queryFn: () => api.unclassifiedCount(tenant.id),
   });
   const total = count.data?.count ?? 0;
   if (total === 0) return null;
@@ -101,7 +101,7 @@ export function OwnTimeView() {
 
 function TimerCard() {
   const colors = useColors();
-  const { organization } = useWorkspace();
+  const { tenant } = useWorkspace();
   const { punch } = useOpenPunch();
   const elapsed = useElapsed(punch?.startedAt);
   const { names } = useLookups();
@@ -117,7 +117,7 @@ function TimerCard() {
   useEffect(() => {
     if (!punch) return;
     set({
-      departmentId: punch.departmentId ?? organizationWide,
+      organizationId: punch.organizationId ?? tenantWide,
       projectId: punch.projectId ?? "",
       taskCategoryId: punch.taskCategoryId ?? "",
       tagIds: punch.tagIds,
@@ -128,7 +128,7 @@ function TimerCard() {
   }, [punch?.id]);
 
   const clockIn = useMutation({
-    mutationFn: () => api.clockIn({ organizationId: organization.id, ...placement.body(description) }),
+    mutationFn: () => api.clockIn({ tenantId: tenant.id, ...placement.body(description) }),
     onSuccess: () => refresh(),
   });
   const clockOut = useMutation({
@@ -263,12 +263,12 @@ const pageSize = 50;
 
 export function EntriesCard({ title = "Your entries" }: { title?: string }) {
   const colors = useColors();
-  const { viewer, organization } = useWorkspace();
+  const { viewer, tenant } = useWorkspace();
   const [limit, setLimit] = useState(pageSize);
   const [range, setRange] = useState<DateRange>({});
   const entries = useQuery({
-    queryKey: ["own-entries", viewer.id, organization.id, limit, range.from ?? "", range.to ?? ""],
-    queryFn: () => api.entries(viewer.id, { organizationId: organization.id, limit, from: range.from, to: range.to }),
+    queryKey: ["own-entries", viewer.id, tenant.id, limit, range.from ?? "", range.to ?? ""],
+    queryFn: () => api.entries(viewer.id, { tenantId: tenant.id, limit, from: range.from, to: range.to }),
     placeholderData: (previous) => previous,
   });
   const items = entries.data?.items ?? [];
@@ -309,8 +309,8 @@ export function EntriesCard({ title = "Your entries" }: { title?: string }) {
 }
 
 export function MemberTimeView({ personId }: { personId?: string }) {
-  const { viewer, organization } = useWorkspace();
-  const members = useQuery({ queryKey: ["members", organization.id], queryFn: () => api.memberships(organization.id) });
+  const { viewer, tenant } = useWorkspace();
+  const members = useQuery({ queryKey: ["members", tenant.id], queryFn: () => api.memberships(tenant.id) });
   const eligible = (members.data?.items ?? [])
     .filter((member) => member.isActive && member.userId !== viewer.id)
     .map((member) => ({ value: member.userId, label: formatPersonName(member.user) }));
@@ -335,12 +335,12 @@ export function MemberTimeView({ personId }: { personId?: string }) {
 }
 
 function useWorkspaceId() {
-  return useWorkspace().organization.id;
+  return useWorkspace().tenant.id;
 }
 
 export function useConnections() {
-  const organizationId = useWorkspaceId();
-  return useQuery({ queryKey: ["connections", organizationId], queryFn: () => api.connections(organizationId) });
+  const tenantId = useWorkspaceId();
+  return useQuery({ queryKey: ["connections", tenantId], queryFn: () => api.connections(tenantId) });
 }
 
 function connectionPeople(connections: Connection[], viewerId: string) {
@@ -354,11 +354,11 @@ function connectionPeople(connections: Connection[], viewerId: string) {
 const relationships = ["Parent", "Child", "Spouse", "Sibling", "Grandparent", "Grandchild", "Guardian", "Dependent", "Friend", "Colleague", "Associate"];
 
 export function ConnectionTimeView() {
-  const { viewer, organization, role } = useWorkspace();
+  const { viewer, tenant, role } = useWorkspace();
   const client = useQueryClient();
   const connections = useConnections();
   const mine = connectionPeople(connections.data?.items ?? [], viewer.id);
-  const canAdd = role === "VOLUNTEER" && organization.preferences.allowVolunteersToAddVolunteers;
+  const canAdd = role === "VOLUNTEER" && tenant.preferences.allowVolunteersToAddVolunteers;
   const [adding, setAdding] = useState(false);
   return (
     <Panel style={{ flex: 1, minHeight: 0 }}>
@@ -387,7 +387,7 @@ export function ConnectionTimeView() {
         onClose={() => setAdding(false)}
         onSaved={async () => {
           setAdding(false);
-          await client.invalidateQueries({ queryKey: ["connections", organization.id] });
+          await client.invalidateQueries({ queryKey: ["connections", tenant.id] });
         }}
         open={adding}
       />
@@ -396,14 +396,14 @@ export function ConnectionTimeView() {
 }
 
 function AddVolunteerSheet({ open, onClose, onSaved }: { open: boolean; onClose: () => void; onSaved: () => void }) {
-  const { organization } = useWorkspace();
+  const { tenant } = useWorkspace();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [relationship, setRelationship] = useState(relationships[0]);
   const create = useMutation({
     mutationFn: () =>
-      api.createMembership(organization.id, {
+      api.createMembership(tenant.id, {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         email: email.trim(),
@@ -472,7 +472,7 @@ export function GroupTimeView() {
           <Text style={{ flex: 1, color: colors.foreground, fontSize: 14, lineHeight: 20 }}>
             {isAdmin
               ? `Add ${entities} before you can save group time.`
-              : `Ask an ${labels.organization.toLowerCase()} admin to add ${entities} before you can save group time.`}
+              : `Ask an ${labels.tenant.toLowerCase()} admin to add ${entities} before you can save group time.`}
           </Text>
         </View>
       ) : null}
@@ -506,19 +506,19 @@ export function GroupTimeView() {
 
 function GroupSessionForm({ onSaved, session, pinActions = false }: { onSaved: () => void; session?: CollectiveEntry; pinActions?: boolean }) {
   const colors = useColors();
-  const { organization, groupDepartments, labels } = useWorkspace();
+  const { tenant, groupOrganizations, labels } = useWorkspace();
   const client = useQueryClient();
-  const departmentIds = groupDepartments === "all" ? undefined : groupDepartments;
+  const organizationIds = groupOrganizations === "all" ? undefined : groupOrganizations;
   const placement = usePlacement(
     session
       ? {
-          departmentId: session.departmentId ?? organizationWide,
+          organizationId: session.organizationId ?? tenantWide,
           projectId: session.projectId,
           taskCategoryId: session.taskCategoryId,
           tagIds: session.tagIds ?? [],
         }
-      : departmentIds?.[0]
-        ? { departmentId: departmentIds[0] }
+      : organizationIds?.[0]
+        ? { organizationId: organizationIds[0] }
         : undefined,
   );
   const [occurredOn, setOccurredOn] = useState(session ? toDateOnly(new Date(session.startedAt)) : today());
@@ -532,13 +532,13 @@ function GroupSessionForm({ onSaved, session, pinActions = false }: { onSaved: (
   const valid = !Number.isNaN(startedAt.getTime()) && !Number.isNaN(endedAt.getTime()) && endedAt > startedAt;
   const count = Number(participants);
   const hours = valid ? (endedAt.getTime() - startedAt.getTime()) / 3_600_000 : 0;
-  const preview = valid && Number.isInteger(count) && count > 0 ? hours * count * organization.volunteerHourlyRate : null;
+  const preview = valid && Number.isInteger(count) && count > 0 ? hours * count * tenant.volunteerHourlyRate : null;
 
   const save = useMutation({
     mutationFn: () => {
       const body = placement.body(notes);
       const payload = {
-        departmentId: body.departmentId,
+        organizationId: body.organizationId,
         projectId: body.projectId,
         taskCategoryId: body.taskCategoryId,
         tagIds: body.tagIds,
@@ -547,11 +547,11 @@ function GroupSessionForm({ onSaved, session, pinActions = false }: { onSaved: (
         endedAt: endedAt.toISOString(),
         participantCount: count,
       };
-      return session ? api.updateCollective(session.id, payload) : api.createCollective({ organizationId: organization.id, ...payload });
+      return session ? api.updateCollective(session.id, payload) : api.createCollective({ tenantId: tenant.id, ...payload });
     },
     onSuccess: async () => {
       setNotes("");
-      await client.invalidateQueries({ queryKey: ["collective", organization.id] });
+      await client.invalidateQueries({ queryKey: ["collective", tenant.id] });
       onSaved();
     },
     onError: (failure) => setError(failure instanceof Error ? failure.message : "Something went wrong."),
@@ -578,7 +578,7 @@ function GroupSessionForm({ onSaved, session, pinActions = false }: { onSaved: (
       <FormField label="People">
         <Input keyboardType="number-pad" mono onChangeText={setParticipants} value={participants} />
       </FormField>
-      <PlacementFields departmentIds={departmentIds} state={placement} />
+      <PlacementFields organizationIds={organizationIds} state={placement} />
       <FormField label="Notes">
         <Input multiline onChangeText={setNotes} placeholder="What did the group work on?" value={notes} />
       </FormField>
@@ -635,9 +635,9 @@ function sessionMinutes(session: CollectiveEntry) {
 
 function GroupSessions() {
   const colors = useColors();
-  const organizationId = useWorkspaceId();
+  const tenantId = useWorkspaceId();
   const { names } = useLookups();
-  const { labels, groupDepartments } = useWorkspace();
+  const { labels, groupOrganizations } = useWorkspace();
   const client = useQueryClient();
   const [editing, setEditing] = useState<CollectiveEntry | null>(null);
   const [removing, setRemoving] = useState<CollectiveEntry | null>(null);
@@ -645,14 +645,14 @@ function GroupSessions() {
     mutationFn: (session: CollectiveEntry) => api.deleteCollective(session.id),
     onSuccess: async () => {
       setRemoving(null);
-      await client.invalidateQueries({ queryKey: ["collective", organizationId] });
+      await client.invalidateQueries({ queryKey: ["collective", tenantId] });
     },
   });
   function canEdit(session: CollectiveEntry) {
-    if (groupDepartments === "all") return true;
-    return session.departmentId !== null && groupDepartments.includes(session.departmentId);
+    if (groupOrganizations === "all") return true;
+    return session.organizationId !== null && groupOrganizations.includes(session.organizationId);
   }
-  const sessions = useQuery({ queryKey: ["collective", organizationId], queryFn: () => api.collective(organizationId) });
+  const sessions = useQuery({ queryKey: ["collective", tenantId], queryFn: () => api.collective(tenantId) });
   const items = sessions.data?.items ?? [];
   const days = useMemo(() => {
     const groups = new Map<string, CollectiveEntry[]>();
@@ -692,9 +692,9 @@ function GroupSessions() {
           {rows.map((session, index) => {
             const project = names.project.get(session.projectId) ?? labels.project;
             const category = names.category.get(session.taskCategoryId);
-            const department = session.departmentId
-              ? (names.department.get(session.departmentId) ?? labels.department)
-              : `Whole ${labels.organization.toLowerCase()}`;
+            const organization = session.organizationId
+              ? (names.organization.get(session.organizationId) ?? labels.organization)
+              : `Whole ${labels.tenant.toLowerCase()}`;
             return (
               <View key={session.id} style={[styles.sessionRow, index > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderColor: colors.border } : null]}>
                 <View style={{ flex: 1, minWidth: 0 }}>
@@ -702,7 +702,7 @@ function GroupSessions() {
                     {session.description || project}
                   </Text>
                   <Text numberOfLines={2} style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 2 }}>
-                    {[session.description ? project : null, category, department, `${formatTime(session.startedAt)} – ${formatTime(session.endedAt)}`]
+                    {[session.description ? project : null, category, organization, `${formatTime(session.startedAt)} – ${formatTime(session.endedAt)}`]
                       .filter(Boolean)
                       .join(" · ")}
                     {` · ${session.participantCount} ${session.participantCount === 1 ? "person" : "people"}`}

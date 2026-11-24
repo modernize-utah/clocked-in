@@ -105,8 +105,8 @@ export async function lockUser(tx: Prisma.TransactionClient, userId: string) {
   await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = CAST(${userId} AS uuid) FOR UPDATE`;
 }
 
-export async function lockOrganization(tx: Prisma.TransactionClient, organizationId: string) {
-  await tx.$queryRaw`SELECT "id" FROM "Organization" WHERE "id" = CAST(${organizationId} AS uuid) FOR UPDATE`;
+export async function lockTenant(tx: Prisma.TransactionClient, tenantId: string) {
+  await tx.$queryRaw`SELECT "id" FROM "Tenant" WHERE "id" = CAST(${tenantId} AS uuid) FOR UPDATE`;
 }
 
 export async function lockSuperAdmins(tx: Prisma.TransactionClient) {

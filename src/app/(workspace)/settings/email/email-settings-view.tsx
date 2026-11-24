@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronRightIcon, MailIcon } from "lucide-react";
 import Link from "next/link";
 import { useActionState, useState } from "react";
-import { updateOrganizationEmailSettingsAction } from "@/app/actions/organizations";
+import { updateTenantEmailSettingsAction } from "@/app/actions/tenants";
 import { EmptyState } from "@/components/empty-state";
 import { Field, FormMessage } from "@/components/field";
 import { SelectField, type Option } from "@/components/select-field";
@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useOrganization } from "@/hooks/use-workspace";
+import { useTenant } from "@/hooks/use-workspace";
 import {
   defaultEmailSettings,
   emailForLabels,
@@ -37,7 +37,7 @@ const booleanEmailItems: { key: BooleanEmailSettingKey; label: string; descripti
   {
     key: "AccessRequestReceived",
     label: "Access request (admins)",
-    description: "Email organization admins when someone requests more access.",
+    description: "Email tenant admins when someone requests more access.",
   },
   {
     key: "AccessRequestDecided",
@@ -47,7 +47,7 @@ const booleanEmailItems: { key: BooleanEmailSettingKey; label: string; descripti
   {
     key: "NeedSubmitted",
     label: "Need submitted (admins)",
-    description: "Email organization admins when a volunteer need is submitted for approval.",
+    description: "Email tenant admins when a volunteer need is submitted for approval.",
   },
   {
     key: "NeedDecided",
@@ -77,7 +77,7 @@ const booleanEmailItems: { key: BooleanEmailSettingKey; label: string; descripti
 ];
 
 export function EmailSettingsView() {
-  const organization = useOrganization();
+  const tenant = useTenant();
   return (
     <Tabs defaultValue="delivery">
       <TabsList variant="line">
@@ -85,7 +85,7 @@ export function EmailSettingsView() {
         <TabsTrigger value="templates">Templates</TabsTrigger>
       </TabsList>
       <TabsContent value="delivery" className="mt-4">
-        <EmailSendSettingsCard key={organization.id} />
+        <EmailSendSettingsCard key={tenant.id} />
       </TabsContent>
       <TabsContent value="templates" className="mt-4">
         <EmailTemplatesCard />
@@ -95,12 +95,12 @@ export function EmailSettingsView() {
 }
 
 function EmailSendSettingsCard() {
-  const organization = useOrganization();
-  const saved = organization.preferences.emailSettings ?? defaultEmailSettings;
+  const tenant = useTenant();
+  const saved = tenant.preferences.emailSettings ?? defaultEmailSettings;
   const [loggedTime, setLoggedTime] = useState<TimeEmailFrequency>(saved.LoggedTime);
   const [unclassifiedEntry, setUnclassifiedEntry] = useState<TimeEmailFrequency>(saved.UnclassifiedEntry);
   const [result, action] = useActionState(
-    updateOrganizationEmailSettingsAction.bind(null, organization.id),
+    updateTenantEmailSettingsAction.bind(null, tenant.id),
     null,
   );
 
@@ -109,7 +109,7 @@ function EmailSendSettingsCard() {
       <CardHeader>
         <CardTitle>When emails are sent</CardTitle>
         <CardDescription>
-          Control how often time-logging notifications are sent and which activity emails are enabled for {organization.name}.
+          Control how often time-logging notifications are sent and which activity emails are enabled for {tenant.name}.
           Invitation, welcome, and password-reset emails are always sent immediately.
         </CardDescription>
       </CardHeader>
@@ -167,9 +167,9 @@ function EmailSendSettingsCard() {
 }
 
 function EmailTemplatesCard() {
-  const organization = useOrganization();
-  const settings = organization.preferences.emailSettings ?? defaultEmailSettings;
-  const { data, isPending, isError, refetch } = useQuery(emailTemplatesQuery(organization.id));
+  const tenant = useTenant();
+  const settings = tenant.preferences.emailSettings ?? defaultEmailSettings;
+  const { data, isPending, isError, refetch } = useQuery(emailTemplatesQuery(tenant.id));
 
   if (isPending) return <PageSkeleton rows={6} />;
   if (isError || !data || data.length === 0) {
@@ -177,7 +177,7 @@ function EmailTemplatesCard() {
       <EmptyState
         icon={MailIcon}
         title="Email templates did not load"
-        description="Every organization starts with a full set. Try again in a moment."
+        description="Every tenant starts with a full set. Try again in a moment."
         action={
           <Button type="button" variant="outline" onClick={() => refetch()}>
             Retry
@@ -192,7 +192,7 @@ function EmailTemplatesCard() {
       <CardHeader>
         <CardTitle>Email Templates</CardTitle>
         <CardDescription>
-          Every email {organization.name} sends. Edit the wording; the VolunTime header and footer stay the same.
+          Every email {tenant.name} sends. Edit the wording; the VolunTime header and footer stay the same.
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">

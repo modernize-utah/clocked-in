@@ -36,13 +36,13 @@ export function ReportFilters({ filters }: { filters: ReportFilters }) {
   const copy = useLabels();
   const { lookups } = useLookups();
   const { members } = useMembers();
-  const { viewer, isCoordinator, groupDepartments } = useWorkspace();
+  const { viewer, isCoordinator, groupOrganizations } = useWorkspace();
   const params = filterParams(filters);
   const { update } = useUrlParams(params);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<ReportFilters>(filters);
   const scoped = isCoordinator
-    ? members.filter((member) => (member.departmentIds ?? []).some((id) => groupDepartments.includes(id)))
+    ? members.filter((member) => (member.organizationIds ?? []).some((id) => groupOrganizations.includes(id)))
     : members;
   const people = scoped.map((member) => ({
     value: member.userId,
@@ -50,10 +50,10 @@ export function ReportFilters({ filters }: { filters: ReportFilters }) {
   }));
   const fields: { key: ReportIdFilterKey; label: string; placeholder: string; options: { value: string; label: string }[] }[] = [
     {
-      key: "departmentId",
-      label: copy.department,
-      placeholder: `Any ${copy.department.toLowerCase()}`,
-      options: lookups.departments.map((item) => ({ value: item.id, label: item.name })),
+      key: "organizationId",
+      label: copy.organization,
+      placeholder: `Any ${copy.organization.toLowerCase()}`,
+      options: lookups.organizations.map((item) => ({ value: item.id, label: item.name })),
     },
     {
       key: "taskCategoryId",

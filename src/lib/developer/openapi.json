@@ -762,12 +762,12 @@
         }
       }
     },
-    "/organizations/{id}/memberships": {
+    "/tenants/{id}/memberships": {
       "get": {
         "tags": [
           "Memberships"
         ],
-        "operationId": "get_organizations_id_memberships",
+        "operationId": "get_tenants_id_memberships",
         "parameters": [
           {
             "name": "id",
@@ -884,7 +884,7 @@
         "tags": [
           "Memberships"
         ],
-        "operationId": "post_organizations_id_memberships",
+        "operationId": "post_tenants_id_memberships",
         "parameters": [
           {
             "name": "id",
@@ -906,7 +906,7 @@
                   "lastName",
                   "timezone",
                   "role",
-                  "departmentIds",
+                  "organizationIds",
                   "emailUser"
                 ],
                 "type": "object",
@@ -971,13 +971,13 @@
                       "string"
                     ]
                   },
-                  "orgUserTitle": {
+                  "title": {
                     "type": [
                       "null",
                       "string"
                     ]
                   },
-                  "orgUserDescription": {
+                  "memberDescription": {
                     "type": [
                       "null",
                       "string"
@@ -991,7 +991,7 @@
                     ],
                     "type": "string"
                   },
-                  "departmentIds": {
+                  "organizationIds": {
                     "type": "array",
                     "items": {
                       "type": "string",
@@ -1161,7 +1161,7 @@
         "tags": [
           "Memberships"
         ],
-        "operationId": "delete_organizations_id_memberships",
+        "operationId": "delete_tenants_id_memberships",
         "parameters": [
           {
             "name": "id",
@@ -1320,12 +1320,12 @@
         ]
       }
     },
-    "/organizations/{id}/memberships/{membershipId}": {
+    "/tenants/{id}/memberships/{membershipId}": {
       "patch": {
         "tags": [
           "Memberships"
         ],
-        "operationId": "patch_organizations_id_memberships_membershipId",
+        "operationId": "patch_tenants_id_memberships_membershipId",
         "parameters": [
           {
             "name": "id",
@@ -1378,14 +1378,14 @@
                   "isActive": {
                     "type": "boolean"
                   },
-                  "primaryDepartmentId": {
+                  "primaryOrganizationId": {
                     "type": [
                       "null",
                       "string"
                     ],
                     "format": "uuid"
                   },
-                  "departmentIds": {
+                  "organizationIds": {
                     "type": "array",
                     "items": {
                       "type": "string",
@@ -1419,10 +1419,10 @@
                   "description": {
                     "type": "string"
                   },
-                  "orgUserTitle": {
+                  "title": {
                     "type": "string"
                   },
-                  "orgUserDescription": {
+                  "memberDescription": {
                     "type": "string"
                   },
                   "email": {
@@ -1569,7 +1569,7 @@
         "tags": [
           "Memberships"
         ],
-        "operationId": "delete_organizations_id_memberships_membershipId",
+        "operationId": "delete_tenants_id_memberships_membershipId",
         "parameters": [
           {
             "name": "id",
@@ -1715,12 +1715,12 @@
         ]
       }
     },
-    "/departments/{id}/memberships": {
+    "/tenants/{id}/memberships": {
       "get": {
         "tags": [
           "Memberships"
         ],
-        "operationId": "get_departments_id_memberships",
+        "operationId": "get_tenants_id_memberships",
         "parameters": [
           {
             "name": "id",
@@ -1834,12 +1834,12 @@
         ]
       }
     },
-    "/departments/{id}/memberships/{membershipId}": {
+    "/tenants/{id}/memberships/{membershipId}": {
       "patch": {
         "tags": [
           "Memberships"
         ],
-        "operationId": "patch_departments_id_memberships_membershipId",
+        "operationId": "patch_organizations_id_memberships_membershipId",
         "parameters": [
           {
             "name": "id",
@@ -2018,7 +2018,7 @@
         "tags": [
           "Memberships"
         ],
-        "operationId": "delete_departments_id_memberships_membershipId",
+        "operationId": "delete_tenants_id_memberships_membershipId",
         "parameters": [
           {
             "name": "id",
@@ -2164,12 +2164,12 @@
         ]
       }
     },
-    "/organizations/{id}/connections": {
+    "/tenants/{id}/connections": {
       "get": {
         "tags": [
           "Connections"
         ],
-        "operationId": "get_organizations_id_connections",
+        "operationId": "get_tenants_id_connections",
         "parameters": [
           {
             "name": "id",
@@ -2286,7 +2286,7 @@
         "tags": [
           "Connections"
         ],
-        "operationId": "post_organizations_id_connections",
+        "operationId": "post_tenants_id_connections",
         "parameters": [
           {
             "name": "id",
@@ -2471,12 +2471,12 @@
         ]
       }
     },
-    "/organizations/{id}/connections/{connectionId}": {
+    "/tenants/{id}/connections/{connectionId}": {
       "patch": {
         "tags": [
           "Connections"
         ],
-        "operationId": "patch_organizations_id_connections_connectionId",
+        "operationId": "patch_tenants_id_connections_connectionId",
         "parameters": [
           {
             "name": "id",
@@ -2668,7 +2668,7 @@
         "tags": [
           "Connections"
         ],
-        "operationId": "delete_organizations_id_connections_connectionId",
+        "operationId": "delete_tenants_id_connections_connectionId",
         "parameters": [
           {
             "name": "id",
@@ -3144,7 +3144,7 @@
         "operationId": "get_users_me_workspace",
         "parameters": [
           {
-            "name": "organizationId",
+            "name": "tenantId",
             "in": "query",
             "required": false,
             "schema": {
@@ -3161,26 +3161,26 @@
                   "type": "object",
                   "required": [
                     "viewer",
-                    "organizations",
-                    "organization",
+                    "tenants",
+                    "tenant",
                     "isAdmin",
                     "isCoordinator",
                     "canSelectRate",
                     "role",
                     "permissions",
-                    "groupDepartments"
+                    "groupOrganizations"
                   ],
                   "properties": {
                     "viewer": {
                       "type": "object"
                     },
-                    "organizations": {
+                    "tenants": {
                       "type": "array",
                       "items": {
                         "type": "object"
                       }
                     },
-                    "organization": {},
+                    "tenant": {},
                     "isAdmin": {
                       "type": "boolean"
                     },
@@ -3197,7 +3197,7 @@
                         "type": "string"
                       }
                     },
-                    "groupDepartments": {}
+                    "groupOrganizations": {}
                   }
                 }
               }
@@ -3651,12 +3651,12 @@
         ]
       }
     },
-    "/organizations": {
+    "/tenants": {
       "get": {
         "tags": [
-          "Organizations"
+          "Tenants"
         ],
-        "operationId": "get_organizations",
+        "operationId": "get_tenants",
         "parameters": [
           {
             "name": "limit",
@@ -3679,7 +3679,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListResponseOfOrganizationDto"
+                  "$ref": "#/components/schemas/ListResponseOfTenantDto"
                 }
               }
             }
@@ -3740,9 +3740,9 @@
       },
       "post": {
         "tags": [
-          "Organizations"
+          "Tenants"
         ],
-        "operationId": "post_organizations",
+        "operationId": "post_tenants",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3767,7 +3767,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OrganizationDto"
+                  "$ref": "#/components/schemas/TenantDto"
                 }
               }
             }
@@ -3871,12 +3871,12 @@
         ]
       }
     },
-    "/organizations/{id}": {
+    "/tenants/{id}": {
       "get": {
         "tags": [
-          "Organizations"
+          "Tenants"
         ],
-        "operationId": "get_organizations_id",
+        "operationId": "get_tenants_id",
         "parameters": [
           {
             "name": "id",
@@ -3894,7 +3894,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OrganizationDto"
+                  "$ref": "#/components/schemas/TenantDto"
                 }
               }
             }
@@ -3977,9 +3977,9 @@
       },
       "patch": {
         "tags": [
-          "Organizations"
+          "Tenants"
         ],
-        "operationId": "patch_organizations_id",
+        "operationId": "patch_tenants_id",
         "parameters": [
           {
             "name": "id",
@@ -4032,20 +4032,20 @@
                       },
                       "entityLabels": {
                         "required": [
-                          "organization",
+                          "tenant",
                           "project",
-                          "department",
+                          "organization",
                           "taskCategory"
                         ],
                         "type": "object",
                         "properties": {
-                          "organization": {
+                          "tenant": {
                             "type": "string"
                           },
                           "project": {
                             "type": "string"
                           },
-                          "department": {
+                          "organization": {
                             "type": "string"
                           },
                           "taskCategory": {
@@ -4099,7 +4099,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OrganizationDto"
+                  "$ref": "#/components/schemas/TenantDto"
                 }
               }
             }
@@ -4226,9 +4226,9 @@
       },
       "delete": {
         "tags": [
-          "Organizations"
+          "Tenants"
         ],
-        "operationId": "delete_organizations_id",
+        "operationId": "delete_tenants_id",
         "parameters": [
           {
             "name": "id",
@@ -4365,12 +4365,12 @@
         ]
       }
     },
-    "/organizations/{id}/hourly-rates": {
+    "/tenants/{id}/hourly-rates": {
       "get": {
         "tags": [
           "Hourly rates"
         ],
-        "operationId": "get_organizations_id_hourly-rates",
+        "operationId": "get_tenants_id_hourly-rates",
         "parameters": [
           {
             "name": "id",
@@ -4487,7 +4487,7 @@
         "tags": [
           "Hourly rates"
         ],
-        "operationId": "post_organizations_id_hourly-rates",
+        "operationId": "post_tenants_id_hourly-rates",
         "parameters": [
           {
             "name": "id",
@@ -5002,12 +5002,12 @@
         ]
       }
     },
-    "/organizations/{id}/report": {
+    "/tenants/{id}/report": {
       "get": {
         "tags": [
           "Reports"
         ],
-        "operationId": "get_organizations_id_report",
+        "operationId": "get_tenants_id_report",
         "parameters": [
           {
             "name": "id",
@@ -5019,7 +5019,7 @@
             }
           },
           {
-            "name": "departmentId",
+            "name": "organizationId",
             "in": "query",
             "schema": {
               "type": "string"
@@ -5149,12 +5149,12 @@
         ]
       }
     },
-    "/organizations/{id}/time-entries.csv": {
+    "/tenants/{id}/time-entries.csv": {
       "get": {
         "tags": [
           "Reports"
         ],
-        "operationId": "get_organizations_id_time-entries.csv",
+        "operationId": "get_tenants_id_time-entries.csv",
         "parameters": [
           {
             "name": "id",
@@ -5166,7 +5166,7 @@
             }
           },
           {
-            "name": "departmentId",
+            "name": "organizationId",
             "in": "query",
             "schema": {
               "type": "string"
@@ -5296,12 +5296,12 @@
         ]
       }
     },
-    "/organizations/{id}/summary.csv": {
+    "/tenants/{id}/summary.csv": {
       "get": {
         "tags": [
           "Reports"
         ],
-        "operationId": "get_organizations_id_summary.csv",
+        "operationId": "get_tenants_id_summary.csv",
         "parameters": [
           {
             "name": "id",
@@ -5313,7 +5313,7 @@
             }
           },
           {
-            "name": "departmentId",
+            "name": "organizationId",
             "in": "query",
             "schema": {
               "type": "string"
@@ -5443,12 +5443,12 @@
         ]
       }
     },
-    "/organizations/{id}/reports": {
+    "/tenants/{id}/reports": {
       "get": {
         "tags": [
           "Reports"
         ],
-        "operationId": "get_organizations_id_reports",
+        "operationId": "get_tenants_id_reports",
         "parameters": [
           {
             "name": "id",
@@ -5565,7 +5565,7 @@
         "tags": [
           "Reports"
         ],
-        "operationId": "post_organizations_id_reports",
+        "operationId": "post_tenants_id_reports",
         "parameters": [
           {
             "name": "id",
@@ -5741,12 +5741,12 @@
         ]
       }
     },
-    "/organizations/{id}/reports/{reportId}": {
+    "/tenants/{id}/reports/{reportId}": {
       "get": {
         "tags": [
           "Reports"
         ],
-        "operationId": "get_organizations_id_reports_reportId",
+        "operationId": "get_tenants_id_reports_reportId",
         "parameters": [
           {
             "name": "id",
@@ -5858,7 +5858,7 @@
         "tags": [
           "Reports"
         ],
-        "operationId": "patch_organizations_id_reports_reportId",
+        "operationId": "patch_tenants_id_reports_reportId",
         "parameters": [
           {
             "name": "id",
@@ -6046,7 +6046,7 @@
         "tags": [
           "Reports"
         ],
-        "operationId": "delete_organizations_id_reports_reportId",
+        "operationId": "delete_tenants_id_reports_reportId",
         "parameters": [
           {
             "name": "id",
@@ -6192,12 +6192,12 @@
         ]
       }
     },
-    "/organizations/{id}/reports/{reportId}/data": {
+    "/tenants/{id}/reports/{reportId}/data": {
       "get": {
         "tags": [
           "Reports"
         ],
-        "operationId": "get_organizations_id_reports_reportId_data",
+        "operationId": "get_tenants_id_reports_reportId_data",
         "parameters": [
           {
             "name": "id",
@@ -6327,12 +6327,12 @@
         ]
       }
     },
-    "/organizations/{id}/report-templates": {
+    "/tenants/{id}/report-templates": {
       "get": {
         "tags": [
           "Reports"
         ],
-        "operationId": "get_organizations_id_report-templates",
+        "operationId": "get_tenants_id_report-templates",
         "parameters": [
           {
             "name": "id",
@@ -6449,7 +6449,7 @@
         "tags": [
           "Reports"
         ],
-        "operationId": "post_organizations_id_report-templates",
+        "operationId": "post_tenants_id_report-templates",
         "parameters": [
           {
             "name": "id",
@@ -6619,12 +6619,12 @@
         ]
       }
     },
-    "/organizations/{id}/report-templates/{templateId}": {
+    "/tenants/{id}/report-templates/{templateId}": {
       "get": {
         "tags": [
           "Reports"
         ],
-        "operationId": "get_organizations_id_report-templates_templateId",
+        "operationId": "get_tenants_id_report-templates_templateId",
         "parameters": [
           {
             "name": "id",
@@ -6736,7 +6736,7 @@
         "tags": [
           "Reports"
         ],
-        "operationId": "patch_organizations_id_report-templates_templateId",
+        "operationId": "patch_tenants_id_report-templates_templateId",
         "parameters": [
           {
             "name": "id",
@@ -6918,7 +6918,7 @@
         "tags": [
           "Reports"
         ],
-        "operationId": "delete_organizations_id_report-templates_templateId",
+        "operationId": "delete_tenants_id_report-templates_templateId",
         "parameters": [
           {
             "name": "id",
@@ -7064,12 +7064,12 @@
         ]
       }
     },
-    "/organizations/{id}/departments": {
+    "/tenants/{id}/tenants": {
       "get": {
         "tags": [
-          "Departments"
+          "Organizations"
         ],
-        "operationId": "get_organizations_id_departments",
+        "operationId": "get_tenants_id_organizations",
         "parameters": [
           {
             "name": "id",
@@ -7101,7 +7101,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListResponseOfDepartmentDto"
+                  "$ref": "#/components/schemas/ListResponseOfOrganizationDto"
                 }
               }
             }
@@ -7184,9 +7184,9 @@
       },
       "post": {
         "tags": [
-          "Departments"
+          "Organizations"
         ],
-        "operationId": "post_organizations_id_departments",
+        "operationId": "post_tenants_id_organizations",
         "parameters": [
           {
             "name": "id",
@@ -7222,7 +7222,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DepartmentDto"
+                  "$ref": "#/components/schemas/OrganizationDto"
                 }
               }
             }
@@ -7348,12 +7348,12 @@
         ]
       }
     },
-    "/departments/{id}": {
+    "/tenants/{id}": {
       "get": {
         "tags": [
-          "Departments"
+          "Organizations"
         ],
-        "operationId": "get_departments_id",
+        "operationId": "get_tenants_id",
         "parameters": [
           {
             "name": "id",
@@ -7371,7 +7371,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DepartmentDto"
+                  "$ref": "#/components/schemas/OrganizationDto"
                 }
               }
             }
@@ -7454,9 +7454,9 @@
       },
       "patch": {
         "tags": [
-          "Departments"
+          "Organizations"
         ],
-        "operationId": "patch_departments_id",
+        "operationId": "patch_organizations_id",
         "parameters": [
           {
             "name": "id",
@@ -7492,7 +7492,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DepartmentDto"
+                  "$ref": "#/components/schemas/OrganizationDto"
                 }
               }
             }
@@ -7619,9 +7619,9 @@
       },
       "delete": {
         "tags": [
-          "Departments"
+          "Organizations"
         ],
-        "operationId": "delete_departments_id",
+        "operationId": "delete_tenants_id",
         "parameters": [
           {
             "name": "id",
@@ -7758,12 +7758,12 @@
         ]
       }
     },
-    "/organizations/{id}/tags": {
+    "/tenants/{id}/tags": {
       "get": {
         "tags": [
           "Tags"
         ],
-        "operationId": "get_organizations_id_tags",
+        "operationId": "get_tenants_id_tags",
         "parameters": [
           {
             "name": "id",
@@ -7880,7 +7880,7 @@
         "tags": [
           "Tags"
         ],
-        "operationId": "post_organizations_id_tags",
+        "operationId": "post_tenants_id_tags",
         "parameters": [
           {
             "name": "id",
@@ -8349,12 +8349,12 @@
         ]
       }
     },
-    "/organizations/{id}/task-categories": {
+    "/tenants/{id}/task-categories": {
       "get": {
         "tags": [
           "Task categories"
         ],
-        "operationId": "get_organizations_id_task-categories",
+        "operationId": "get_tenants_id_task-categories",
         "parameters": [
           {
             "name": "id",
@@ -8471,7 +8471,7 @@
         "tags": [
           "Task categories"
         ],
-        "operationId": "post_organizations_id_task-categories",
+        "operationId": "post_tenants_id_task-categories",
         "parameters": [
           {
             "name": "id",
@@ -8940,12 +8940,12 @@
         ]
       }
     },
-    "/organizations/{id}/projects": {
+    "/tenants/{id}/projects": {
       "get": {
         "tags": [
           "Projects"
         ],
-        "operationId": "get_organizations_id_projects",
+        "operationId": "get_tenants_id_projects",
         "parameters": [
           {
             "name": "id",
@@ -9062,7 +9062,7 @@
         "tags": [
           "Projects"
         ],
-        "operationId": "post_organizations_id_projects",
+        "operationId": "post_tenants_id_projects",
         "parameters": [
           {
             "name": "id",
@@ -9091,8 +9091,8 @@
                     "enum": [
                       "Public",
                       "Private",
-                      "Department",
-                      "Organization"
+                      "Organization",
+                      "Tenant"
                     ],
                     "type": "string"
                   },
@@ -9103,7 +9103,7 @@
                     ],
                     "type": "string"
                   },
-                  "departmentId": {
+                  "organizationId": {
                     "type": [
                       "null",
                       "string"
@@ -9411,8 +9411,8 @@
                     "enum": [
                       "Public",
                       "Private",
-                      "Department",
-                      "Organization"
+                      "Organization",
+                      "Tenant"
                     ],
                     "type": "string"
                   },
@@ -9423,7 +9423,7 @@
                     ],
                     "type": "string"
                   },
-                  "departmentId": {
+                  "organizationId": {
                     "type": [
                       "null",
                       "string"
@@ -9738,12 +9738,12 @@
         ]
       }
     },
-    "/organizations/{id}/imports/people": {
+    "/tenants/{id}/imports/people": {
       "post": {
         "tags": [
           "Imports"
         ],
-        "operationId": "post_organizations_id_imports_people",
+        "operationId": "post_tenants_id_imports_people",
         "parameters": [
           {
             "name": "id",
@@ -9908,12 +9908,12 @@
         ]
       }
     },
-    "/organizations/{id}/imports/departments": {
+    "/tenants/{id}/imports/tenants": {
       "post": {
         "tags": [
           "Imports"
         ],
-        "operationId": "post_organizations_id_imports_departments",
+        "operationId": "post_tenants_id_imports_organizations",
         "parameters": [
           {
             "name": "id",
@@ -10078,12 +10078,12 @@
         ]
       }
     },
-    "/organizations/{id}/imports/projects": {
+    "/tenants/{id}/imports/projects": {
       "post": {
         "tags": [
           "Imports"
         ],
-        "operationId": "post_organizations_id_imports_projects",
+        "operationId": "post_tenants_id_imports_projects",
         "parameters": [
           {
             "name": "id",
@@ -10248,12 +10248,12 @@
         ]
       }
     },
-    "/organizations/{id}/roles": {
+    "/tenants/{id}/roles": {
       "get": {
         "tags": [
           "Roles"
         ],
-        "operationId": "get_organizations_id_roles",
+        "operationId": "get_tenants_id_roles",
         "parameters": [
           {
             "name": "id",
@@ -10285,7 +10285,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListResponseOfOrganizationRoleDto"
+                  "$ref": "#/components/schemas/ListResponseOfTenantRoleDto"
                 }
               }
             }
@@ -10370,7 +10370,7 @@
         "tags": [
           "Roles"
         ],
-        "operationId": "post_organizations_id_roles",
+        "operationId": "post_tenants_id_roles",
         "parameters": [
           {
             "name": "id",
@@ -10421,7 +10421,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OrganizationRoleDto"
+                  "$ref": "#/components/schemas/TenantRoleDto"
                 }
               }
             }
@@ -10547,12 +10547,12 @@
         ]
       }
     },
-    "/organizations/{id}/roles/{roleId}": {
+    "/tenants/{id}/roles/{roleId}": {
       "patch": {
         "tags": [
           "Roles"
         ],
-        "operationId": "patch_organizations_id_roles_roleId",
+        "operationId": "patch_tenants_id_roles_roleId",
         "parameters": [
           {
             "name": "id",
@@ -10612,7 +10612,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OrganizationRoleDto"
+                  "$ref": "#/components/schemas/TenantRoleDto"
                 }
               }
             }
@@ -10741,7 +10741,7 @@
         "tags": [
           "Roles"
         ],
-        "operationId": "delete_organizations_id_roles_roleId",
+        "operationId": "delete_tenants_id_roles_roleId",
         "parameters": [
           {
             "name": "id",
@@ -10887,12 +10887,12 @@
         ]
       }
     },
-    "/organizations/{id}/access-requests": {
+    "/tenants/{id}/access-requests": {
       "get": {
         "tags": [
           "Access requests"
         ],
-        "operationId": "get_organizations_id_access-requests",
+        "operationId": "get_tenants_id_access-requests",
         "parameters": [
           {
             "name": "id",
@@ -11016,7 +11016,7 @@
         "tags": [
           "Access requests"
         ],
-        "operationId": "post_organizations_id_access-requests",
+        "operationId": "post_tenants_id_access-requests",
         "parameters": [
           {
             "name": "id",
@@ -11034,7 +11034,7 @@
               "schema": {
                 "required": [
                   "requestedRole",
-                  "requestedDepartmentIds"
+                  "requestedOrganizationIds"
                 ],
                 "type": "object",
                 "properties": {
@@ -11047,7 +11047,7 @@
                   "requestedRole": {
                     "type": "string"
                   },
-                  "requestedDepartmentIds": {
+                  "requestedOrganizationIds": {
                     "type": "array",
                     "items": {
                       "type": "string",
@@ -11218,12 +11218,12 @@
         ]
       }
     },
-    "/organizations/{id}/access-requests/{requestId}": {
+    "/tenants/{id}/access-requests/{requestId}": {
       "patch": {
         "tags": [
           "Access requests"
         ],
-        "operationId": "patch_organizations_id_access-requests_requestId",
+        "operationId": "patch_tenants_id_access-requests_requestId",
         "parameters": [
           {
             "name": "id",
@@ -11394,12 +11394,477 @@
         ]
       }
     },
-    "/organizations/{id}/invitations": {
+    "/tenants/{id}/invitations": {
       "get": {
         "tags": [
           "Invitations"
         ],
-        "operationId": "get_organizations_id_invitations",
+        "operationId": "get_tenants_id_invitations",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListResponseOfInvitationDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Invitations"
+        ],
+        "operationId": "post_tenants_id_invitations",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "required": [
+                  "email",
+                  "role"
+                ],
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "enum": [
+                      "MEMBER",
+                      "VOLUNTEER",
+                      "ADMIN"
+                    ],
+                    "type": "string"
+                  },
+                  "firstName": {
+                    "type": "string",
+                    "default": "Volunteer"
+                  },
+                  "lastName": {
+                    "type": "string",
+                    "default": ""
+                  },
+                  "username": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/tenants/{id}/invitations/{invitationId}": {
+      "delete": {
+        "tags": [
+          "Invitations"
+        ],
+        "operationId": "delete_tenants_id_invitations_invitationId",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "invitationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/tenants/{id}/invitations": {
+      "get": {
+        "tags": [
+          "Invitations"
+        ],
+        "operationId": "get_tenants_id_invitations",
         "parameters": [
           {
             "name": "id",
@@ -11701,477 +12166,12 @@
         ]
       }
     },
-    "/organizations/{id}/invitations/{invitationId}": {
+    "/tenants/{id}/invitations/{invitationId}": {
       "delete": {
         "tags": [
           "Invitations"
         ],
-        "operationId": "delete_organizations_id_invitations_invitationId",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "invitationId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InvitationDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "required": [
-                    "code",
-                    "message"
-                  ],
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "required": [
-                    "code",
-                    "message"
-                  ],
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "required": [
-                    "code",
-                    "message"
-                  ],
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "required": [
-                    "code",
-                    "message"
-                  ],
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "required": [
-                    "code",
-                    "message"
-                  ],
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          },
-          {
-            "apiKeyAuth": []
-          }
-        ]
-      }
-    },
-    "/departments/{id}/invitations": {
-      "get": {
-        "tags": [
-          "Invitations"
-        ],
-        "operationId": "get_departments_id_invitations",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ListResponseOfInvitationDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "required": [
-                    "code",
-                    "message"
-                  ],
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "required": [
-                    "code",
-                    "message"
-                  ],
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "required": [
-                    "code",
-                    "message"
-                  ],
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          },
-          {
-            "apiKeyAuth": []
-          }
-        ]
-      },
-      "post": {
-        "tags": [
-          "Invitations"
-        ],
-        "operationId": "post_departments_id_invitations",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "required": [
-                  "email",
-                  "role"
-                ],
-                "type": "object",
-                "properties": {
-                  "email": {
-                    "type": "string"
-                  },
-                  "role": {
-                    "enum": [
-                      "MEMBER",
-                      "VOLUNTEER",
-                      "ADMIN"
-                    ],
-                    "type": "string"
-                  },
-                  "firstName": {
-                    "type": "string",
-                    "default": "Volunteer"
-                  },
-                  "lastName": {
-                    "type": "string",
-                    "default": ""
-                  },
-                  "username": {
-                    "type": [
-                      "null",
-                      "string"
-                    ]
-                  }
-                }
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "description": "Created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InvitationDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "required": [
-                    "code",
-                    "message"
-                  ],
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "required": [
-                    "code",
-                    "message"
-                  ],
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "required": [
-                    "code",
-                    "message"
-                  ],
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "required": [
-                    "code",
-                    "message"
-                  ],
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "required": [
-                    "code",
-                    "message"
-                  ],
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          },
-          {
-            "apiKeyAuth": []
-          }
-        ]
-      }
-    },
-    "/departments/{id}/invitations/{invitationId}": {
-      "delete": {
-        "tags": [
-          "Invitations"
-        ],
-        "operationId": "delete_departments_id_invitations_invitationId",
+        "operationId": "delete_tenants_id_invitations_invitationId",
         "parameters": [
           {
             "name": "id",
@@ -12355,14 +12355,14 @@
             }
           },
           {
-            "name": "organizationId",
+            "name": "tenantId",
             "in": "query",
             "schema": {
               "type": "string"
             }
           },
           {
-            "name": "departmentId",
+            "name": "organizationId",
             "in": "query",
             "schema": {
               "type": "string"
@@ -12503,16 +12503,16 @@
                   },
                   "placement": {
                     "required": [
-                      "organizationId",
+                      "tenantId",
                       "tagIds"
                     ],
                     "type": "object",
                     "properties": {
-                      "organizationId": {
+                      "tenantId": {
                         "type": "string",
                         "format": "uuid"
                       },
-                      "departmentId": {
+                      "organizationId": {
                         "type": [
                           "null",
                           "string"
@@ -12772,12 +12772,12 @@
         ]
       }
     },
-    "/organizations/{id}/time-entries": {
+    "/tenants/{id}/time-entries": {
       "get": {
         "tags": [
           "Time entries"
         ],
-        "operationId": "get_organizations_id_time-entries",
+        "operationId": "get_tenants_id_time-entries",
         "parameters": [
           {
             "name": "id",
@@ -13020,11 +13020,11 @@
                 ],
                 "type": "object",
                 "properties": {
-                  "organizationId": {
+                  "tenantId": {
                     "type": "string",
                     "format": "uuid"
                   },
-                  "departmentId": {
+                  "organizationId": {
                     "type": [
                       "null",
                       "string"
@@ -13385,16 +13385,16 @@
                 "properties": {
                   "placement": {
                     "required": [
-                      "organizationId",
+                      "tenantId",
                       "tagIds"
                     ],
                     "type": "object",
                     "properties": {
-                      "organizationId": {
+                      "tenantId": {
                         "type": "string",
                         "format": "uuid"
                       },
-                      "departmentId": {
+                      "organizationId": {
                         "type": [
                           "null",
                           "string"
@@ -13602,7 +13602,7 @@
                     ],
                     "format": "uuid"
                   },
-                  "departmentId": {
+                  "organizationId": {
                     "type": [
                       "null",
                       "string"
@@ -13734,7 +13734,9 @@
     },
     "/time/clock-cancel": {
       "post": {
-        "tags": ["Time"],
+        "tags": [
+          "Time"
+        ],
         "operationId": "post_time_clock-cancel",
         "summary": "Discard the running timer without saving it.",
         "requestBody": {
@@ -13744,23 +13746,44 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "userId": { "type": ["null", "string"], "format": "uuid" }
+                  "userId": {
+                    "type": [
+                      "null",
+                      "string"
+                    ],
+                    "format": "uuid"
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "204": { "description": "No Content" },
-          "401": { "description": "Unauthorized" },
-          "409": { "description": "No open punch" }
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "409": {
+            "description": "No open punch"
+          }
         },
-        "security": [{ "bearerAuth": [] }, { "apiKeyAuth": [] }]
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ]
       }
     },
     "/time/clock-reset": {
       "post": {
-        "tags": ["Time"],
+        "tags": [
+          "Time"
+        ],
         "operationId": "post_time_clock-reset",
         "summary": "Restart the running timer from now. The elapsed time is not saved.",
         "requestBody": {
@@ -13770,7 +13793,13 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "userId": { "type": ["null", "string"], "format": "uuid" }
+                  "userId": {
+                    "type": [
+                      "null",
+                      "string"
+                    ],
+                    "format": "uuid"
+                  }
                 }
               }
             }
@@ -13779,12 +13808,29 @@
         "responses": {
           "200": {
             "description": "OK",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TimeEntryDto" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeEntryDto"
+                }
+              }
+            }
           },
-          "401": { "description": "Unauthorized" },
-          "409": { "description": "No open punch" }
+          "401": {
+            "description": "Unauthorized"
+          },
+          "409": {
+            "description": "No open punch"
+          }
         },
-        "security": [{ "bearerAuth": [] }, { "apiKeyAuth": [] }]
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ]
       }
     },
     "/time/duration": {
@@ -13819,16 +13865,16 @@
                       },
                       "placement": {
                         "required": [
-                          "organizationId",
+                          "tenantId",
                           "tagIds"
                         ],
                         "type": "object",
                         "properties": {
-                          "organizationId": {
+                          "tenantId": {
                             "type": "string",
                             "format": "uuid"
                           },
-                          "departmentId": {
+                          "organizationId": {
                             "type": [
                               "null",
                               "string"
@@ -14103,16 +14149,16 @@
                       },
                       "placement": {
                         "required": [
-                          "organizationId",
+                          "tenantId",
                           "tagIds"
                         ],
                         "type": "object",
                         "properties": {
-                          "organizationId": {
+                          "tenantId": {
                             "type": "string",
                             "format": "uuid"
                           },
-                          "departmentId": {
+                          "organizationId": {
                             "type": [
                               "null",
                               "string"
@@ -14377,14 +14423,14 @@
             }
           },
           {
-            "name": "organizationId",
+            "name": "tenantId",
             "in": "query",
             "schema": {
               "type": "string"
             }
           },
           {
-            "name": "departmentId",
+            "name": "organizationId",
             "in": "query",
             "schema": {
               "type": "string"
@@ -14466,7 +14512,7 @@
             "application/json": {
               "schema": {
                 "required": [
-                  "organizationId",
+                  "tenantId",
                   "projectId",
                   "taskCategoryId",
                   "startedAt",
@@ -14476,11 +14522,11 @@
                 ],
                 "type": "object",
                 "properties": {
-                  "organizationId": {
+                  "tenantId": {
                     "type": "string",
                     "format": "uuid"
                   },
-                  "departmentId": {
+                  "organizationId": {
                     "type": [
                       "null",
                       "string"
@@ -14773,11 +14819,11 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "organizationId": {
+                  "tenantId": {
                     "type": "string",
                     "format": "uuid"
                   },
-                  "departmentId": {
+                  "organizationId": {
                     "type": [
                       "null",
                       "string"
@@ -15103,15 +15149,15 @@
         ]
       }
     },
-    "/organizations/{organizationId}/themes": {
+    "/tenants/{tenantId}/themes": {
       "get": {
         "tags": [
           "Themes"
         ],
-        "operationId": "get_organizations_organizationId_themes",
+        "operationId": "get_tenants_tenantId_themes",
         "parameters": [
           {
-            "name": "organizationId",
+            "name": "tenantId",
             "in": "path",
             "required": true,
             "schema": {
@@ -15211,10 +15257,10 @@
         "tags": [
           "Themes"
         ],
-        "operationId": "post_organizations_organizationId_themes",
+        "operationId": "post_tenants_tenantId_themes",
         "parameters": [
           {
-            "name": "organizationId",
+            "name": "tenantId",
             "in": "path",
             "required": true,
             "schema": {
@@ -15438,15 +15484,15 @@
         ]
       }
     },
-    "/organizations/{organizationId}/themes/{id}": {
+    "/tenants/{tenantId}/themes/{id}": {
       "patch": {
         "tags": [
           "Themes"
         ],
-        "operationId": "patch_organizations_organizationId_themes_id",
+        "operationId": "patch_tenants_tenantId_themes_id",
         "parameters": [
           {
-            "name": "organizationId",
+            "name": "tenantId",
             "in": "path",
             "required": true,
             "schema": {
@@ -15682,10 +15728,10 @@
         "tags": [
           "Themes"
         ],
-        "operationId": "delete_organizations_organizationId_themes_id",
+        "operationId": "delete_tenants_tenantId_themes_id",
         "parameters": [
           {
-            "name": "organizationId",
+            "name": "tenantId",
             "in": "path",
             "required": true,
             "schema": {
@@ -15828,15 +15874,15 @@
         ]
       }
     },
-    "/organizations/{organizationId}/email-templates": {
+    "/tenants/{tenantId}/email-templates": {
       "get": {
         "tags": [
-          "Organizations"
+          "Tenants"
         ],
-        "operationId": "get_organizations_organizationId_email-templates",
+        "operationId": "get_tenants_tenantId_email-templates",
         "parameters": [
           {
-            "name": "organizationId",
+            "name": "tenantId",
             "in": "path",
             "required": true,
             "schema": {
@@ -15933,15 +15979,15 @@
         ]
       }
     },
-    "/organizations/{organizationId}/email-templates/{id}": {
+    "/tenants/{tenantId}/email-templates/{id}": {
       "get": {
         "tags": [
-          "Organizations"
+          "Tenants"
         ],
-        "operationId": "get_organizations_organizationId_email-templates_id",
+        "operationId": "get_tenants_tenantId_email-templates_id",
         "parameters": [
           {
-            "name": "organizationId",
+            "name": "tenantId",
             "in": "path",
             "required": true,
             "schema": {
@@ -16048,12 +16094,12 @@
       },
       "patch": {
         "tags": [
-          "Organizations"
+          "Tenants"
         ],
-        "operationId": "patch_organizations_organizationId_email-templates_id",
+        "operationId": "patch_tenants_tenantId_email-templates_id",
         "parameters": [
           {
-            "name": "organizationId",
+            "name": "tenantId",
             "in": "path",
             "required": true,
             "schema": {
@@ -16203,15 +16249,15 @@
         ]
       }
     },
-    "/organizations/{organizationId}/email-templates/{id}/reset": {
+    "/tenants/{tenantId}/email-templates/{id}/reset": {
       "post": {
         "tags": [
-          "Organizations"
+          "Tenants"
         ],
-        "operationId": "post_organizations_organizationId_email-templates_id_reset",
+        "operationId": "post_tenants_tenantId_email-templates_id_reset",
         "parameters": [
           {
-            "name": "organizationId",
+            "name": "tenantId",
             "in": "path",
             "required": true,
             "schema": {
@@ -16552,7 +16598,7 @@
                       "type": "string"
                     }
                   },
-                  "organizationId": {
+                  "tenantId": {
                     "type": [
                       "null",
                       "string"
@@ -17005,12 +17051,12 @@
         ]
       }
     },
-    "/organizations/{id}/volunteer-needs": {
+    "/tenants/{id}/volunteer-needs": {
       "get": {
         "tags": [
           "Volunteer needs"
         ],
-        "operationId": "get_organizations_id_volunteer-needs",
+        "operationId": "get_tenants_id_volunteer-needs",
         "parameters": [
           {
             "name": "id",
@@ -17057,7 +17103,7 @@
             }
           },
           {
-            "name": "departmentId",
+            "name": "organizationId",
             "in": "query",
             "schema": {
               "type": "string"
@@ -17176,7 +17222,7 @@
         "tags": [
           "Volunteer needs"
         ],
-        "operationId": "post_organizations_id_volunteer-needs",
+        "operationId": "post_tenants_id_volunteer-needs",
         "parameters": [
           {
             "name": "id",
@@ -17270,7 +17316,7 @@
                     ],
                     "format": "uuid"
                   },
-                  "departmentId": {
+                  "organizationId": {
                     "type": [
                       "null",
                       "string"
@@ -17606,7 +17652,7 @@
                     ],
                     "format": "uuid"
                   },
-                  "departmentId": {
+                  "organizationId": {
                     "type": [
                       "null",
                       "string"
@@ -18855,12 +18901,12 @@
         ]
       }
     },
-    "/organizations/{id}/api-keys": {
+    "/tenants/{id}/api-keys": {
       "get": {
         "tags": [
           "API keys"
         ],
-        "operationId": "get_organizations_id_api-keys",
+        "operationId": "get_tenants_id_api-keys",
         "parameters": [
           {
             "name": "id",
@@ -18892,7 +18938,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListResponseOfOrganizationApiKeyDto"
+                  "$ref": "#/components/schemas/ListResponseOfTenantApiKeyDto"
                 }
               }
             }
@@ -18974,7 +19020,7 @@
         "tags": [
           "API keys"
         ],
-        "operationId": "post_organizations_id_api-keys",
+        "operationId": "post_tenants_id_api-keys",
         "parameters": [
           {
             "name": "id",
@@ -19024,7 +19070,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OrganizationApiKeyDto"
+                  "$ref": "#/components/schemas/TenantApiKeyDto"
                 }
               }
             }
@@ -19147,12 +19193,12 @@
         ]
       }
     },
-    "/organizations/{id}/api-keys/{keyId}": {
+    "/tenants/{id}/api-keys/{keyId}": {
       "patch": {
         "tags": [
           "API keys"
         ],
-        "operationId": "patch_organizations_id_api-keys_keyId",
+        "operationId": "patch_tenants_id_api-keys_keyId",
         "parameters": [
           {
             "name": "id",
@@ -19207,7 +19253,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OrganizationApiKeyDto"
+                  "$ref": "#/components/schemas/TenantApiKeyDto"
                 }
               }
             }
@@ -19333,7 +19379,7 @@
         "tags": [
           "API keys"
         ],
-        "operationId": "delete_organizations_id_api-keys_keyId",
+        "operationId": "delete_tenants_id_api-keys_keyId",
         "parameters": [
           {
             "name": "id",
@@ -19476,12 +19522,12 @@
         ]
       }
     },
-    "/organizations/{id}/api-keys/{keyId}/rotate": {
+    "/tenants/{id}/api-keys/{keyId}/rotate": {
       "post": {
         "tags": [
           "API keys"
         ],
-        "operationId": "post_organizations_id_api-keys_keyId_rotate",
+        "operationId": "post_tenants_id_api-keys_keyId_rotate",
         "parameters": [
           {
             "name": "id",
@@ -19508,7 +19554,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OrganizationApiKeyDto"
+                  "$ref": "#/components/schemas/TenantApiKeyDto"
                 }
               }
             }
@@ -19659,9 +19705,9 @@
         }
       }
     },
-    "/organizations/{id}/lookups": {
+    "/tenants/{id}/lookups": {
       "get": {
-        "operationId": "get__organizations_id_lookups",
+        "operationId": "get__tenants_id_lookups",
         "parameters": [
           {
             "name": "id",
@@ -19687,9 +19733,9 @@
         ]
       }
     },
-    "/organizations/{id}/unclassified-count": {
+    "/tenants/{id}/unclassified-count": {
       "get": {
-        "operationId": "get__organizations_id_unclassified_count",
+        "operationId": "get__tenants_id_unclassified_count",
         "parameters": [
           {
             "name": "id",
@@ -19715,9 +19761,9 @@
         ]
       }
     },
-    "/organizations/{id}/view.csv": {
+    "/tenants/{id}/view.csv": {
       "get": {
-        "operationId": "get__organizations_id_view_csv",
+        "operationId": "get__tenants_id_view_csv",
         "parameters": [
           {
             "name": "id",
@@ -19882,9 +19928,9 @@
         ]
       }
     },
-    "/organizations/{id}/payroll": {
+    "/tenants/{id}/payroll": {
       "get": {
-        "operationId": "get__organizations_id_payroll",
+        "operationId": "get__tenants_id_payroll",
         "parameters": [
           {
             "name": "id",
@@ -19910,9 +19956,9 @@
         ]
       }
     },
-    "/organizations/{id}/payroll.csv": {
+    "/tenants/{id}/payroll.csv": {
       "get": {
-        "operationId": "get__organizations_id_payroll_csv",
+        "operationId": "get__tenants_id_payroll_csv",
         "parameters": [
           {
             "name": "id",
@@ -19957,12 +20003,12 @@
         ]
       }
     },
-    "/organizations/{id}/brand/{kind}": {
+    "/tenants/{id}/brand/{kind}": {
       "delete": {
         "tags": [
-          "Organizations"
+          "Tenants"
         ],
-        "operationId": "delete_organizations_id_brand_kind",
+        "operationId": "delete_tenants_id_brand_kind",
         "parameters": [
           {
             "name": "id",
@@ -19993,7 +20039,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OrganizationDto"
+                  "$ref": "#/components/schemas/TenantDto"
                 }
               }
             }
@@ -20097,12 +20143,12 @@
         ]
       }
     },
-    "/organizations/{id}/brand": {
+    "/tenants/{id}/brand": {
       "post": {
         "tags": [
-          "Organizations"
+          "Tenants"
         ],
-        "operationId": "post_organizations_id_brand",
+        "operationId": "post_tenants_id_brand",
         "parameters": [
           {
             "name": "id",
@@ -20148,7 +20194,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OrganizationDto"
+                  "$ref": "#/components/schemas/TenantDto"
                 }
               }
             }
@@ -20252,12 +20298,12 @@
         ]
       }
     },
-    "/organizations/{id}/invitations/{invitationId}/resend": {
+    "/tenants/{id}/invitations/{invitationId}/resend": {
       "post": {
         "tags": [
           "Invitations"
         ],
-        "operationId": "post_organizations_id_invitations_invitationId_resend",
+        "operationId": "post_tenants_id_invitations_invitationId_resend",
         "parameters": [
           {
             "name": "id",
@@ -20542,6 +20588,325 @@
           }
         ]
       }
+    },
+    "/auth/external/callback": {
+      "get": {
+        "operationId": "get__auth_external_callback",
+        "parameters": [],
+        "responses": {
+          "default": {
+            "description": "Response from the Next.js handler."
+          }
+        }
+      },
+      "post": {
+        "operationId": "post__auth_external_callback",
+        "parameters": [],
+        "responses": {
+          "default": {
+            "description": "Response from the Next.js handler."
+          }
+        }
+      }
+    },
+    "/tenants/{id}/external-sync/tenant-groups/contract": {
+      "get": {
+        "operationId": "get__tenants_id_external_sync_tenant_groups_contract",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Response from the Next.js handler."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/tenants/{id}/external-sync/tenant-groups/outbound-token": {
+      "put": {
+        "operationId": "put__tenants_id_external_sync_tenant_groups_outbound_token",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Response from the Next.js handler."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/tenants/{id}/external-sync/tenant-groups/pull": {
+      "post": {
+        "operationId": "post__tenants_id_external_sync_tenant_groups_pull",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Response from the Next.js handler."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/tenants/{id}/external-sync/tenant-groups/validate": {
+      "post": {
+        "operationId": "post__tenants_id_external_sync_tenant_groups_validate",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Response from the Next.js handler."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/tenants/{id}/external-sync/tenant-groups/webhook-secret": {
+      "post": {
+        "operationId": "post__tenants_id_external_sync_tenant_groups_webhook_secret",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Response from the Next.js handler."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/tenants/{id}/external-sync/people-roles/contract": {
+      "get": {
+        "operationId": "get__tenants_id_external_sync_people_roles_contract",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Response from the Next.js handler."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/tenants/{id}/external-sync/people-roles/outbound-token": {
+      "put": {
+        "operationId": "put__tenants_id_external_sync_people_roles_outbound_token",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Response from the Next.js handler."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/tenants/{id}/external-sync/people-roles/pull": {
+      "post": {
+        "operationId": "post__tenants_id_external_sync_people_roles_pull",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Response from the Next.js handler."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/tenants/{id}/external-sync/people-roles/validate": {
+      "post": {
+        "operationId": "post__tenants_id_external_sync_people_roles_validate",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Response from the Next.js handler."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/tenants/{id}/external-sync/people-roles/webhook-secret": {
+      "post": {
+        "operationId": "post__tenants_id_external_sync_people_roles_webhook_secret",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Response from the Next.js handler."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/api/cron/external-sync": {
+      "get": {
+        "operationId": "get__api_cron_external_sync",
+        "parameters": [],
+        "responses": {
+          "default": {
+            "description": "Response from the Next.js handler."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -20555,7 +20920,7 @@
           "invitation": {
             "$ref": "#/components/schemas/InvitationDto"
           },
-          "organizationMembership": {
+          "tenantMembership": {
             "oneOf": [
               {
                 "type": "null"
@@ -20565,7 +20930,7 @@
               }
             ]
           },
-          "departmentMembership": {
+          "organizationMembership": {
             "oneOf": [
               {
                 "type": "null"
@@ -20580,10 +20945,10 @@
       "AccessRequestDto": {
         "required": [
           "id",
-          "organizationId",
+          "tenantId",
           "email",
           "name",
-          "requestedDepartmentIds",
+          "requestedOrganizationIds",
           "status",
           "createdAt"
         ],
@@ -20593,7 +20958,7 @@
             "type": "string",
             "format": "uuid"
           },
-          "organizationId": {
+          "tenantId": {
             "type": "string",
             "format": "uuid"
           },
@@ -20634,7 +20999,7 @@
               }
             ]
           },
-          "requestedDepartmentIds": {
+          "requestedOrganizationIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -20729,7 +21094,7 @@
         "required": [
           "id",
           "recordedByUserId",
-          "organizationId",
+          "tenantId",
           "projectId",
           "taskCategoryId",
           "startedAt",
@@ -20750,11 +21115,11 @@
             "type": "string",
             "format": "uuid"
           },
-          "organizationId": {
+          "tenantId": {
             "type": "string",
             "format": "uuid"
           },
-          "departmentId": {
+          "organizationId": {
             "type": [
               "null",
               "string"
@@ -20824,7 +21189,7 @@
           "hours",
           "entries",
           "inKind",
-          "byDepartment",
+          "byOrganization",
           "byCategory",
           "byProject"
         ],
@@ -20846,7 +21211,7 @@
             "type": "number",
             "format": "decimal"
           },
-          "byDepartment": {
+          "byOrganization": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/BucketDto"
@@ -20869,7 +21234,7 @@
       "ConnectionDto": {
         "required": [
           "id",
-          "organizationId",
+          "tenantId",
           "userAId",
           "userBId",
           "relationship",
@@ -20884,7 +21249,7 @@
             "type": "string",
             "format": "uuid"
           },
-          "organizationId": {
+          "tenantId": {
             "type": "string",
             "format": "uuid"
           },
@@ -20953,10 +21318,10 @@
           }
         }
       },
-      "DepartmentDto": {
+      "OrganizationDto": {
         "required": [
           "id",
-          "organizationId",
+          "tenantId",
           "name"
         ],
         "type": "object",
@@ -20965,7 +21330,7 @@
             "type": "string",
             "format": "uuid"
           },
-          "organizationId": {
+          "tenantId": {
             "type": "string",
             "format": "uuid"
           },
@@ -20977,7 +21342,7 @@
       "EmailTemplateDto": {
         "required": [
           "id",
-          "organizationId",
+          "tenantId",
           "name",
           "version",
           "for",
@@ -20997,7 +21362,7 @@
             "type": "string",
             "format": "uuid"
           },
-          "organizationId": {
+          "tenantId": {
             "type": "string",
             "format": "uuid"
           },
@@ -21067,20 +21432,20 @@
       },
       "EntityLabelsDto": {
         "required": [
-          "organization",
+          "tenant",
           "project",
-          "department",
+          "organization",
           "taskCategory"
         ],
         "type": "object",
         "properties": {
-          "organization": {
+          "tenant": {
             "type": "string"
           },
           "project": {
             "type": "string"
           },
-          "department": {
+          "organization": {
             "type": "string"
           },
           "taskCategory": {
@@ -21175,7 +21540,7 @@
             "type": "string",
             "format": "uuid"
           },
-          "organizationId": {
+          "tenantId": {
             "type": [
               "null",
               "string"
@@ -21241,13 +21606,13 @@
           "user": {
             "$ref": "#/components/schemas/FeedbackPersonDto"
           },
-          "organization": {
+          "tenant": {
             "oneOf": [
               {
                 "type": "null"
               },
               {
-                "$ref": "#/components/schemas/FeedbackOrganizationDto"
+                "$ref": "#/components/schemas/FeedbackTenantDto"
               }
             ]
           },
@@ -21259,7 +21624,7 @@
           }
         }
       },
-      "FeedbackOrganizationDto": {
+      "FeedbackTenantDto": {
         "required": [
           "id",
           "name"
@@ -21307,7 +21672,7 @@
       "HourlyRateDto": {
         "required": [
           "id",
-          "organizationId",
+          "tenantId",
           "type",
           "name",
           "perHourRate",
@@ -21320,7 +21685,7 @@
             "type": "string",
             "format": "uuid"
           },
-          "organizationId": {
+          "tenantId": {
             "type": "string",
             "format": "uuid"
           },
@@ -21423,7 +21788,7 @@
         "required": [
           "id",
           "email",
-          "organizationId",
+          "tenantId",
           "role",
           "invitedByUserId",
           "expiresAt",
@@ -21438,11 +21803,11 @@
           "email": {
             "type": "string"
           },
-          "organizationId": {
+          "tenantId": {
             "type": "string",
             "format": "uuid"
           },
-          "departmentId": {
+          "organizationId": {
             "type": [
               "null",
               "string"
@@ -21577,7 +21942,7 @@
           }
         }
       },
-      "ListResponseOfDepartmentDto": {
+      "ListResponseOfOrganizationDto": {
         "required": [
           "items",
           "limit",
@@ -21588,7 +21953,7 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/DepartmentDto"
+              "$ref": "#/components/schemas/OrganizationDto"
             }
           },
           "limit": {
@@ -21769,7 +22134,7 @@
           }
         }
       },
-      "ListResponseOfOrganizationApiKeyDto": {
+      "ListResponseOfTenantApiKeyDto": {
         "required": [
           "items",
           "limit",
@@ -21780,7 +22145,7 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/OrganizationApiKeyDto"
+              "$ref": "#/components/schemas/TenantApiKeyDto"
             }
           },
           "limit": {
@@ -21801,7 +22166,7 @@
           }
         }
       },
-      "ListResponseOfOrganizationDto": {
+      "ListResponseOfTenantDto": {
         "required": [
           "items",
           "limit",
@@ -21812,7 +22177,7 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/OrganizationDto"
+              "$ref": "#/components/schemas/TenantDto"
             }
           },
           "limit": {
@@ -21833,7 +22198,7 @@
           }
         }
       },
-      "ListResponseOfOrganizationRoleDto": {
+      "ListResponseOfTenantRoleDto": {
         "required": [
           "items",
           "limit",
@@ -21844,7 +22209,7 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/OrganizationRoleDto"
+              "$ref": "#/components/schemas/TenantRoleDto"
             }
           },
           "limit": {
@@ -22253,10 +22618,10 @@
         "required": [
           "id",
           "userId",
-          "organizationId",
+          "tenantId",
           "role",
           "joinedAt",
-          "departmentIds",
+          "organizationIds",
           "user"
         ],
         "type": [
@@ -22272,11 +22637,11 @@
             "type": "string",
             "format": "uuid"
           },
-          "organizationId": {
+          "tenantId": {
             "type": "string",
             "format": "uuid"
           },
-          "departmentId": {
+          "organizationId": {
             "type": [
               "null",
               "string"
@@ -22309,27 +22674,27 @@
               "boolean"
             ]
           },
-          "primaryDepartmentId": {
+          "primaryOrganizationId": {
             "type": [
               "null",
               "string"
             ],
             "format": "uuid"
           },
-          "departmentIds": {
+          "organizationIds": {
             "type": "array",
             "items": {
               "type": "string",
               "format": "uuid"
             }
           },
-          "orgUserTitle": {
+          "title": {
             "type": [
               "null",
               "string"
             ]
           },
-          "orgUserDescription": {
+          "memberDescription": {
             "type": [
               "null",
               "string"
@@ -22463,10 +22828,10 @@
           }
         }
       },
-      "OrganizationApiKeyDto": {
+      "TenantApiKeyDto": {
         "required": [
           "id",
-          "organizationId",
+          "tenantId",
           "name",
           "prefix",
           "scopes",
@@ -22479,7 +22844,7 @@
             "type": "string",
             "format": "uuid"
           },
-          "organizationId": {
+          "tenantId": {
             "type": "string",
             "format": "uuid"
           },
@@ -22525,7 +22890,7 @@
           }
         }
       },
-      "OrganizationDto": {
+      "TenantDto": {
         "required": [
           "id",
           "name",
@@ -22558,7 +22923,7 @@
             "type": "string"
           },
           "preferences": {
-            "$ref": "#/components/schemas/OrganizationPreferencesDto"
+            "$ref": "#/components/schemas/TenantPreferencesDto"
           },
           "themeId": {
             "type": "string",
@@ -22611,7 +22976,7 @@
           }
         }
       },
-      "OrganizationPreferencesDto": {
+      "TenantPreferencesDto": {
         "required": [
           "allowTimeEntryEditing",
           "allowVolunteersToAddVolunteers",
@@ -22684,7 +23049,7 @@
           }
         }
       },
-      "OrganizationRoleDto": {
+      "TenantRoleDto": {
         "required": [
           "id",
           "code",
@@ -22705,7 +23070,7 @@
           "name": {
             "type": "string"
           },
-          "organizationId": {
+          "tenantId": {
             "type": [
               "null",
               "string"
@@ -22894,7 +23259,7 @@
       "ProjectDto": {
         "required": [
           "id",
-          "organizationId",
+          "tenantId",
           "ownerUserId",
           "title",
           "accessType",
@@ -22908,11 +23273,11 @@
             "type": "string",
             "format": "uuid"
           },
-          "organizationId": {
+          "tenantId": {
             "type": "string",
             "format": "uuid"
           },
-          "departmentId": {
+          "organizationId": {
             "type": [
               "null",
               "string"
@@ -23000,7 +23365,7 @@
           "remaining",
           "requireVetting",
           "questions",
-          "organizationName"
+          "tenantName"
         ],
         "type": "object",
         "properties": {
@@ -23076,7 +23441,7 @@
               "$ref": "#/components/schemas/PublicQuestionDto"
             }
           },
-          "organizationName": {
+          "tenantName": {
             "type": "string"
           }
         }
@@ -23115,7 +23480,7 @@
             "type": "string",
             "format": "uuid"
           },
-          "organizationId": {
+          "tenantId": {
             "type": [
               "null",
               "string"
@@ -23195,7 +23560,7 @@
       "SavedReportDto": {
         "required": [
           "id",
-          "organizationId",
+          "tenantId",
           "name",
           "isDefault",
           "isDashboard",
@@ -23210,7 +23575,7 @@
             "type": "string",
             "format": "uuid"
           },
-          "organizationId": {
+          "tenantId": {
             "type": "string",
             "format": "uuid"
           },
@@ -23297,7 +23662,7 @@
       "TagDto": {
         "required": [
           "id",
-          "organizationId",
+          "tenantId",
           "name"
         ],
         "type": "object",
@@ -23306,7 +23671,7 @@
             "type": "string",
             "format": "uuid"
           },
-          "organizationId": {
+          "tenantId": {
             "type": "string",
             "format": "uuid"
           },
@@ -23318,7 +23683,7 @@
       "TaskCategoryDto": {
         "required": [
           "id",
-          "organizationId",
+          "tenantId",
           "name"
         ],
         "type": "object",
@@ -23327,7 +23692,7 @@
             "type": "string",
             "format": "uuid"
           },
-          "organizationId": {
+          "tenantId": {
             "type": "string",
             "format": "uuid"
           },
@@ -23364,7 +23729,7 @@
           "name": {
             "type": "string"
           },
-          "organizationId": {
+          "tenantId": {
             "type": [
               "null",
               "string"
@@ -23429,7 +23794,7 @@
           "id",
           "userId",
           "enteredByUserId",
-          "organizationId",
+          "tenantId",
           "mode",
           "occurredOn",
           "hourlyRate",
@@ -23450,11 +23815,11 @@
             "type": "string",
             "format": "uuid"
           },
-          "organizationId": {
+          "tenantId": {
             "type": "string",
             "format": "uuid"
           },
-          "departmentId": {
+          "organizationId": {
             "type": [
               "null",
               "string"
@@ -23602,7 +23967,7 @@
           "volunteers",
           "entries",
           "inKind",
-          "byDepartment",
+          "byOrganization",
           "byCategory",
           "byPerson",
           "byVolunteer",
@@ -23635,7 +24000,7 @@
             "type": "number",
             "format": "decimal"
           },
-          "byDepartment": {
+          "byOrganization": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/BucketDto"
@@ -23676,7 +24041,7 @@
       "VolunteerNeedDto": {
         "required": [
           "id",
-          "organizationId",
+          "tenantId",
           "createdByUserId",
           "publicToken",
           "name",
@@ -23695,7 +24060,7 @@
             "type": "string",
             "format": "uuid"
           },
-          "organizationId": {
+          "tenantId": {
             "type": "string",
             "format": "uuid"
           },
@@ -23778,7 +24143,7 @@
             ],
             "format": "uuid"
           },
-          "departmentId": {
+          "organizationId": {
             "type": [
               "null",
               "string"
@@ -23920,7 +24285,7 @@
       "name": "Imports"
     },
     {
-      "name": "Departments"
+      "name": "Organizations"
     },
     {
       "name": "Projects"
@@ -23962,7 +24327,7 @@
       "name": "Health"
     },
     {
-      "name": "Organizations"
+      "name": "Tenants"
     }
   ]
 }

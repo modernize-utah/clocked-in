@@ -33,7 +33,7 @@ export function AcceptForm() {
           key={codeFromUrl}
           defaultValue={codeFromUrl}
           required
-          className="h-10 font-mono"
+          className="font-mono"
         />
       </Field>
       {mismatch ? (
@@ -51,7 +51,7 @@ export function AcceptForm() {
       ) : (
         <FormMessage result={result} />
       )}
-      <SubmitButton className="h-10 w-full">Join organization</SubmitButton>
+      <SubmitButton className="w-full">Join tenant</SubmitButton>
     </form>
   );
 }

@@ -1,12 +1,12 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useOrganization, useWorkspace } from "@/hooks/use-workspace";
+import { useTenant, useWorkspace } from "@/hooks/use-workspace";
 import { membersQuery } from "@/lib/queries";
 
 export function useMembers({ enabled = true }: { enabled?: boolean } = {}) {
-  const organization = useOrganization();
-  const query = useQuery({ ...membersQuery(organization.id), enabled });
+  const tenant = useTenant();
+  const query = useQuery({ ...membersQuery(tenant.id), enabled });
   return { ...query, members: query.data ?? [] };
 }
 

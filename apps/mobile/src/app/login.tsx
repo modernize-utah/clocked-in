@@ -25,7 +25,7 @@ export default function LoginScreen() {
   };
 
   return (
-    <AuthFrame description="Sign in to log hours for every organization you belong to." title="Sign in">
+    <AuthFrame description="Sign in to log hours for every tenant you belong to." title="Sign in">
       <Field autoComplete="username" label="Username" onChangeText={setUsername} returnKeyType="next" value={username} />
       <Field label="Password" onChangeText={setPassword} onSubmitEditing={submit} returnKeyType="go" secureTextEntry value={password} />
       <ErrorText error={error} />

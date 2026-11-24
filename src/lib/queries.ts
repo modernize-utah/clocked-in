@@ -15,7 +15,7 @@ import type {
   VolunteerSignup,
   Invitation,
   Membership,
-  OrganizationApiKey,
+  TenantApiKey,
   Paged,
   Report,
   Theme,
@@ -27,7 +27,7 @@ export const entriesPageSize = 50;
 export type EntriesListFilter = DateRange & {
   projectId?: string;
   taskCategoryId?: string;
-  departmentId?: string;
+  organizationId?: string;
   unclassified?: boolean;
   everyone?: boolean;
 };
@@ -44,47 +44,47 @@ function query(values: Record<string, string | number | string[] | undefined>) {
 }
 
 export const keys = {
-  organization: (organizationId: string) => ["org", organizationId] as const,
-  lookups: (organizationId: string) => ["org", organizationId, "lookups"] as const,
-  members: (organizationId: string) => ["org", organizationId, "members"] as const,
-  connections: (organizationId: string) => ["org", organizationId, "connections"] as const,
-  invitations: (organizationId: string) => ["org", organizationId, "invitations"] as const,
-  departmentInvitations: (departmentId: string) => ["department", departmentId, "invitations"] as const,
-  apiKeys: (organizationId: string) => ["org", organizationId, "api-keys"] as const,
-  entries: (organizationId: string, userId: string, filter: EntriesListFilter = {}) =>
+  tenant: (tenantId: string) => ["org", tenantId] as const,
+  lookups: (tenantId: string) => ["org", tenantId, "lookups"] as const,
+  members: (tenantId: string) => ["org", tenantId, "members"] as const,
+  connections: (tenantId: string) => ["org", tenantId, "connections"] as const,
+  invitations: (tenantId: string) => ["org", tenantId, "invitations"] as const,
+  organizationInvitations: (organizationId: string) => ["organization", organizationId, "invitations"] as const,
+  apiKeys: (tenantId: string) => ["org", tenantId, "api-keys"] as const,
+  entries: (tenantId: string, userId: string, filter: EntriesListFilter = {}) =>
     [
       "org",
-      organizationId,
+      tenantId,
       "entries",
       userId,
       filter.from ?? "",
       filter.to ?? "",
       filter.projectId ?? "",
       filter.taskCategoryId ?? "",
-      filter.departmentId ?? "",
+      filter.organizationId ?? "",
       filter.unclassified ?? false,
       filter.everyone ?? false,
     ] as const,
-  organizationEntries: (organizationId: string) => ["org", organizationId, "recent-entries"] as const,
-  groupSessions: (organizationId: string) => ["org", organizationId, "group-sessions"] as const,
-  report: (organizationId: string, filter: ReportFilters) => ["org", organizationId, "report", filter] as const,
-  savedReports: (organizationId: string) => ["org", organizationId, "saved-reports"] as const,
-  savedReport: (organizationId: string, reportId: string) => ["org", organizationId, "saved-reports", reportId] as const,
-  reportTemplates: (organizationId: string) => ["org", organizationId, "report-templates"] as const,
-  reportTemplate: (organizationId: string, templateId: string) =>
-    ["org", organizationId, "report-templates", templateId] as const,
-  savedReportData: (organizationId: string, reportId: string, filter: ReportFilters) =>
-    ["org", organizationId, "saved-report-data", reportId, filter] as const,
-  themes: (organizationId: string) => ["org", organizationId, "themes"] as const,
-  emailTemplates: (organizationId: string) => ["org", organizationId, "email-templates"] as const,
-  emailTemplate: (organizationId: string, templateId: string) =>
-    ["org", organizationId, "email-templates", templateId] as const,
+  tenantEntries: (tenantId: string) => ["org", tenantId, "recent-entries"] as const,
+  groupSessions: (tenantId: string) => ["org", tenantId, "group-sessions"] as const,
+  report: (tenantId: string, filter: ReportFilters) => ["org", tenantId, "report", filter] as const,
+  savedReports: (tenantId: string) => ["org", tenantId, "saved-reports"] as const,
+  savedReport: (tenantId: string, reportId: string) => ["org", tenantId, "saved-reports", reportId] as const,
+  reportTemplates: (tenantId: string) => ["org", tenantId, "report-templates"] as const,
+  reportTemplate: (tenantId: string, templateId: string) =>
+    ["org", tenantId, "report-templates", templateId] as const,
+  savedReportData: (tenantId: string, reportId: string, filter: ReportFilters) =>
+    ["org", tenantId, "saved-report-data", reportId, filter] as const,
+  themes: (tenantId: string) => ["org", tenantId, "themes"] as const,
+  emailTemplates: (tenantId: string) => ["org", tenantId, "email-templates"] as const,
+  emailTemplate: (tenantId: string, templateId: string) =>
+    ["org", tenantId, "email-templates", templateId] as const,
   openPunch: (userId: string) => ["user", userId, "open-punch"] as const,
   me: () => ["user", "me"] as const,
   user: (userId: string) => ["user", userId, "detail"] as const,
   feedback: (active?: boolean) => (active === undefined ? (["feedback"] as const) : (["feedback", active] as const)),
   feedbackItem: (id: string) => ["feedback", "item", id] as const,
-  needs: (organizationId: string) => ["org", organizationId, "needs"] as const,
+  needs: (tenantId: string) => ["org", tenantId, "needs"] as const,
   need: (needId: string) => ["need", needId] as const,
   signups: (needId: string) => ["need", needId, "signups"] as const,
 };
@@ -92,168 +92,168 @@ export const keys = {
 export const lookupStaleTime = 5 * 60 * 1000;
 export const lookupGcTime = 24 * 60 * 60 * 1000;
 
-export function lookupsQuery(organizationId: string, userId: string) {
+export function lookupsQuery(tenantId: string, userId: string) {
   return queryOptions({
-    queryKey: [...keys.lookups(organizationId), userId] as const,
+    queryKey: [...keys.lookups(tenantId), userId] as const,
     staleTime: lookupStaleTime,
     gcTime: lookupGcTime,
-    queryFn: ({ signal }) => fetchJson<Lookups>(`/organizations/${organizationId}/lookups`, signal),
+    queryFn: ({ signal }) => fetchJson<Lookups>(`/tenants/${tenantId}/lookups`, signal),
   });
 }
 
-export function membersQuery(organizationId: string) {
+export function membersQuery(tenantId: string) {
   return queryOptions({
-    queryKey: keys.members(organizationId),
+    queryKey: keys.members(tenantId),
     queryFn: async ({ signal }) =>
-      (await fetchJson<Paged<Membership>>(`/organizations/${organizationId}/memberships?limit=100`, signal)).items,
+      (await fetchJson<Paged<Membership>>(`/tenants/${tenantId}/memberships?limit=100`, signal)).items,
   });
 }
 
-export function connectionsQuery(organizationId: string) {
+export function connectionsQuery(tenantId: string) {
   return queryOptions({
-    queryKey: keys.connections(organizationId),
+    queryKey: keys.connections(tenantId),
     queryFn: async ({ signal }) =>
-      (await fetchJson<Paged<MemberConnectionRecord>>(`/organizations/${organizationId}/connections?limit=100`, signal))
+      (await fetchJson<Paged<MemberConnectionRecord>>(`/tenants/${tenantId}/connections?limit=100`, signal))
         .items,
   });
 }
 
-export function apiKeysQuery(organizationId: string) {
+export function apiKeysQuery(tenantId: string) {
   return queryOptions({
-    queryKey: keys.apiKeys(organizationId),
+    queryKey: keys.apiKeys(tenantId),
     queryFn: async ({ signal }) =>
-      (await fetchJson<Paged<OrganizationApiKey>>(`/organizations/${organizationId}/api-keys?limit=100`, signal)).items,
+      (await fetchJson<Paged<TenantApiKey>>(`/tenants/${tenantId}/api-keys?limit=100`, signal)).items,
   });
 }
 
-export function invitationsQuery(organizationId: string) {
+export function invitationsQuery(tenantId: string) {
   return queryOptions({
-    queryKey: keys.invitations(organizationId),
+    queryKey: keys.invitations(tenantId),
     queryFn: async ({ signal }) =>
-      (await fetchJson<Paged<Invitation>>(`/organizations/${organizationId}/invitations?limit=100`, signal)).items,
+      (await fetchJson<Paged<Invitation>>(`/tenants/${tenantId}/invitations?limit=100`, signal)).items,
   });
 }
 
-export function departmentInvitationsQuery(departmentId: string) {
+export function organizationInvitationsQuery(organizationId: string) {
   return queryOptions({
-    queryKey: keys.departmentInvitations(departmentId),
+    queryKey: keys.organizationInvitations(organizationId),
     queryFn: async ({ signal }) =>
-      (await fetchJson<Paged<Invitation>>(`/departments/${departmentId}/invitations?limit=100`, signal)).items,
+      (await fetchJson<Paged<Invitation>>(`/tenants/${organizationId}/invitations?limit=100`, signal)).items,
   });
 }
 
-export function organizationEntriesQuery(organizationId: string) {
+export function tenantEntriesQuery(tenantId: string) {
   return queryOptions({
-    queryKey: keys.organizationEntries(organizationId),
+    queryKey: keys.tenantEntries(tenantId),
     queryFn: ({ signal }) =>
-      fetchJson<Paged<TimeEntry>>(`/organizations/${organizationId}/time-entries${query({ limit: 20 })}`, signal),
+      fetchJson<Paged<TimeEntry>>(`/tenants/${tenantId}/time-entries${query({ limit: 20 })}`, signal),
   });
 }
 
-export function entriesQuery(organizationId: string, userId: string, filter: EntriesListFilter = {}) {
+export function entriesQuery(tenantId: string, userId: string, filter: EntriesListFilter = {}) {
   const placement = {
     from: filter.from,
     to: filter.to,
     projectId: filter.projectId,
     taskCategoryId: filter.taskCategoryId,
-    departmentId: filter.departmentId,
+    organizationId: filter.organizationId,
     unclassified: filter.unclassified ? "1" : undefined,
   };
   return infiniteQueryOptions({
-    queryKey: keys.entries(organizationId, userId, filter),
+    queryKey: keys.entries(tenantId, userId, filter),
     initialPageParam: 0,
     queryFn: ({ pageParam, signal }) =>
       fetchJson<Paged<TimeEntry>>(
         filter.everyone
-          ? `/organizations/${organizationId}/time-entries${query({ ...placement, userId: userId || undefined, offset: pageParam, limit: entriesPageSize })}`
-          : `/users/${userId}/time-entries${query({ organizationId, ...placement, offset: pageParam, limit: entriesPageSize })}`,
+          ? `/tenants/${tenantId}/time-entries${query({ ...placement, userId: userId || undefined, offset: pageParam, limit: entriesPageSize })}`
+          : `/users/${userId}/time-entries${query({ tenantId, ...placement, offset: pageParam, limit: entriesPageSize })}`,
         signal,
       ),
     getNextPageParam: (last) => (last.items.length < last.limit ? undefined : last.offset + last.limit),
   });
 }
 
-export function groupSessionsQuery(organizationId: string) {
+export function groupSessionsQuery(tenantId: string) {
   return infiniteQueryOptions({
-    queryKey: keys.groupSessions(organizationId),
+    queryKey: keys.groupSessions(tenantId),
     initialPageParam: 0,
     queryFn: ({ pageParam, signal }) =>
       fetchJson<Paged<GroupSession>>(
-        `/collective-time-entries${query({ organizationId, offset: pageParam, limit: entriesPageSize })}`,
+        `/collective-time-entries${query({ tenantId, offset: pageParam, limit: entriesPageSize })}`,
         signal,
       ),
     getNextPageParam: (last) => (last.items.length < last.limit ? undefined : last.offset + last.limit),
   });
 }
 
-export function themesQuery(organizationId: string) {
+export function themesQuery(tenantId: string) {
   return queryOptions({
-    queryKey: keys.themes(organizationId),
+    queryKey: keys.themes(tenantId),
     queryFn: ({ signal }) =>
-      fetchJson<Paged<Theme>>(`/organizations/${organizationId}/themes`, signal).then((page) => page.items),
+      fetchJson<Paged<Theme>>(`/tenants/${tenantId}/themes`, signal).then((page) => page.items),
   });
 }
 
-export function reportQuery(organizationId: string, filter: ReportFilters) {
+export function reportQuery(tenantId: string, filter: ReportFilters) {
   return queryOptions({
-    queryKey: keys.report(organizationId, filter),
-    queryFn: ({ signal }) => fetchJson<Report>(`/organizations/${organizationId}/report${query({ ...filter })}`, signal),
+    queryKey: keys.report(tenantId, filter),
+    queryFn: ({ signal }) => fetchJson<Report>(`/tenants/${tenantId}/report${query({ ...filter })}`, signal),
   });
 }
 
-export function savedReportsQuery(organizationId: string) {
+export function savedReportsQuery(tenantId: string) {
   return queryOptions({
-    queryKey: keys.savedReports(organizationId),
+    queryKey: keys.savedReports(tenantId),
     queryFn: async ({ signal }) =>
-      (await fetchJson<Paged<SavedReport>>(`/organizations/${organizationId}/reports?limit=100`, signal)).items,
+      (await fetchJson<Paged<SavedReport>>(`/tenants/${tenantId}/reports?limit=100`, signal)).items,
   });
 }
 
-export function reportTemplatesQuery(organizationId: string) {
+export function reportTemplatesQuery(tenantId: string) {
   return queryOptions({
-    queryKey: keys.reportTemplates(organizationId),
+    queryKey: keys.reportTemplates(tenantId),
     queryFn: async ({ signal }) =>
-      (await fetchJson<Paged<ReportTemplate>>(`/organizations/${organizationId}/report-templates?limit=100`, signal)).items,
+      (await fetchJson<Paged<ReportTemplate>>(`/tenants/${tenantId}/report-templates?limit=100`, signal)).items,
   });
 }
 
-export function emailTemplatesQuery(organizationId: string) {
+export function emailTemplatesQuery(tenantId: string) {
   return queryOptions({
-    queryKey: keys.emailTemplates(organizationId),
+    queryKey: keys.emailTemplates(tenantId),
     queryFn: async ({ signal }) =>
-      (await fetchJson<Paged<EmailTemplateJson>>(`/organizations/${organizationId}/email-templates`, signal)).items,
+      (await fetchJson<Paged<EmailTemplateJson>>(`/tenants/${tenantId}/email-templates`, signal)).items,
   });
 }
 
-export function emailTemplateQuery(organizationId: string, templateId: string) {
+export function emailTemplateQuery(tenantId: string, templateId: string) {
   return queryOptions({
-    queryKey: keys.emailTemplate(organizationId, templateId),
+    queryKey: keys.emailTemplate(tenantId, templateId),
     queryFn: ({ signal }) =>
-      fetchJson<EmailTemplateJson>(`/organizations/${organizationId}/email-templates/${templateId}`, signal),
+      fetchJson<EmailTemplateJson>(`/tenants/${tenantId}/email-templates/${templateId}`, signal),
   });
 }
 
-export function reportTemplateQuery(organizationId: string, templateId: string) {
+export function reportTemplateQuery(tenantId: string, templateId: string) {
   return queryOptions({
-    queryKey: keys.reportTemplate(organizationId, templateId),
+    queryKey: keys.reportTemplate(tenantId, templateId),
     queryFn: ({ signal }) =>
-      fetchJson<ReportTemplate>(`/organizations/${organizationId}/report-templates/${templateId}`, signal),
+      fetchJson<ReportTemplate>(`/tenants/${tenantId}/report-templates/${templateId}`, signal),
   });
 }
 
-export function savedReportQuery(organizationId: string, reportId: string) {
+export function savedReportQuery(tenantId: string, reportId: string) {
   return queryOptions({
-    queryKey: keys.savedReport(organizationId, reportId),
-    queryFn: ({ signal }) => fetchJson<SavedReport>(`/organizations/${organizationId}/reports/${reportId}`, signal),
+    queryKey: keys.savedReport(tenantId, reportId),
+    queryFn: ({ signal }) => fetchJson<SavedReport>(`/tenants/${tenantId}/reports/${reportId}`, signal),
   });
 }
 
-export function savedReportDataQuery(organizationId: string, reportId: string, filter: Pick<ReportFilters, "from" | "to">) {
+export function savedReportDataQuery(tenantId: string, reportId: string, filter: Pick<ReportFilters, "from" | "to">) {
   return queryOptions({
-    queryKey: keys.savedReportData(organizationId, reportId, filter),
+    queryKey: keys.savedReportData(tenantId, reportId, filter),
     queryFn: ({ signal }) =>
       fetchJson<Report>(
-        `/organizations/${organizationId}/reports/${reportId}/data${query({ ...filter, clearDates: "true" })}`,
+        `/tenants/${tenantId}/reports/${reportId}/data${query({ ...filter, clearDates: "true" })}`,
         signal,
       ),
   });
@@ -350,10 +350,10 @@ export function syncFeedbackInCache(queryClient: QueryClient, item: Feedback) {
   }
 }
 
-export function needsQuery(organizationId: string) {
+export function needsQuery(tenantId: string) {
   return queryOptions({
-    queryKey: keys.needs(organizationId),
-    queryFn: ({ signal }) => fetchJson<Paged<VolunteerNeed>>(`/organizations/${organizationId}/volunteer-needs?limit=100`, signal),
+    queryKey: keys.needs(tenantId),
+    queryFn: ({ signal }) => fetchJson<Paged<VolunteerNeed>>(`/tenants/${tenantId}/volunteer-needs?limit=100`, signal),
   });
 }
 
@@ -371,21 +371,21 @@ export function signupsQuery(needId: string) {
   });
 }
 
-export function csvUrl(organizationId: string, filter: ReportFilters) {
-  return `/organizations/${organizationId}/time-entries.csv${query({ ...filter })}`;
+export function csvUrl(tenantId: string, filter: ReportFilters) {
+  return `/tenants/${tenantId}/time-entries.csv${query({ ...filter })}`;
 }
 
-export function summaryCsvUrl(organizationId: string, filter: ReportFilters) {
-  return `/organizations/${organizationId}/summary.csv${query({ ...filter })}`;
+export function summaryCsvUrl(tenantId: string, filter: ReportFilters) {
+  return `/tenants/${tenantId}/summary.csv${query({ ...filter })}`;
 }
 
-export function payrollCsvUrl(organizationId: string, filter: ReportFilters) {
-  return `/organizations/${organizationId}/payroll.csv${query({ ...filter })}`;
+export function payrollCsvUrl(tenantId: string, filter: ReportFilters) {
+  return `/tenants/${tenantId}/payroll.csv${query({ ...filter })}`;
 }
 
-export function payrollQuery(organizationId: string, filter: ReportFilters) {
+export function payrollQuery(tenantId: string, filter: ReportFilters) {
   return queryOptions({
-    queryKey: ["org", organizationId, "payroll", filter] as const,
+    queryKey: ["org", tenantId, "payroll", filter] as const,
     queryFn: ({ signal }) =>
       fetchJson<{
         hours: number;
@@ -402,10 +402,10 @@ export function payrollQuery(organizationId: string, filter: ReportFilters) {
           grossPay: number;
           entries: number;
         }[];
-      }>(`/organizations/${organizationId}/payroll${query({ ...filter })}`, signal),
+      }>(`/tenants/${tenantId}/payroll${query({ ...filter })}`, signal),
   });
 }
 
-export function viewCsvUrl(organizationId: string, filter: ReportFilters) {
-  return `/organizations/${organizationId}/view.csv${query({ ...filter })}`;
+export function viewCsvUrl(tenantId: string, filter: ReportFilters) {
+  return `/tenants/${tenantId}/view.csv${query({ ...filter })}`;
 }

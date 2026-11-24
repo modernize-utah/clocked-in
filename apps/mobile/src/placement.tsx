@@ -8,14 +8,14 @@ import { useColors } from "@/theme";
 import { Button, ErrorText, FormField, Input, Muted, Select, Sheet, styles } from "@/ui";
 import { useLookups, useWorkspace } from "@/workspace";
 
-export const organizationWide = "organization";
+export const tenantWide = "tenant";
 const none = "none";
 
-export type PlacementValue = { departmentId: string; projectId: string; taskCategoryId: string; tagIds: string[] };
+export type PlacementValue = { organizationId: string; projectId: string; taskCategoryId: string; tagIds: string[] };
 
 export function usePlacement(initial?: Partial<PlacementValue>) {
   const [value, setValue] = useState<PlacementValue>({
-    departmentId: initial?.departmentId || organizationWide,
+    organizationId: initial?.organizationId || tenantWide,
     projectId: initial?.projectId ?? "",
     taskCategoryId: initial?.taskCategoryId ?? "",
     tagIds: initial?.tagIds ?? [],
@@ -23,10 +23,10 @@ export function usePlacement(initial?: Partial<PlacementValue>) {
   return {
     value,
     set: (patch: Partial<PlacementValue>) => setValue((current) => ({ ...current, ...patch })),
-    reset: () => setValue({ departmentId: organizationWide, projectId: "", taskCategoryId: "", tagIds: [] }),
+    reset: () => setValue({ organizationId: tenantWide, projectId: "", taskCategoryId: "", tagIds: [] }),
     ready: Boolean(value.projectId && value.taskCategoryId),
     body: (description: string) => ({
-      departmentId: value.departmentId === organizationWide ? null : value.departmentId,
+      organizationId: value.organizationId === tenantWide ? null : value.organizationId,
       projectId: value.projectId || null,
       taskCategoryId: value.taskCategoryId || null,
       tagIds: value.tagIds,
@@ -53,20 +53,20 @@ function projectOptions(projects: Project[]) {
 export function PlacementFields({
   state,
   optional = false,
-  departmentIds,
+  organizationIds,
 }: {
   state: PlacementState;
   optional?: boolean;
-  departmentIds?: string[];
+  organizationIds?: string[];
 }) {
   const { lookups } = useLookups();
   const { labels, isAdmin, permissions } = useWorkspace();
   const { value, set } = state;
   const canCreate = isAdmin || permissions.includes("create_projects");
-  const [creating, setCreating] = useState<"project" | "category" | "department" | null>(null);
+  const [creating, setCreating] = useState<"project" | "category" | "organization" | null>(null);
   const projects = useMemo(() => projectOptions(lookups.projects.filter((project) => project.isActive !== false)), [lookups.projects]);
   const categories = lookups.categories.map((item) => ({ value: item.id, label: item.name }));
-  const departments = (departmentIds ? lookups.departments.filter((item) => departmentIds.includes(item.id)) : lookups.departments).map(
+  const organizations = (organizationIds ? lookups.organizations.filter((item) => organizationIds.includes(item.id)) : lookups.organizations).map(
     (item) => ({ value: item.id, label: item.name }),
   );
 
@@ -95,15 +95,15 @@ export function PlacementFields({
           : {})}
       />
       <Select
-        label={labels.department}
-        onChange={(departmentId) => set({ departmentId })}
+        label={labels.organization}
+        onChange={(organizationId) => set({ organizationId })}
         options={
-          departmentIds ? departments : [{ value: organizationWide, label: `Whole ${labels.organization.toLowerCase()}` }, ...departments]
+          organizationIds ? organizations : [{ value: tenantWide, label: `Whole ${labels.tenant.toLowerCase()}` }, ...organizations]
         }
         searchable
-        value={value.departmentId}
-        {...(canCreate && !departmentIds
-          ? { createLabel: `Add a ${labels.department.toLowerCase()}`, onCreate: () => setCreating("department") }
+        value={value.organizationId}
+        {...(canCreate && !organizationIds
+          ? { createLabel: `Add a ${labels.organization.toLowerCase()}`, onCreate: () => setCreating("organization") }
           : {})}
       />
       {lookups.tags.length || isAdmin ? (
@@ -115,7 +115,7 @@ export function PlacementFields({
         onCreated={(id) => {
           if (creating === "project") set({ projectId: id });
           if (creating === "category") set({ taskCategoryId: id });
-          if (creating === "department") set({ departmentId: id });
+          if (creating === "organization") set({ organizationId: id });
         }}
         open={creating !== null}
         title={
@@ -123,7 +123,7 @@ export function PlacementFields({
             ? `Add a ${labels.project.toLowerCase()}`
             : creating === "category"
               ? `Add a ${labels.taskCategory.toLowerCase()}`
-              : `Add a ${labels.department.toLowerCase()}`
+              : `Add a ${labels.organization.toLowerCase()}`
         }
         kind={creating ?? "project"}
       />
@@ -142,23 +142,23 @@ function CreateNamed({
   open: boolean;
   title: string;
   label: string;
-  kind: "project" | "category" | "department" | "tag";
+  kind: "project" | "category" | "organization" | "tag";
   onClose: () => void;
   onCreated: (id: string) => void;
 }) {
-  const { organization } = useWorkspace();
+  const { tenant } = useWorkspace();
   const client = useQueryClient();
   const [name, setName] = useState("");
   const create = useMutation({
     mutationFn: async () => {
       const trimmed = name.trim();
-      if (kind === "project") return api.createProject(organization.id, { title: trimmed, accessType: "Private" });
-      if (kind === "category") return api.createCategory(organization.id, trimmed);
-      if (kind === "department") return api.createDepartment(organization.id, trimmed);
-      return api.createTag(organization.id, trimmed);
+      if (kind === "project") return api.createProject(tenant.id, { title: trimmed, accessType: "Private" });
+      if (kind === "category") return api.createCategory(tenant.id, trimmed);
+      if (kind === "organization") return api.createOrganization(tenant.id, trimmed);
+      return api.createTag(tenant.id, trimmed);
     },
     onSuccess: async (created) => {
-      await client.invalidateQueries({ queryKey: ["lookups", organization.id] });
+      await client.invalidateQueries({ queryKey: ["lookups", tenant.id] });
       onCreated(created.id);
       setName("");
       onClose();
@@ -195,14 +195,14 @@ function TagPicker({
 }) {
   const colors = useColors();
   const { lookups } = useLookups();
-  const { organization } = useWorkspace();
+  const { tenant } = useWorkspace();
   const client = useQueryClient();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const create = useMutation({
-    mutationFn: () => api.createTag(organization.id, name.trim()),
+    mutationFn: () => api.createTag(tenant.id, name.trim()),
     onSuccess: async (created) => {
-      await client.invalidateQueries({ queryKey: ["lookups", organization.id] });
+      await client.invalidateQueries({ queryKey: ["lookups", tenant.id] });
       onChange([...selected, created.id]);
       setName("");
     },

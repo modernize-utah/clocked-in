@@ -16,7 +16,7 @@ test("entriesHref keeps single-id report filters and drops multi-id ones", () =>
   assert.equal(entriesHref({ projectId: [a], userId: [a, b] }), `/entries?projectId=${a}`);
 });
 
-test("value cards open organization entries", () => {
+test("value cards open tenant entries", () => {
   assert.equal(entriesHrefFromAccessor("user.hours"), "/entries?everyone=1");
   assert.equal(entriesHrefFromAccessor("user.inKind"), "/entries?everyone=1");
 });

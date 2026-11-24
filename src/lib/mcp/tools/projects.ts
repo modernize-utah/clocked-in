@@ -19,9 +19,9 @@ export function registerProjectTools(server: McpServer) {
   tool(
     server,
     "list_projects",
-    "List projects in an organization that the caller can see.",
-    { organizationId: guid, ...page },
-    ({ organizationId, limit, offset }) => listProjects(mcpAccess(), organizationId, query({ limit, offset })),
+    "List projects in an tenant that the caller can see.",
+    { tenantId: guid, ...page },
+    ({ tenantId, limit, offset }) => listProjects(mcpAccess(), tenantId, query({ limit, offset })),
   );
 
   tool(server, "get_project", "Get a project by id.", { projectId: guid }, ({ projectId }) => getProject(mcpAccess(), projectId));
@@ -29,9 +29,9 @@ export function registerProjectTools(server: McpServer) {
   tool(
     server,
     "create_project",
-    "Create a project. Pass JSON with title, accessType, and optional projectType, departmentId, description, startDate, endDate, isActive, editorIds.",
-    { organizationId: guid, body: z.string() },
-    ({ organizationId, body }) => createProject(mcpAccess(), organizationId, parseCreateProject(jsonBody(body))),
+    "Create a project. Pass JSON with title, accessType, and optional projectType, organizationId, description, startDate, endDate, isActive, editorIds.",
+    { tenantId: guid, body: z.string() },
+    ({ tenantId, body }) => createProject(mcpAccess(), tenantId, parseCreateProject(jsonBody(body))),
   );
 
   tool(

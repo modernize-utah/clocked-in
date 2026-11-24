@@ -11,7 +11,7 @@ export type ReportPdfColors = {
 
 type ReportPdfDocumentProps = {
   title: string;
-  organizationName: string;
+  tenantName: string;
   logoSrc: string | null;
   filterSummary: string;
   blocks: PdfBlock[];
@@ -165,19 +165,19 @@ const styles = StyleSheet.create({
   },
 });
 
-function Header({ organizationName, logoSrc }: { organizationName: string; logoSrc: string | null }) {
+function Header({ tenantName, logoSrc }: { tenantName: string; logoSrc: string | null }) {
   return (
     <View style={styles.header} fixed>
-      <Text style={styles.headerName}>{organizationName}</Text>
+      <Text style={styles.headerName}>{tenantName}</Text>
       {logoSrc ? <Image src={logoSrc} style={styles.logo} /> : null}
     </View>
   );
 }
 
-function Footer({ organizationName }: { organizationName: string }) {
+function Footer({ tenantName }: { tenantName: string }) {
   return (
     <View style={styles.footer} fixed>
-      <Text style={styles.footerText}>{organizationName}</Text>
+      <Text style={styles.footerText}>{tenantName}</Text>
       <Text
         style={styles.footerText}
         render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
@@ -256,16 +256,16 @@ function ChartBlock({ block }: { block: Extract<PdfBlock, { kind: "chart" }> }) 
 
 export function ReportPdfDocument({
   title,
-  organizationName,
+  tenantName,
   logoSrc,
   filterSummary,
   blocks,
   colors,
 }: ReportPdfDocumentProps) {
   return (
-    <Document title={title} author={organizationName} creator="VolunTime">
+    <Document title={title} author={tenantName} creator="VolunTime">
       <Page size="LETTER" style={{ ...styles.page, color: colors.foreground }}>
-        <Header organizationName={organizationName} logoSrc={logoSrc} />
+        <Header tenantName={tenantName} logoSrc={logoSrc} />
         <View>
           <Text style={{ ...styles.title, color: colors.primary }}>{title}</Text>
           <Text style={styles.filters}>{filterSummary}</Text>
@@ -275,7 +275,7 @@ export function ReportPdfDocument({
           if (block.kind === "table") return <TableBlock key={`table-${block.title}-${index}`} block={block} />;
           return <ChartBlock key={block.id} block={block} />;
         })}
-        <Footer organizationName={organizationName} />
+        <Footer tenantName={tenantName} />
       </Page>
     </Document>
   );

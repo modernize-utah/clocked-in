@@ -2,11 +2,11 @@ import { Access } from "@/lib/api/access";
 import { guard } from "@/lib/api/db";
 import { notFound } from "@/lib/api/errors";
 import { list, page } from "@/lib/api/json";
-import { NameRequest } from "@/lib/api/features/organizations";
+import { NameRequest } from "@/lib/api/features/tenants";
 import { prisma } from "@/lib/prisma";
 
-function tagJson(tag: { id: string; organizationId: string; name: string; isArchived?: boolean }) {
-  return { id: tag.id, organizationId: tag.organizationId, name: tag.name, isArchived: tag.isArchived ?? false };
+function tagJson(tag: { id: string; tenantId: string; name: string; isArchived?: boolean }) {
+  return { id: tag.id, tenantId: tag.tenantId, name: tag.name, isArchived: tag.isArchived ?? false };
 }
 
 async function managed(access: Access, tagId: string) {
@@ -15,15 +15,15 @@ async function managed(access: Access, tagId: string) {
     notFound();
   }
 
-  await access.requireOrganization(tag.organizationId, true);
+  await access.requireTenant(tag.tenantId, true);
   return tag;
 }
 
-export async function listTags(access: Access, organizationId: string, params: URLSearchParams) {
+export async function listTags(access: Access, tenantId: string, params: URLSearchParams) {
   const paging = page(params);
-  await access.requireOrganization(organizationId, false);
+  await access.requireTenant(tenantId, false);
   const tags = await prisma.tag.findMany({
-    where: { organizationId, ...(params.get("includeArchived") === "true" ? {} : { isArchived: false }) },
+    where: { tenantId, ...(params.get("includeArchived") === "true" ? {} : { isArchived: false }) },
     orderBy: { name: "asc" },
     skip: paging.offset,
     take: paging.limit,
@@ -31,9 +31,9 @@ export async function listTags(access: Access, organizationId: string, params: U
   return list(tags.map(tagJson), paging);
 }
 
-export async function createTag(access: Access, organizationId: string, request: NameRequest) {
-  await access.requireOrganization(organizationId, true);
-  return tagJson(await guard(prisma.tag.create({ data: { organizationId, name: request.name } })));
+export async function createTag(access: Access, tenantId: string, request: NameRequest) {
+  await access.requireTenant(tenantId, true);
+  return tagJson(await guard(prisma.tag.create({ data: { tenantId, name: request.name } })));
 }
 
 export async function updateTag(access: Access, tagId: string, request: NameRequest & { isArchived?: boolean }) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { pullPortalDirectoryAction } from "@/app/actions/external-sync";
 import { createRoleAction, deleteRoleAction, updateRoleAction } from "@/app/actions/roles";
 import { Field } from "@/components/field";
 import { SelectField } from "@/components/select-field";
@@ -11,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { useActionMutation } from "@/hooks/use-action-mutation";
-import { useOrganization, useWorkspace } from "@/hooks/use-workspace";
+import { useTenant, useWorkspace } from "@/hooks/use-workspace";
 import { permissionGroups } from "@/lib/permissions";
 import { keys } from "@/lib/queries";
 import { useQuery } from "@tanstack/react-query";
@@ -22,19 +23,23 @@ type OrgRole = {
   id: string;
   code: string;
   name: string;
-  organizationId: string | null;
+  tenantId: string | null;
   isSystem: boolean;
   scope: string;
   permissions: string[];
 };
 
 export function RolesView() {
-  const organization = useOrganization();
+  const tenant = useTenant();
   const { permissions, viewer } = useWorkspace();
-  const canManage = permissions.includes("manage_roles");
+  const externalPeople = Boolean(tenant.preferences.portalDirectorySync);
+  const canManage = permissions.includes("manage_roles") && !externalPeople;
+  const pull = useActionMutation(() => pullPortalDirectoryAction(tenant.id), {
+    invalidate: [["org", tenant.id, "roles"], keys.members(tenant.id)],
+  });
   const { data, isPending } = useQuery({
-    queryKey: ["org", organization.id, "roles"],
-    queryFn: ({ signal }) => fetchJson<Paged<OrgRole>>(`/organizations/${organization.id}/roles?limit=100`, signal),
+    queryKey: ["org", tenant.id, "roles"],
+    queryFn: ({ signal }) => fetchJson<Paged<OrgRole>>(`/tenants/${tenant.id}/roles?limit=100`, signal),
   });
   const roles = data?.items ?? [];
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -47,7 +52,16 @@ export function RolesView() {
       <Card>
         <CardHeader>
           <CardTitle>Roles</CardTitle>
-          <CardDescription>System roles stay, and you can add ones this organization needs.</CardDescription>
+          <CardDescription>
+            {externalPeople
+              ? "Roles are managed by an external system of record."
+              : "System roles stay, and you can add ones this tenant needs."}
+          </CardDescription>
+          {externalPeople ? (
+            <Button type="button" size="sm" className="mt-2 h-8 w-fit" disabled={pull.isPending} onClick={() => pull.mutate()}>
+              Pull from source
+            </Button>
+          ) : null}
         </CardHeader>
         <CardContent className="flex flex-col gap-2">
           {roles.map((role) => (
@@ -77,11 +91,11 @@ export function RolesView() {
 }
 
 function CreateRoleForm() {
-  const organization = useOrganization();
+  const tenant = useTenant();
   const [name, setName] = useState("");
   const create = useActionMutation(
-    () => createRoleAction(organization.id, { name, permissions: ["log_own_time"], scope: "assigned_groups" }),
-    { invalidate: [["org", organization.id, "roles"]], onSuccess: () => setName("") },
+    () => createRoleAction(tenant.id, { name, permissions: ["log_own_time"], scope: "assigned_groups" }),
+    { invalidate: [["org", tenant.id, "roles"]], onSuccess: () => setName("") },
   );
   return (
     <form
@@ -108,7 +122,7 @@ function RoleEditor({
   canManage: boolean;
   isSuperAdmin: boolean;
 }) {
-  const organization = useOrganization();
+  const tenant = useTenant();
   const canEditSystemRole = isSuperAdmin;
   const canEditName = canManage && (!role.isSystem || canEditSystemRole);
   const canEditScope = canManage && (!role.isSystem || canEditSystemRole);
@@ -117,11 +131,11 @@ function RoleEditor({
   const [scope, setScope] = useState(role.scope);
   const [granted, setGranted] = useState<string[]>(role.permissions);
   const save = useActionMutation(
-    () => updateRoleAction(organization.id, role.id, { name, scope, permissions: granted }),
-    { invalidate: [["org", organization.id, "roles"], keys.members(organization.id)] },
+    () => updateRoleAction(tenant.id, role.id, { name, scope, permissions: granted }),
+    { invalidate: [["org", tenant.id, "roles"], keys.members(tenant.id)] },
   );
-  const remove = useActionMutation(() => deleteRoleAction(organization.id, role.id), {
-    invalidate: [["org", organization.id, "roles"]],
+  const remove = useActionMutation(() => deleteRoleAction(tenant.id, role.id), {
+    invalidate: [["org", tenant.id, "roles"]],
   });
   const selected = useMemo(() => new Set(granted), [granted]);
 
@@ -134,7 +148,7 @@ function RoleEditor({
             ? canEditSystemRole
               ? "System role. You can change its name, scope, and permissions. You cannot delete it."
               : "System role. A SuperAdmin can change it. You cannot delete it."
-            : "Custom role for this organization."}
+            : "Custom role for this tenant."}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
@@ -147,7 +161,7 @@ function RoleEditor({
             onValueChange={setScope}
             disabled={!canEditScope}
             options={[
-              { value: "organization", label: "Whole organization" },
+              { value: "tenant", label: "Whole tenant" },
               { value: "assigned_groups", label: "Assigned groups" },
               { value: "self", label: "Own records" },
             ]}

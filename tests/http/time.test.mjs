@@ -25,39 +25,39 @@ describe("time entries", suite, () => {
     ctx.admin = await signUp("timeadmin");
     ctx.member = await signUp("timemember");
     ctx.outsider = await signUp("timeout");
-    ctx.departmentAdmin = await signUp("timedept");
-    ctx.org = await createJson(ctx.admin.accessToken, "/organizations", { name: label("Time org") });
-    ctx.department = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/departments`, {
-      name: label("Time department"),
+    ctx.tenantAdmin = await signUp("timedept");
+    ctx.org = await createJson(ctx.admin.accessToken, "/tenants", { name: label("Time org") });
+    ctx.tenant = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/tenants`, {
+      name: label("Time organization"),
     });
-    ctx.tag = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/tags`, { name: label("Time tag") });
-    ctx.category = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/task-categories`, {
+    ctx.tag = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/tags`, { name: label("Time tag") });
+    ctx.category = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/task-categories`, {
       name: label("Time category"),
     });
-    ctx.project = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/projects`, {
+    ctx.project = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/projects`, {
       title: label("Time project"),
       accessType: "Public",
     });
-    ctx.departmentProject = await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/projects`, {
-      title: label("Department time project"),
-      accessType: "Department",
-      departmentId: ctx.department.id,
+    ctx.tenantProject = await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/projects`, {
+      title: label("Organization time project"),
+      accessType: "Organization",
+      organizationId: ctx.tenant.id,
     });
-    await createJson(ctx.admin.accessToken, `/organizations/${ctx.org.id}/invitations`, {
+    await createJson(ctx.admin.accessToken, `/tenants/${ctx.org.id}/invitations`, {
       email: ctx.member.email,
       role: "MEMBER",
     });
     await acceptInvite(ctx.member.accessToken, ctx.member.email);
-    await createJson(ctx.admin.accessToken, `/departments/${ctx.department.id}/invitations`, {
-      email: ctx.departmentAdmin.email,
+    await createJson(ctx.admin.accessToken, `/tenants/${ctx.tenant.id}/invitations`, {
+      email: ctx.tenantAdmin.email,
       role: "ADMIN",
     });
-    await acceptInvite(ctx.departmentAdmin.accessToken, ctx.departmentAdmin.email);
+    await acceptInvite(ctx.tenantAdmin.accessToken, ctx.tenantAdmin.email);
   });
 
   test("duration and total record a snapshot of the membership rate", async () => {
     const duration = await createJson(ctx.member.accessToken, "/time/duration", {
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       durationMinutes: 90,
@@ -69,7 +69,7 @@ describe("time entries", suite, () => {
     assertTimeEntry(duration, {
       userId: ctx.member.user.id,
       enteredByUserId: ctx.member.user.id,
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       mode: "Duration",
@@ -82,7 +82,7 @@ describe("time entries", suite, () => {
     assert.equal(duration.description, "Committee");
     assert.deepEqual(duration.tagIds, [ctx.tag.id]);
     const total = await createJson(ctx.member.accessToken, "/time/total", {
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       durationMinutes: 59940,
@@ -95,7 +95,7 @@ describe("time entries", suite, () => {
       method: "POST",
       token: ctx.member.accessToken,
       body: {
-        organizationId: ctx.org.id,
+        tenantId: ctx.org.id,
         projectId: ctx.project.id,
         taskCategoryId: ctx.category.id,
         durationMinutes: 1441,
@@ -106,7 +106,7 @@ describe("time entries", suite, () => {
       method: "POST",
       token: ctx.member.accessToken,
       body: {
-        organizationId: ctx.org.id,
+        tenantId: ctx.org.id,
         projectId: ctx.project.id,
         taskCategoryId: ctx.category.id,
         durationMinutes: 59941,
@@ -117,7 +117,7 @@ describe("time entries", suite, () => {
       method: "POST",
       token: ctx.member.accessToken,
       body: {
-        organizationId: ctx.org.id,
+        tenantId: ctx.org.id,
         projectId: ctx.project.id,
         taskCategoryId: ctx.category.id,
         durationMinutes: 60,
@@ -129,7 +129,7 @@ describe("time entries", suite, () => {
       method: "POST",
       token: ctx.member.accessToken,
       body: {
-        organizationId: ctx.org.id,
+        tenantId: ctx.org.id,
         projectId: ctx.project.id,
         taskCategoryId: ctx.category.id,
         occurredOn: "2026-10-02",
@@ -141,7 +141,7 @@ describe("time entries", suite, () => {
       method: "POST",
       token: ctx.member.accessToken,
       body: {
-        organizationId: ctx.org.id,
+        tenantId: ctx.org.id,
         projectId: ctx.project.id,
         taskCategoryId: ctx.category.id,
         occurredOn: "2026-10-02",
@@ -162,7 +162,7 @@ describe("time entries", suite, () => {
       token: ctx.member.accessToken,
       body: {
         mode: "Duration",
-        organizationId: ctx.org.id,
+        tenantId: ctx.org.id,
         projectId: ctx.project.id,
         taskCategoryId: ctx.category.id,
         durationMinutes: 30,
@@ -173,10 +173,10 @@ describe("time entries", suite, () => {
     assertError(duplicate, 409, "conflict");
   });
 
-  test("list and get honor organization membership", async () => {
+  test("list and get honor tenant membership", async () => {
     const listed = await callApi(`/users/${ctx.member.user.id}/time-entries`, {
       token: ctx.admin.accessToken,
-      query: { organizationId: ctx.org.id, from: "2026-10-01", to: "2026-10-01" },
+      query: { tenantId: ctx.org.id, from: "2026-10-01", to: "2026-10-01" },
     });
     assertList(listed.json);
     assert.ok(listed.json.items.every((item) => item.occurredOn === "2026-10-01"));
@@ -201,12 +201,12 @@ describe("time entries", suite, () => {
       const refused = await callApi(path, {
         method: "POST",
         token: ctx.member.accessToken,
-        body: { organizationId: ctx.org.id, durationMinutes, occurredOn: "2026-10-20" },
+        body: { tenantId: ctx.org.id, durationMinutes, occurredOn: "2026-10-20" },
       });
       assertError(refused, 400, "validation_error", "Choose a project and a task category.");
     }
     const duration = await createJson(ctx.member.accessToken, "/time/duration", {
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       durationMinutes: 45,
@@ -229,13 +229,13 @@ describe("time entries", suite, () => {
     const leaver = await signUp("timeleaver");
     const membership = await joinOrg(ctx.admin.accessToken, ctx.org.id, leaver, { role: "VOLUNTEER" });
     const entry = await createJson(leaver.accessToken, "/time/duration", {
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       durationMinutes: 30,
       occurredOn: "2026-10-22",
     });
-    const deactivated = await callApi(`/organizations/${ctx.org.id}/memberships/${membership.id}`, {
+    const deactivated = await callApi(`/tenants/${ctx.org.id}/memberships/${membership.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
       body: { isActive: false },
@@ -259,7 +259,7 @@ describe("time entries", suite, () => {
       token: ctx.member.accessToken,
       body: {
         mode: "Total",
-        organizationId: ctx.org.id,
+        tenantId: ctx.org.id,
         projectId: ctx.project.id,
         taskCategoryId: ctx.category.id,
         durationMinutes: 60,
@@ -269,8 +269,8 @@ describe("time entries", suite, () => {
     assertError(forbidden, 403, "forbidden", "Forbidden.");
     const created = await createJson(ctx.admin.accessToken, `/users/${ctx.member.user.id}/time-entries`, {
       mode: "Duration",
-      organizationId: ctx.org.id,
-      departmentId: ctx.department.id,
+      tenantId: ctx.org.id,
+      organizationId: ctx.tenant.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       durationMinutes: 60,
@@ -281,47 +281,47 @@ describe("time entries", suite, () => {
     assertTimeEntry(created, {
       userId: ctx.member.user.id,
       enteredByUserId: ctx.admin.user.id,
-      organizationId: ctx.org.id,
-      departmentId: ctx.department.id,
+      tenantId: ctx.org.id,
+      organizationId: ctx.tenant.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       mode: "Duration",
       durationMinutes: 60,
       inKindValue: inKind(60),
     });
-    const forDepartment = await createJson(
-      ctx.departmentAdmin.accessToken,
+    const forOrganization = await createJson(
+      ctx.tenantAdmin.accessToken,
       `/users/${ctx.member.user.id}/time-entries`,
       {
         mode: "Total",
-        organizationId: ctx.org.id,
-        departmentId: ctx.department.id,
-        projectId: ctx.departmentProject.id,
+        tenantId: ctx.org.id,
+        organizationId: ctx.tenant.id,
+        projectId: ctx.tenantProject.id,
         taskCategoryId: ctx.category.id,
         durationMinutes: 30,
         occurredOn: "2026-10-11",
       },
     );
-    assert.equal(forDepartment.enteredByUserId, ctx.departmentAdmin.user.id);
-    assert.equal(forDepartment.projectId, ctx.departmentProject.id);
+    assert.equal(forOrganization.enteredByUserId, ctx.tenantAdmin.user.id);
+    assert.equal(forOrganization.projectId, ctx.tenantProject.id);
     const wrongProject = await callApi(`/users/${ctx.member.user.id}/time-entries`, {
       method: "POST",
       token: ctx.admin.accessToken,
       body: {
         mode: "Total",
-        organizationId: ctx.org.id,
-        projectId: ctx.departmentProject.id,
+        tenantId: ctx.org.id,
+        projectId: ctx.tenantProject.id,
         taskCategoryId: ctx.category.id,
         durationMinutes: 30,
         occurredOn: "2026-10-11",
       },
     });
-    assertError(wrongProject, 400, "validation_error", "departmentId must match this department project.");
+    assertError(wrongProject, 400, "validation_error", "organizationId must match this organization project.");
   });
 
   test("clock in and clock out keep a single open punch", async () => {
     const open = await createJson(ctx.admin.accessToken, "/time/clock-in", {
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       description: "Open",
@@ -338,7 +338,7 @@ describe("time entries", suite, () => {
       method: "POST",
       token: ctx.admin.accessToken,
       body: {
-        organizationId: ctx.org.id,
+        tenantId: ctx.org.id,
         projectId: ctx.project.id,
         taskCategoryId: ctx.category.id,
       },
@@ -358,7 +358,7 @@ describe("time entries", suite, () => {
     const none = await callApi("/time/clock-out", { method: "POST", token: ctx.admin.accessToken, body: {} });
     assertError(none, 409, "conflict", "No open punch.");
     const restarted = await createJson(ctx.admin.accessToken, "/time/clock-in", {
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       description: "Restart me",
@@ -385,7 +385,7 @@ describe("time entries", suite, () => {
 
   test("patch and delete a duration entry", async () => {
     const created = await createJson(ctx.member.accessToken, "/time/duration", {
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       durationMinutes: 60,
@@ -398,7 +398,7 @@ describe("time entries", suite, () => {
       body: { durationMinutes: 90 },
     });
     assertError(blocked, 400, "validation_error", "Time entries cannot be edited.");
-    const enabled = await callApi(`/organizations/${ctx.org.id}`, {
+    const enabled = await callApi(`/tenants/${ctx.org.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
       body: { preferences: { allowTimeEntryEditing: true } },
@@ -426,14 +426,14 @@ describe("time entries", suite, () => {
   });
 
   test("an allowed punch can change its start and end", async () => {
-    const enabled = await callApi(`/organizations/${ctx.org.id}`, {
+    const enabled = await callApi(`/tenants/${ctx.org.id}`, {
       method: "PATCH",
       token: ctx.admin.accessToken,
       body: { preferences: { allowTimeEntryEditing: true } },
     });
     assert.equal(enabled.status, 200);
     const open = await createJson(ctx.admin.accessToken, "/time/clock-in", {
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
     });
@@ -464,7 +464,7 @@ describe("time entries", suite, () => {
   test("a batch records the same entry on each selected day", async () => {
     const shared = {
       mode: "Duration",
-      organizationId: ctx.org.id,
+      tenantId: ctx.org.id,
       projectId: ctx.project.id,
       taskCategoryId: ctx.category.id,
       description: "Same shift",
@@ -493,7 +493,7 @@ describe("time entries", suite, () => {
       assertTimeEntry(created.items[index], {
         userId: ctx.member.user.id,
         enteredByUserId: ctx.member.user.id,
-        organizationId: ctx.org.id,
+        tenantId: ctx.org.id,
         projectId: ctx.project.id,
         taskCategoryId: ctx.category.id,
         mode: "Duration",
@@ -565,7 +565,7 @@ describe("time entries", suite, () => {
     });
     const listedBefore = await callApi(`/users/${ctx.member.user.id}/time-entries`, {
       token: ctx.member.accessToken,
-      query: { organizationId: ctx.org.id, from: "2026-10-18", to: "2026-10-21" },
+      query: { tenantId: ctx.org.id, from: "2026-10-18", to: "2026-10-21" },
     });
     const partial = await callApi("/time/batch", {
       method: "POST",
@@ -590,7 +590,7 @@ describe("time entries", suite, () => {
     });
     const listedAfter = await callApi(`/users/${ctx.member.user.id}/time-entries`, {
       token: ctx.member.accessToken,
-      query: { organizationId: ctx.org.id, from: "2026-10-18", to: "2026-10-22" },
+      query: { tenantId: ctx.org.id, from: "2026-10-18", to: "2026-10-22" },
     });
     assertError(duplicate, 400, "validation_error", "Each day can only be saved once.");
     assertError(mismatch, 400, "validation_error", "Each day must use the same duration.");

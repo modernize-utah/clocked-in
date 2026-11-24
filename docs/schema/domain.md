@@ -6,7 +6,7 @@ Next.js server actions and REST routes use the same feature services. Users and 
 
 Identifiers are UUIDs. Instants are `timestamptz`. `username` and `email` are stored lowercase and are unique. Money rates use `decimal(10,2)`. In-kind totals use `decimal(12,2)`.
 
-CASWJ workbook mapping: the umbrella org is one `Organization`; spreadsheet Groups are `Department`; free-form log Tags stay org-scoped `Tag`. Entry notes are the `description` field.
+CASWJ workbook mapping: the umbrella org is one `Tenant`; spreadsheet Groups are `Organization`; free-form log Tags stay org-scoped `Tag`. Entry notes are the `description` field.
 
 ## Model
 
@@ -40,7 +40,7 @@ classDiagram
     string code
     string name
   }
-  class Organization {
+  class Tenant {
     uuid id
     string name
     string slug
@@ -58,7 +58,7 @@ classDiagram
   class Theme {
     uuid id
     string name
-    uuid organizationId
+    uuid tenantId
     string primary
     string primaryForeground
     string highlight
@@ -83,20 +83,20 @@ classDiagram
     bool isArchived
     string source
   }
-  class OrganizationMembership {
+  class TenantMembership {
     uuid id
     string rateType
     decimal professionalBillingRate
     bool isActive
-    string orgUserTitle
-    string orgUserDescription
+    string title
+    string memberDescription
     datetime joinedAt
   }
-  class Department {
+  class Organization {
     uuid id
     string name
   }
-  class DepartmentMembership {
+  class OrganizationMembership {
     uuid id
     datetime joinedAt
   }
@@ -175,47 +175,47 @@ classDiagram
 
   User "1" --> "1" UserProfile
   User "1" --> "*" RefreshToken
-  User "1" --> "*" OrganizationMembership
-  Organization "*" --> "1" Theme : active
-  Organization "1" --> "*" Theme : saved
-  Organization "1" --> "*" HourlyRate
-  Organization "1" --> "*" OrganizationMembership
+  User "1" --> "*" TenantMembership
+  Tenant "*" --> "1" Theme : active
+  Tenant "1" --> "*" Theme : saved
+  Tenant "1" --> "*" HourlyRate
+  Tenant "1" --> "*" TenantMembership
   HourlyRate "0..1" --> "*" UserTimeEntry
   HourlyRate "0..1" --> "*" CollectiveTimeEntry
-  Department "0..1" --> "*" OrganizationMembership : primaryDepartment
+  Organization "0..1" --> "*" TenantMembership : primaryOrganization
+  Role "1" --> "*" TenantMembership
+  Tenant "1" --> "*" Organization
+  User "1" --> "*" OrganizationMembership
+  Organization "1" --> "*" OrganizationMembership
   Role "1" --> "*" OrganizationMembership
-  Organization "1" --> "*" Department
-  User "1" --> "*" DepartmentMembership
-  Department "1" --> "*" DepartmentMembership
-  Role "1" --> "*" DepartmentMembership
-  Organization "1" --> "*" Tag
-  Organization "1" --> "*" TaskCategory
-  Organization "1" --> "*" Project
-  Organization "1" --> "*" Report
-  Department "0..1" --> "*" Project
+  Tenant "1" --> "*" Tag
+  Tenant "1" --> "*" TaskCategory
+  Tenant "1" --> "*" Project
+  Tenant "1" --> "*" Report
+  Organization "0..1" --> "*" Project
   User "1" --> "*" Project : owner
   Project "*" --> "*" User : editors
   User "1" --> "*" UserTimeEntry : hoursFor
   User "1" --> "*" UserTimeEntry : enteredBy
-  Organization "1" --> "*" UserTimeEntry
-  Department "0..1" --> "*" UserTimeEntry
+  Tenant "1" --> "*" UserTimeEntry
+  Organization "0..1" --> "*" UserTimeEntry
   Project "1" --> "*" UserTimeEntry
   TaskCategory "1" --> "*" UserTimeEntry
   UserTimeEntry "*" --> "*" Tag
   User "1" --> "*" CollectiveTimeEntry : recordedBy
-  Organization "1" --> "*" CollectiveTimeEntry
-  Department "0..1" --> "*" CollectiveTimeEntry
+  Tenant "1" --> "*" CollectiveTimeEntry
+  Organization "0..1" --> "*" CollectiveTimeEntry
   Project "1" --> "*" CollectiveTimeEntry
   TaskCategory "1" --> "*" CollectiveTimeEntry
   CollectiveTimeEntry "*" --> "*" Tag
   User "1" --> "*" Invitation : invitedBy
-  Organization "1" --> "*" Invitation
-  Department "0..1" --> "*" Invitation
+  Tenant "1" --> "*" Invitation
+  Organization "0..1" --> "*" Invitation
   Role "1" --> "*" Invitation
   User "1" --> "*" PasswordResetCode
-  Organization "1" --> "*" VolunteerNeed
+  Tenant "1" --> "*" VolunteerNeed
   User "1" --> "*" VolunteerNeed : createdBy
-  Department "0..1" --> "*" VolunteerNeed
+  Organization "0..1" --> "*" VolunteerNeed
   Project "0..1" --> "*" VolunteerNeed
   TaskCategory "0..1" --> "*" VolunteerNeed
   VolunteerNeed "1" --> "*" VolunteerSignup
@@ -224,7 +224,7 @@ classDiagram
   User "0..1" --> "*" Guest
 ```
 
-`TimeEntryMode` is `Punch`, `Duration`, or `Total`. Seed `Role.code` with `MEMBER`, `VOLUNTEER`, and `ADMIN`. The same role rows are used on organization and department memberships. `HourlyRate.type`, `defaultRateType`, and membership `rateType` are `Volunteer`, `Professional`, or `Paid` (stored as text). `Paid` is compensation: the entry snapshots the pay rate and stores `inKindValue` as zero. Gross pay is hours times that snapshot and is reported only on the payroll view. `accessType` is `Public`, `Private`, or `Department` (stored as text). `headingFont` and `bodyFont` are `HelveticaNeue`, `AvenirNext`, `SourceSans3`, `NunitoSans`, or `Geist`. Helvetica Neue and Avenir Next are system font names with Source Sans 3 and Nunito Sans fallbacks. Tag and project-editor links are many-to-many; join tables are not domain entities. Color fields are `#RRGGBB`.
+`TimeEntryMode` is `Punch`, `Duration`, or `Total`. Seed `Role.code` with `MEMBER`, `VOLUNTEER`, and `ADMIN`. The same role rows are used on tenant and organization memberships. `HourlyRate.type`, `defaultRateType`, and membership `rateType` are `Volunteer`, `Professional`, or `Paid` (stored as text). `Paid` is compensation: the entry snapshots the pay rate and stores `inKindValue` as zero. Gross pay is hours times that snapshot and is reported only on the payroll view. `accessType` is `Public`, `Private`, or `Organization` (stored as text). `headingFont` and `bodyFont` are `HelveticaNeue`, `AvenirNext`, `SourceSans3`, `NunitoSans`, or `Geist`. Helvetica Neue and Avenir Next are system font names with Source Sans 3 and Nunito Sans fallbacks. Tag and project-editor links are many-to-many; join tables are not domain entities. Color fields are `#RRGGBB`.
 
 ## Entities
 
@@ -245,7 +245,7 @@ Foreign keys below are the relationship ends from the diagram. Tag and project-e
 
 ### UserProfile
 
-One profile per user. `timezone` is an IANA name and defaults to `UTC`. `displayName`, `avatarUrl`, `description`, `phone`, `zipCode`, and `notes` are optional. `description` is Markdown. `firstName` and `lastName` are required. Rate type and professional rate live on `OrganizationMembership`, not on the profile. `memberNumber` is an optional Volunteer ID (`001`…).
+One profile per user. `timezone` is an IANA name and defaults to `UTC`. `displayName`, `avatarUrl`, `description`, `phone`, `zipCode`, and `notes` are optional. `description` is Markdown. `firstName` and `lastName` are required. Rate type and professional rate live on `TenantMembership`, not on the profile. `memberNumber` is an optional Volunteer ID (`001`…).
 
 | Field        | Required | Notes                                       |
 | ------------ | -------- | ------------------------------------------- |
@@ -264,7 +264,7 @@ One profile per user. `timezone` is an IANA name and defaults to `UTC`. `display
 
 ### Role
 
-Lookup shared by organization and department memberships. Seed three system rows: `VOLUNTEER` (Volunteer), `MEMBER` (Staff), and `ADMIN` (Admin). Group manager is not a role row — it is `DepartmentMembership` with `ADMIN`.
+Lookup shared by tenant and organization memberships. Seed three system rows: `VOLUNTEER` (Volunteer), `MEMBER` (Staff), and `ADMIN` (Admin). Group manager is not a role row — it is `OrganizationMembership` with `ADMIN`.
 
 | Field | Required | Notes                                     |
 | ----- | -------- | ----------------------------------------- |
@@ -272,9 +272,9 @@ Lookup shared by organization and department memberships. Seed three system rows
 | code  | yes      | Unique. `VOLUNTEER`, `MEMBER`, or `ADMIN` |
 | name  | yes      | Display name: Volunteer, Staff, or Admin  |
 
-### Organization
+### Tenant
 
-In-kind valuation catalogs live on `HourlyRate`. Creating an organization seeds `defaultRateType` `Volunteer` and one default volunteer `HourlyRate` named `Volunteer` at `35.47`. The HTTP organization still exposes `volunteerHourlyRate` as that default rate.
+In-kind valuation catalogs live on `HourlyRate`. Creating an tenant seeds `defaultRateType` `Volunteer` and one default volunteer `HourlyRate` named `Volunteer` at `35.47`. The HTTP tenant still exposes `volunteerHourlyRate` as that default rate.
 
 | Field              | Required | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | ------------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -282,25 +282,25 @@ In-kind valuation catalogs live on `HourlyRate`. Creating an organization seeds 
 | name               | yes      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | slug               | no       | Unique case-insensitive (`citext`) subdomain label for `{slug}.{APP_HOST}` white-label hosting (1–63 lowercase letters, digits, or hyphens, not starting or ending with a hyphen, and not in the reserved host list). Null when not launched.                                                                                                                                                                                                                        |
 | publicSlug         | no       | Unique case-insensitive slug for `/openings/{publicSlug}`.                                                                                                                                                                                                                                                                                                                                                                                                           |
-| description        | no       | Organization about information in Markdown                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| description        | no       | Tenant about information in Markdown                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | websiteUrl         | no       |                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | defaultRateType    | yes      | `Volunteer`, `Professional`, or `Paid`, default `Volunteer`                                                                                                                                                                                                                                                                                                                                                                                                          |
-| preferences        | yes      | jsonb. `allowTimeEntryEditing` defaults to false. When false, a time entry update cannot change `startedAt`, `endedAt`, `durationMinutes`, or `occurredOn`. `allowVolunteersToAddVolunteers` defaults to false. When true, a volunteer can create another volunteer and must record a relationship. `entityLabels` holds display names for `organization`, `project`, `department`, and `taskCategory` (defaults: Organization, Project, Department, Task category). |
+| preferences        | yes      | jsonb. `allowTimeEntryEditing` defaults to false. When false, a time entry update cannot change `startedAt`, `endedAt`, `durationMinutes`, or `occurredOn`. `allowVolunteersToAddVolunteers` defaults to false. When true, a volunteer can create another volunteer and must record a relationship. `entityLabels` holds display names for `tenant`, `project`, `organization`, and `taskCategory` (defaults: Tenant, Project, Organization, Task category). |
 | themeId            | yes      | Foreign key to Theme. Defaults to the seeded VolunTime global theme.                                                                                                                                                                                                                                                                                                                                                                                                 |
-| wordmarkUrl        | no       | Light-on-dark sidebar wordmark. Stays on the organization so switching themes does not wipe marks. Uploads are resized to fit 800×200, stored privately, and served at `/brand/wordmark` for members.                                                                                                                                                                                                                                                                |
+| wordmarkUrl        | no       | Light-on-dark sidebar wordmark. Stays on the tenant so switching themes does not wipe marks. Uploads are resized to fit 800×200, stored privately, and served at `/brand/wordmark` for members.                                                                                                                                                                                                                                                                |
 | wordmarkOnLightUrl | no       | Dark-on-light wordmark for light surfaces. Same resize and private storage as `wordmarkUrl`, served at `/brand/wordmarkOnLight`.                                                                                                                                                                                                                                                                                                                                     |
 | markUrl            | no       | Compact mark for favicon-sized use. Uploads are cropped to 64×64, stored privately, and served at `/brand/mark` for members.                                                                                                                                                                                                                                                                                                                                         |
 | accentImageUrl     | no       | Decorative image for login, enrollment, empty states, and header bands, never behind tables or forms                                                                                                                                                                                                                                                                                                                                                                 |
 
 ### Theme
 
-Global presets have `organizationId` empty and are read-only. Organizations can save named copies. Palettes are JSON arrays of `#RRGGBB` colors: categorical 6–8, sequential 5–10, diverging 7. Seed seven global themes: VolunTime, Harbor, Atelier, Evergreen, Orchid, Okabe–Ito, and Tol Bright.
+Global presets have `tenantId` empty and are read-only. Tenants can save named copies. Palettes are JSON arrays of `#RRGGBB` colors: categorical 6–8, sequential 5–10, diverging 7. Seed seven global themes: VolunTime, Harbor, Atelier, Evergreen, Orchid, Okabe–Ito, and Tol Bright.
 
 | Field              | Required | Notes                                                 |
 | ------------------ | -------- | ----------------------------------------------------- |
 | id                 | yes      | UUID primary key                                      |
 | name               | yes      |                                                       |
-| organizationId     | no       | Empty for a global preset. Set for an org-saved theme |
+| tenantId     | no       | Empty for a global preset. Set for an org-saved theme |
 | primary            | yes      | `#RRGGBB`. Sidebar, headings, primary buttons         |
 | primaryForeground  | yes      | `#RRGGBB`. Text on primary                            |
 | highlight          | yes      | `#RRGGBB`. Emphasis and active nav, not body text     |
@@ -318,45 +318,45 @@ Global presets have `organizationId` empty and are read-only. Organizations can 
 
 ### HourlyRate
 
-An organization-scoped catalog of rates. Names are unique within that organization, compared case-insensitively. Exactly one volunteer rate per organization has `isDefault` true.
+An tenant-scoped catalog of rates. Names are unique within that tenant, compared case-insensitively. Exactly one volunteer rate per tenant has `isDefault` true.
 
 | Field          | Required | Notes                                                                                                                                        |
 | -------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | id             | yes      | UUID primary key                                                                                                                             |
-| organizationId | yes      | Foreign key to Organization                                                                                                                  |
+| tenantId | yes      | Foreign key to Tenant                                                                                                                  |
 | type           | yes      | `Volunteer`, `Professional`, or `Paid`. Only a volunteer rate can be the default. Paid hours are gross pay, not in-kind. |
-| name           | yes      | Unique per organization, case-insensitive                                                                                                    |
+| name           | yes      | Unique per tenant, case-insensitive                                                                                                    |
 | perHourRate    | yes      | decimal(10,2), greater than zero                                                                                                             |
-| isDefault      | yes      | Default false. True only when `type` is `Volunteer`. One default volunteer rate per organization                                             |
-| isArchived     | yes      | Default false. Archived rates stay on the organization and cannot be selected for new entries. The default volunteer rate cannot be archived |
+| isDefault      | yes      | Default false. True only when `type` is `Volunteer`. One default volunteer rate per tenant                                             |
+| isArchived     | yes      | Default false. Archived rates stay on the tenant and cannot be selected for new entries. The default volunteer rate cannot be archived |
 | source         | no       | Where the amount comes from, 1 to 200 characters. Empty when omitted                                                                         |
 
-### OrganizationMembership
+### TenantMembership
 
-A user has at most one membership in a given organization. A person may belong to more than one department through `DepartmentMembership`. `primaryDepartmentId`, when set, is a department of this organization and is only the default on the log form. Membership `rateType` and `professionalBillingRate` are kept on the membership and do not set time-entry rates.
+A user has at most one membership in a given tenant. A person may belong to more than one organization through `OrganizationMembership`. `primaryOrganizationId`, when set, is a organization of this tenant and is only the default on the log form. Membership `rateType` and `professionalBillingRate` are kept on the membership and do not set time-entry rates.
 
 | Field                   | Required | Notes                                                                                     |
 | ----------------------- | -------- | ----------------------------------------------------------------------------------------- |
 | id                      | yes      | UUID primary key                                                                          |
-| userId                  | yes      | Foreign key to User. Unique with organizationId                                           |
-| organizationId          | yes      | Foreign key to Organization. Unique with userId                                           |
+| userId                  | yes      | Foreign key to User. Unique with tenantId                                           |
+| tenantId          | yes      | Foreign key to Tenant. Unique with userId                                           |
 | roleId                  | yes      | Foreign key to Role                                                                       |
 | rateType                | yes      | `Volunteer`, `Professional`, or `Paid`. Default from the org’s `defaultRateType` at join time. `Professional` and `Paid` require `professionalBillingRate` greater than zero. |
 | professionalBillingRate | no       | decimal(10,2). Required and greater than zero when `Professional`; empty when `Volunteer` |
 | isActive                | yes      | Default true. Workbook Active? without deleting history                                   |
-| primaryDepartmentId     | no       | Foreign key to Department. Cleared when that department is deleted                        |
-| orgUserTitle            | no       | Title of the user for this organization                                                   |
-| orgUserDescription      | no       | Description of the user for this organization in Markdown                                 |
+| primaryOrganizationId     | no       | Foreign key to Organization. Cleared when that organization is deleted                        |
+| title            | no       | Title of the user for this tenant                                                   |
+| memberDescription      | no       | Description of the user for this tenant in Markdown                                 |
 | joinedAt                | yes      |                                                                                           |
 
 ### MemberConnection
 
-One relationship between two members of an organization. `userAId` is the lower user id as text. `relationship` is how user B relates to user A. Callers send the label from one person's point of view (`Child` means the other person is their child) and the API stores the inverse when it swaps the pair. A pair can be connected once. Turning off `allowVolunteersToAddVolunteers` does not remove connections.
+One relationship between two members of an tenant. `userAId` is the lower user id as text. `relationship` is how user B relates to user A. Callers send the label from one person's point of view (`Child` means the other person is their child) and the API stores the inverse when it swaps the pair. A pair can be connected once. Turning off `allowVolunteersToAddVolunteers` does not remove connections.
 
 | Field           | Required | Notes                                                                                                                               |
 | --------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | id              | yes      | UUID primary key                                                                                                                    |
-| organizationId  | yes      | Foreign key to Organization                                                                                                         |
+| tenantId  | yes      | Foreign key to Tenant                                                                                                         |
 | userAId         | yes      | Foreign key to User. Lower than `userBId`                                                                                           |
 | userBId         | yes      | Foreign key to User                                                                                                                 |
 | relationship    | yes      | `Parent`, `Child`, `Spouse`, `Sibling`, `Grandparent`, `Grandchild`, `Guardian`, `Dependent`, `Friend`, `Colleague`, or `Associate` |
@@ -365,14 +365,14 @@ One relationship between two members of an organization. `userAId` is the lower 
 
 ### Report
 
-A named report design for one organization. `layout` is the card grid. `filters` is the saved report query (`departmentId`, `taskCategoryId`, `projectId`, `userId`, `from`, `to`). Names are unique within the organization, compared case-insensitively. At most one report per organization has `isDefault` true.
+A named report design for one tenant. `layout` is the card grid. `filters` is the saved report query (`organizationId`, `taskCategoryId`, `projectId`, `userId`, `from`, `to`). Names are unique within the tenant, compared case-insensitively. At most one report per tenant has `isDefault` true.
 
 | Field          | Required | Notes                                                                   |
 | -------------- | -------- | ----------------------------------------------------------------------- |
 | id             | yes      | UUID primary key                                                        |
-| organizationId | yes      | Foreign key to Organization. Cascade delete                             |
-| name           | yes      | Unique per organization, case-insensitive. 1–80 characters              |
-| isDefault      | yes      | Default false. Partial unique index allows one default per organization |
+| tenantId | yes      | Foreign key to Tenant. Cascade delete                             |
+| name           | yes      | Unique per tenant, case-insensitive. 1–80 characters              |
+| isDefault      | yes      | Default false. Partial unique index allows one default per tenant |
 | layout         | yes      | jsonb. Versioned card grid                                              |
 | filters        | yes      | jsonb. Saved report query. Empty object means no extra filter           |
 | createdAt      | yes      |                                                                         |
@@ -380,27 +380,27 @@ A named report design for one organization. `layout` is the card grid. `filters`
 
 ### ReportTemplate
 
-A reusable card layout. `organizationId` null is a global template. A row with `baseTemplateId` is one organization's override of that global and is shown instead of the global for that organization. Org-owned templates have an organization and no base. Templates store a layout only, not filters. Names are unique among globals, and unique within an organization, compared case-insensitively.
+A reusable card layout. `tenantId` null is a global template. A row with `baseTemplateId` is one tenant's override of that global and is shown instead of the global for that tenant. Org-owned templates have an tenant and no base. Templates store a layout only, not filters. Names are unique among globals, and unique within an tenant, compared case-insensitively.
 
 | Field          | Required | Notes                                                                                     |
 | -------------- | -------- | ----------------------------------------------------------------------------------------- |
 | id             | yes      | UUID primary key                                                                          |
-| organizationId | no       | Null for a global template. Foreign key to Organization. Cascade delete                   |
-| key            | no       | `summary`, `people`, `groups`, or `staff` on a global. Null on organization rows          |
+| tenantId | no       | Null for a global template. Foreign key to Tenant. Cascade delete                   |
+| key            | no       | `summary`, `people`, `groups`, or `staff` on a global. Null on tenant rows          |
 | name           | yes      | 1–80 characters                                                                           |
 | layout         | yes      | jsonb. Versioned card grid                                                                |
-| baseTemplateId | no       | Null, or the global template this row overrides. One override per organization per global |
+| baseTemplateId | no       | Null, or the global template this row overrides. One override per tenant per global |
 | createdAt      | yes      |                                                                                           |
 | updatedAt      | yes      |                                                                                           |
 
 ### EmailTemplate
 
-One organization's copy of a transactional email. Every organization gets one row per `for` when it is created; the `EmailTemplates` migration backfilled existing organizations. Defaults come from [emails/defaults.ts](../../emails/defaults.ts), built into `emails/dist/defaults.json` by `npm run email:render`. Mail falls back to that default when an organization has no row (and always for a password reset when the person belongs to zero or several organizations, or feedback with no organization).
+One tenant's copy of a transactional email. Every tenant gets one row per `for` when it is created; the `EmailTemplates` migration backfilled existing tenants. Defaults come from [emails/defaults.ts](../../emails/defaults.ts), built into `emails/dist/defaults.json` by `npm run email:render`. Mail falls back to that default when an tenant has no row (and always for a password reset when the person belongs to zero or several tenants, or feedback with no tenant).
 
 | Field          | Required | Notes                                                                                                                                                                                                                                                     |
 | -------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | id             | yes      | UUID primary key                                                                                                                                                                                                                                          |
-| organizationId | yes      | Foreign key to Organization. Cascade delete. Unique with `for`                                                                                                                                                                                            |
+| tenantId | yes      | Foreign key to Tenant. Cascade delete. Unique with `for`                                                                                                                                                                                            |
 | name           | yes      | 1–80 characters. Admin label                                                                                                                                                                                                                              |
 | version        | yes      | Starts at 1. Each patch or reset adds 1                                                                                                                                                                                                                   |
 | for            | yes      | `Invite`, `Welcome`, `PasswordReset`, `LoggedTime`, `UnclassifiedEntry`, `FeedbackReceived`, `FeedbackNotify`, `FeedbackCompleted`, `AccessRequestReceived`, `AccessRequestDecided`, `NeedSubmitted`, `NeedDecided`, `VolunteerMessage`. Fixed after seed |
@@ -414,61 +414,61 @@ One organization's copy of a transactional email. Every organization gets one ro
 
 Placeholders are `{{path.to.field}}`. Each `for` has a fixed field catalog in [src/lib/email/templates.ts](../../src/lib/email/templates.ts). Saving rejects a field outside that catalog. Sending fails if the template uses a field the sender did not provide. Values are HTML-encoded in the body, and line breaks become `<br>`. A paragraph that holds only a `*.code` field renders as the gold code box.
 
-### Department
+### Organization
 
-A department belongs to exactly one organization. Names are unique within that organization, compared case-insensitively.
+A organization belongs to exactly one tenant. Names are unique within that tenant, compared case-insensitively.
 
 | Field          | Required | Notes                                     |
 | -------------- | -------- | ----------------------------------------- |
 | id             | yes      | UUID primary key                          |
-| organizationId | yes      | Foreign key to Organization               |
-| name           | yes      | Unique per organization, case-insensitive |
+| tenantId | yes      | Foreign key to Tenant               |
+| name           | yes      | Unique per tenant, case-insensitive |
 
-### DepartmentMembership
+### OrganizationMembership
 
-A user has at most one membership in a given department and may belong to many departments in the same organization. The user must already belong to that department’s organization.
+A user has at most one membership in a given organization and may belong to many organizations in the same tenant. The user must already belong to that organization’s tenant.
 
 | Field        | Required | Notes                                         |
 | ------------ | -------- | --------------------------------------------- |
 | id           | yes      | UUID primary key                              |
-| userId       | yes      | Foreign key to User. Unique with departmentId |
-| departmentId | yes      | Foreign key to Department. Unique with userId |
+| userId       | yes      | Foreign key to User. Unique with organizationId |
+| organizationId | yes      | Foreign key to Organization. Unique with userId |
 | roleId       | yes      | Foreign key to Role                           |
 | joinedAt     | yes      |                                               |
 
 ### Tag
 
-A tag belongs to one organization. Names are unique within that organization, compared case-insensitively.
+A tag belongs to one tenant. Names are unique within that tenant, compared case-insensitively.
 
 | Field          | Required | Notes                                     |
 | -------------- | -------- | ----------------------------------------- |
 | id             | yes      | UUID primary key                          |
-| organizationId | yes      | Foreign key to Organization               |
-| name           | yes      | Unique per organization, case-insensitive |
+| tenantId | yes      | Foreign key to Tenant               |
+| name           | yes      | Unique per tenant, case-insensitive |
 
 ### TaskCategory
 
-An org-scoped lookup, same uniqueness pattern as Tag. Each organization creates its own categories (for example Board Hours, Committee Member Hours, Participant Hours, Volunteer Hours). Not globally seeded.
+An org-scoped lookup, same uniqueness pattern as Tag. Each tenant creates its own categories (for example Board Hours, Committee Member Hours, Participant Hours, Volunteer Hours). Not globally seeded.
 
 | Field          | Required | Notes                                     |
 | -------------- | -------- | ----------------------------------------- |
 | id             | yes      | UUID primary key                          |
-| organizationId | yes      | Foreign key to Organization               |
-| name           | yes      | Unique per organization, case-insensitive |
+| tenantId | yes      | Foreign key to Tenant               |
+| name           | yes      | Unique per tenant, case-insensitive |
 
 ### Project
 
-A project belongs to an organization. When `accessType` is `Department`, it also belongs to one of that organization’s departments. Workbook “General / No Specific Project” is a normal project row the organization creates; the schema does not auto-seed it.
+A project belongs to an tenant. When `accessType` is `Organization`, it also belongs to one of that tenant’s organizations. Workbook “General / No Specific Project” is a normal project row the tenant creates; the schema does not auto-seed it.
 
 | Field          | Required | Notes                                                                                       |
 | -------------- | -------- | ------------------------------------------------------------------------------------------- |
 | id             | yes      | UUID primary key                                                                            |
-| organizationId | yes      | Foreign key to Organization                                                                 |
-| departmentId   | no       | Foreign key to Department. Set only when `accessType` is `Department`                       |
+| tenantId | yes      | Foreign key to Tenant                                                                 |
+| organizationId   | no       | Foreign key to Organization. Set only when `accessType` is `Organization`                       |
 | ownerUserId    | yes      | Foreign key to User. The creator in normal use. Can edit; not duplicated in the editor list |
-| title          | yes      | Unique per organization, case-insensitive                                                   |
+| title          | yes      | Unique per tenant, case-insensitive                                                   |
 | description    | no       |                                                                                             |
-| accessType     | yes      | `Public`, `Private`, or `Department`                                                        |
+| accessType     | yes      | `Public`, `Private`, or `Organization`                                                        |
 | projectType    | yes      | `Project` or `Event`. Default `Project`                                                     |
 | startDate      | no       | Calendar date                                                                               |
 | endDate        | no       | Calendar date. When both dates are set, on or after startDate                               |
@@ -478,12 +478,12 @@ Editors are a many-to-many with User. The join table is not a domain entity.
 
 ### VolunteerNeed
 
-A request for volunteers inside one organization. `departmentId` is the optional group. `projectId` and `taskCategoryId` are optional and, when set, belong to the same organization. `questions` is a jsonb form (`version` 1 and `items`). Each item has `id`, `prompt`, `kind` (`single` or `multi`), `choices` (`id`, `label`), and `correctChoiceIds`. A single question has one required choice. A multi question has the exact set that must be selected. Questions are not a separate table. `countVetted` is the number of vetted signups and is maintained with those signups. `publicToken` is the unguessable token in `/volunteer/{token}`.
+A request for volunteers inside one tenant. `organizationId` is the optional group. `projectId` and `taskCategoryId` are optional and, when set, belong to the same tenant. `questions` is a jsonb form (`version` 1 and `items`). Each item has `id`, `prompt`, `kind` (`single` or `multi`), `choices` (`id`, `label`), and `correctChoiceIds`. A single question has one required choice. A multi question has the exact set that must be selected. Questions are not a separate table. `countVetted` is the number of vetted signups and is maintained with those signups. `publicToken` is the unguessable token in `/volunteer/{token}`.
 
 | Field           | Required | Notes                                                                  |
 | --------------- | -------- | ---------------------------------------------------------------------- |
 | id              | yes      | UUID primary key                                                       |
-| organizationId  | yes      | Foreign key to Organization                                            |
+| tenantId  | yes      | Foreign key to Tenant                                            |
 | createdByUserId | yes      | Foreign key to User                                                    |
 | publicToken     | yes      | Unique 32-character lowercase hex token                                |
 | name            | yes      | 1 to 200 characters                                                    |
@@ -499,7 +499,7 @@ A request for volunteers inside one organization. `departmentId` is the optional
 | questions       | yes      | jsonb form. Default `{ "version": 1, "items": [] }`                    |
 | projectId       | no       | Foreign key to Project. Cleared if the project is deleted              |
 | taskCategoryId  | no       | Foreign key to TaskCategory. Cleared if the category is deleted        |
-| departmentId    | no       | Foreign key to Department. Cleared if the department is deleted        |
+| organizationId    | no       | Foreign key to Organization. Cleared if the organization is deleted        |
 | createdAt       | yes      |                                                                        |
 | updatedAt       | yes      |                                                                        |
 
@@ -533,15 +533,15 @@ One person signed up for one need. Exactly one of `userId` or `guestId` is set. 
 
 ### UserTimeEntry
 
-Personal time for one user, against an organization or one of its departments. `userId` is whose hours they are. `enteredByUserId` is who created the row (may equal `userId`). `description` is optional notes. Tags are optional and must belong to the entry’s organization. Project and task category are required and must belong to the entry’s organization.
+Personal time for one user, against an tenant or one of its organizations. `userId` is whose hours they are. `enteredByUserId` is who created the row (may equal `userId`). `description` is optional notes. Tags are optional and must belong to the entry’s tenant. Project and task category are required and must belong to the entry’s tenant.
 
 | Field           | Required | Notes                                                                        |
 | --------------- | -------- | ---------------------------------------------------------------------------- |
 | id              | yes      | UUID primary key                                                             |
 | userId          | yes      | Foreign key to User. Whose hours                                             |
 | enteredByUserId | yes      | Foreign key to User. Who entered the row                                     |
-| organizationId  | yes      | Foreign key to Organization. Always set                                      |
-| departmentId    | no       | Foreign key to Department. Empty for organization-level time                 |
+| tenantId  | yes      | Foreign key to Tenant. Always set                                      |
+| organizationId    | no       | Foreign key to Organization. Empty for tenant-level time                 |
 | projectId       | yes      | Foreign key to Project                                                       |
 | taskCategoryId  | yes      | Foreign key to TaskCategory                                                  |
 | mode            | yes      | `Punch`, `Duration`, or `Total`                                              |
@@ -558,14 +558,14 @@ Personal time for one user, against an organization or one of its departments. `
 
 ### CollectiveTimeEntry
 
-Group time recorded by an admin. It is not calculated from user entries. `description` is optional. Tags are optional and must belong to the entry’s organization. Project and task category are required.
+Group time recorded by an admin. It is not calculated from user entries. `description` is optional. Tags are optional and must belong to the entry’s tenant. Project and task category are required.
 
 | Field            | Required | Notes                                                                          |
 | ---------------- | -------- | ------------------------------------------------------------------------------ |
 | id               | yes      | UUID primary key                                                               |
 | recordedByUserId | yes      | Foreign key to User. The admin who recorded the session                        |
-| organizationId   | yes      | Foreign key to Organization. Always set                                        |
-| departmentId     | no       | Foreign key to Department. Empty for organization-level time                   |
+| tenantId   | yes      | Foreign key to Tenant. Always set                                        |
+| organizationId     | no       | Foreign key to Organization. Empty for tenant-level time                   |
 | projectId        | yes      | Foreign key to Project                                                         |
 | taskCategoryId   | yes      | Foreign key to TaskCategory                                                    |
 | startedAt        | yes      | Time in                                                                        |
@@ -591,7 +591,7 @@ Stores a hash of the refresh token so a backend can end a session. Access tokens
 
 ### Invitation
 
-A pending invite to one organization, or to one department of that organization. `departmentId` is empty for an organization invite. The emailed code is stored only as `codeHash`. `roleId` may be Volunteer, Staff, Admin, or a custom role.
+A pending invite to one tenant, or to one organization of that tenant. `organizationId` is empty for an tenant invite. The emailed code is stored only as `codeHash`. `roleId` may be Volunteer, Staff, Admin, or a custom role.
 
 One pending invite is allowed per email and target. Pending means `acceptedAt` and `revokedAt` are both empty. That rule is a partial unique index.
 
@@ -599,8 +599,8 @@ One pending invite is allowed per email and target. Pending means `acceptedAt` a
 | --------------- | -------- | --------------------------------------------------------------------------------------------------------------- |
 | id              | yes      | UUID primary key                                                                                                |
 | email           | yes      | Stored lowercase. The account that may accept                                                                   |
-| organizationId  | yes      | Foreign key to Organization                                                                                     |
-| departmentId    | no       | Foreign key to Department. Empty for an organization invite. When set, the department belongs to organizationId |
+| tenantId  | yes      | Foreign key to Tenant                                                                                     |
+| organizationId    | no       | Foreign key to Organization. Empty for an tenant invite. When set, the organization belongs to tenantId |
 | roleId          | yes      | Foreign key to Role                                                                                             |
 | codeHash        | yes      | Unique hash of the emailed code                                                                                 |
 | invitedByUserId | yes      | Foreign key to User                                                                                             |
@@ -624,45 +624,45 @@ A single-use forgot-password code. Only `codeHash` is stored.
 
 ## Membership rules
 
-- A department belongs to exactly one organization. Department names are unique within that organization.
-- A user has at most one membership per organization and per department.
-- A department membership is allowed only when that user already belongs to the department’s organization.
-- Roles do not inherit. An organization admin is not automatically a department admin.
-- An organization admin may record a collective entry for the organization or for any of its departments. A department admin may record one only for that department.
+- A organization belongs to exactly one tenant. Organization names are unique within that tenant.
+- A user has at most one membership per tenant and per organization.
+- A organization membership is allowed only when that user already belongs to the organization’s tenant.
+- Roles do not inherit. An tenant admin is not automatically a organization admin.
+- An tenant admin may record a collective entry for the tenant or for any of its organizations. A organization admin may record one only for that organization.
 - Removing a membership or setting `isActive` false does not delete historical time entries.
-- Membership `rateType` defaults from the organization’s `defaultRateType` at join time. `professionalBillingRate` is required only when `rateType` is `Professional`. Those fields do not set time-entry rates.
-- `primaryDepartmentId` does not limit which department a member may log against. When it is set, that department belongs to the membership’s organization.
+- Membership `rateType` defaults from the tenant’s `defaultRateType` at join time. `professionalBillingRate` is required only when `rateType` is `Professional`. Those fields do not set time-entry rates.
+- `primaryOrganizationId` does not limit which organization a member may log against. When it is set, that organization belongs to the membership’s tenant.
 
 ## Projects
 
-- Project titles are unique within an organization, compared case-insensitively.
-- When `accessType` is `Department`, `departmentId` is required and that department belongs to `organizationId`. When `accessType` is `Public` or `Private`, `departmentId` is empty.
+- Project titles are unique within an tenant, compared case-insensitively.
+- When `accessType` is `Organization`, `organizationId` is required and that organization belongs to `tenantId`. When `accessType` is `Public` or `Private`, `organizationId` is empty.
 - The owner can edit. Editors are additional users; the owner is not stored in the editor list.
-- A time entry’s `projectId` must reference a project in the entry’s organization. A `Department` project is only linked from entries for that department. Those matches are API rules.
+- A time entry’s `projectId` must reference a project in the entry’s tenant. A `Organization` project is only linked from entries for that organization. Those matches are API rules.
 
 ## Time entries
 
-A user entry always has an organization. `departmentId` is empty for organization-level time. When it is set, `organizationId` must be that department’s organization. The user must be a member of the target they log against. The same organization-or-department target rule applies to collective entries. Project and task category are required and must belong to the entry’s organization.
+A user entry always has an tenant. `organizationId` is empty for tenant-level time. When it is set, `tenantId` must be that organization’s tenant. The user must be a member of the target they log against. The same tenant-or-organization target rule applies to collective entries. Project and task category are required and must belong to the entry’s tenant.
 
 - **Punch:** `startedAt` is required. `endedAt`, `durationMinutes`, and `inKindValue` stay empty while the punch is open. Closing it sets `endedAt`, stores whole minutes between the two times (1–1440), and sets `inKindValue`. `occurredOn` is the user’s local date of `startedAt`. A user has at most one open punch.
 - **Duration:** `occurredOn` is required. `durationMinutes` is 1–1440. `startedAt` and `endedAt` are both empty, or both set. A start with an end calculates the minutes. A start with minutes calculates the end. When all three are sent, the minutes must match the two times. A duration entry is never open. `inKindValue` is required.
 - **Total:** `occurredOn` and `durationMinutes` (1–59940, 999 hours) are required. `startedAt` and `endedAt` may be stored as clock times on `occurredOn` so a Volunteer Log import can match the sheet. `inKindValue` is required. A Total row is one person’s hours, including a monthly dump. It is not a collective entry.
-- **In-kind snapshot (user):** at write and on punch close, `hourlyRateId` and `hourlyRate` snapshot the selected `HourlyRate`. A volunteer logging their own time always uses the organization’s default volunteer rate, unless that person's membership `rateType` is `Paid`. Admins and members may choose any unarchived rate; the default is the volunteer default. Volunteer and Professional `inKindValue` equals `durationMinutes * hourlyRate / 60`, rounded to cents, when a duration is present. A Paid rate keeps that pay-rate snapshot and stores `inKindValue` as zero. The database also allows zero so that row can be saved. Gross pay is hours times the snapshot and is only on the payroll report.
+- **In-kind snapshot (user):** at write and on punch close, `hourlyRateId` and `hourlyRate` snapshot the selected `HourlyRate`. A volunteer logging their own time always uses the tenant’s default volunteer rate, unless that person's membership `rateType` is `Paid`. Admins and members may choose any unarchived rate; the default is the volunteer default. Volunteer and Professional `inKindValue` equals `durationMinutes * hourlyRate / 60`, rounded to cents, when a duration is present. A Paid rate keeps that pay-rate snapshot and stores `inKindValue` as zero. The database also allows zero so that row can be saved. Gross pay is hours times the snapshot and is only on the payroll report.
 - **In-kind snapshot (collective):** `hourlyRateId` and `hourlyRate` snapshot the selected `HourlyRate`, defaulting to the volunteer default. `inKindValue` equals elapsed hours × `participantCount` × `hourlyRate`, rounded to cents. No 24-hour cap. Collective totals are reported separately from user totals.
 - Later changes to catalog rates do not rewrite existing entries.
-- **Tags and description:** optional on both user and collective entries. A tag belongs to one organization, its name is unique in that organization, and an entry can use only tags from its organization.
-- **Collective entry:** separate from user punches. Requires `startedAt`, `endedAt` after `startedAt`, `participantCount` of at least 1, the recording admin, project, task category, and the same organization-or-department target rule. It is not calculated from user entries.
+- **Tags and description:** optional on both user and collective entries. A tag belongs to one tenant, its name is unique in that tenant, and an entry can use only tags from its tenant.
+- **Collective entry:** separate from user punches. Requires `startedAt`, `endedAt` after `startedAt`, `participantCount` of at least 1, the recording admin, project, task category, and the same tenant-or-organization target rule. It is not calculated from user entries.
 
 ## Delete behavior
 
 - Deleting a volunteer need deletes its signups. Guests remain. Deleting a vetted signup decreases `countVetted`.
-- Deleting an organization, department, project, task category, or user is restricted while time entries still reference them. Deleting a user is also restricted while they created a volunteer need or have a volunteer signup. Deleting a project, task category, or department clears that link on a volunteer need.
+- Deleting an tenant, organization, project, task category, or user is restricted while time entries still reference them. Deleting a user is also restricted while they created a volunteer need or have a volunteer signup. Deleting a project, task category, or organization clears that link on a volunteer need.
 - Deleting a user is restricted while they own a project, appear as `userId` or `enteredByUserId` on user entries, or as `recordedByUserId` on collective entries.
 - Profile, memberships, refresh tokens, password reset codes, invitations sent by the user, and project editor rows for that user delete with the user.
-- Organization cascade deletes departments, tags, task categories, projects, saved reports, and org-saved themes when no restricting time entries remain. Global themes stay. The active `themeId` cannot be deleted while organizations still point at it.
-- Deleting a department clears `primaryDepartmentId` on memberships that pointed at it.
-- Departments cascade with their organization when no time entries remain.
-- Projects cascade with their organization or department when no time entries remain.
+- Tenant cascade deletes organizations, tags, task categories, projects, saved reports, and org-saved themes when no restricting time entries remain. Global themes stay. The active `themeId` cannot be deleted while tenants still point at it.
+- Deleting a organization clears `primaryOrganizationId` on memberships that pointed at it.
+- Organizations cascade with their tenant when no time entries remain.
+- Projects cascade with their tenant or organization when no time entries remain.
 - Inactive membership (`isActive` false) does not delete historical entries.
 
 ## Prisma Migrations
@@ -672,7 +672,7 @@ A user entry always has an organization. `departmentId` is empty for organizatio
 - `DATABASE_URL` is the only database connection setting. Environment selection uses `APP_ENV`.
 - Existing EF-managed databases must pass baseline verification first. Leave the inactive EF migration-history schema intact; never run two DDL owners concurrently.
 - Use UUID primary keys and `timestamptz` for instants.
-- Enforce the unique pairs in the database: `(username)`, `(email)`, `(Role.code)`, `(userId, organizationId)`, `(userId, departmentId)`, department name per organization, tag name per organization, task category name per organization, project title per organization, hourly rate name per organization, one default volunteer `HourlyRate` per organization, report name per organization, one default `Report` per organization, `UserTimeEntry.sourceRef` when set, one pending invitation per email and target, `Guest.email`, `Guest.userId` when set, `VolunteerNeed.publicToken`, one `VolunteerSignup` per need and user, and one `VolunteerSignup` per need and guest.
-- Index user entries on `(organizationId, occurredOn)` and `(userId, occurredOn)`. Index collective entries on `(organizationId, startedAt)`.
-- Enforce check constraints for rate types, access types, membership professional rate, project department/access pairing, date order, hourly rates (catalog greater than zero, time-entry snapshots zero or greater), user entry modes (Punch and Duration 1–1440 minutes, Total 1–59940), theme hex colors, palette JSON, font keys, and in-kind nullability.
-- Enforce “one open punch per user”, “department membership requires organization membership”, and project/category organization match in the API. Those rules depend on more than a single foreign key.
+- Enforce the unique pairs in the database: `(username)`, `(email)`, `(Role.code)`, `(userId, tenantId)`, `(userId, organizationId)`, organization name per tenant, tag name per tenant, task category name per tenant, project title per tenant, hourly rate name per tenant, one default volunteer `HourlyRate` per tenant, report name per tenant, one default `Report` per tenant, `UserTimeEntry.sourceRef` when set, one pending invitation per email and target, `Guest.email`, `Guest.userId` when set, `VolunteerNeed.publicToken`, one `VolunteerSignup` per need and user, and one `VolunteerSignup` per need and guest.
+- Index user entries on `(tenantId, occurredOn)` and `(userId, occurredOn)`. Index collective entries on `(tenantId, startedAt)`.
+- Enforce check constraints for rate types, access types, membership professional rate, project organization/access pairing, date order, hourly rates (catalog greater than zero, time-entry snapshots zero or greater), user entry modes (Punch and Duration 1–1440 minutes, Total 1–59940), theme hex colors, palette JSON, font keys, and in-kind nullability.
+- Enforce “one open punch per user”, “organization membership requires tenant membership”, and project/category tenant match in the API. Those rules depend on more than a single foreign key.
