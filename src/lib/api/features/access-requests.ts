@@ -18,7 +18,7 @@ function asStringArray(value: unknown) {
 /** The ids that are organizations of this tenant. */
 async function organizationsIn(tenantId: string, organizationIds: string[]) {
   if (organizationIds.length === 0) return [];
-  const rows = await prisma.tenant.findMany({
+  const rows = await prisma.organization.findMany({
     where: { tenantId, id: { in: organizationIds.map(parseGuid).filter((id): id is string => id !== null) } },
     select: { id: true },
   });
@@ -264,7 +264,7 @@ async function approve(
       });
     }
     for (const organizationId of organizationIds) {
-      await tx.tenantMembership.upsert({
+      await tx.organizationMembership.upsert({
         where: { userId_organizationId: { userId, organizationId } },
         update: { roleId: adminRole },
         create: { userId, organizationId, roleId: adminRole },

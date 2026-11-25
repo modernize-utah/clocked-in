@@ -38,7 +38,7 @@ async function assertPlacement(tenantId: string, organizationId: string | null) 
   }
 
   if (organizationId !== null) {
-    const organization = await prisma.tenant.findUnique({
+    const organization = await prisma.organization.findUnique({
       where: { id: organizationId },
       select: { tenantId: true },
     });

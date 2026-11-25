@@ -308,7 +308,7 @@ async function relations(tenantId: string, projectId: string | null, taskCategor
   if (taskCategoryId && !(await prisma.taskCategory.findFirst({ where: { id: taskCategoryId, tenantId }, select: { id: true } }))) {
     validation("taskCategoryId was not found.");
   }
-  if (organizationId && !(await prisma.tenant.findFirst({ where: { id: organizationId, tenantId }, select: { id: true } }))) {
+  if (organizationId && !(await prisma.organization.findFirst({ where: { id: organizationId, tenantId }, select: { id: true } }))) {
     validation("organizationId was not found.");
   }
 }

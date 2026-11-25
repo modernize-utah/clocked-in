@@ -127,7 +127,10 @@ export function ExternalSystemsView() {
             </code>
           </p>
           <p className="text-sm text-muted-foreground">
-            Last pulled: {portal.lastPulledAt ? formatInstant(portal.lastPulledAt) : "Never"}
+            Last pulled:{" "}
+            {portal.lastPulledAt
+              ? formatInstant(portal.lastPulledAt, Intl.DateTimeFormat().resolvedOptions().timeZone)
+              : "Never"}
           </p>
           <FormMessage result={result} />
           <div className="flex flex-wrap gap-2">

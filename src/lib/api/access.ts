@@ -459,7 +459,7 @@ export class Access {
         return this.organizations;
       }
 
-      const organizations = await prisma.tenant.findMany({
+      const organizations = await prisma.organization.findMany({
         where: { tenantId: key.tenantId },
         select: { id: true, tenantId: true },
       });
@@ -472,7 +472,7 @@ export class Access {
     }
 
     this.organizations = (
-      await prisma.tenantMembership.findMany({
+      await prisma.organizationMembership.findMany({
         where: { userId: this.caller.id, ...(pinned ? { organization: { tenantId: pinned.id } } : {}) },
         select: { organizationId: true, organization: { select: { tenantId: true } }, role: { select: { code: true } } },
       })

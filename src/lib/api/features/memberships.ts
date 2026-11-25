@@ -704,7 +704,7 @@ export async function deleteOrgMemberships(access: Access, tenantId: string, mem
     }
 
     const userIds = memberships.map((membership) => membership.userId);
-    await tx.tenantMembership.deleteMany({
+    await tx.organizationMembership.deleteMany({
       where: { userId: { in: userIds }, organization: { tenantId } },
     });
     await tx.tenantMembership.deleteMany({
@@ -717,7 +717,7 @@ export async function listOrganizationMemberships(access: Access, organizationId
   const paging = page(params);
   const organization = await access.requireOrganization(organizationId);
   const visibility = await memberVisibility(access, organization.tenantId);
-  const memberships = await prisma.tenantMembership.findMany({
+  const memberships = await prisma.organizationMembership.findMany({
     where: { organizationId },
     include: membershipInclude,
     orderBy: { joinedAt: "asc" },
@@ -739,13 +739,13 @@ export async function updateOrganizationMembership(
   request: UpdateOrganizationMembershipRequest,
 ) {
   const organization = await access.requireOrganizationManager(organizationId);
-  const membership = await prisma.tenantMembership.findFirst({ where: { id: membershipId, organizationId } });
+  const membership = await prisma.organizationMembership.findFirst({ where: { id: membershipId, organizationId } });
   if (!membership) {
     notFound();
   }
 
   const saved = await guard(
-    prisma.tenantMembership.update({
+    prisma.organizationMembership.update({
       where: { id: membership.id },
       data: { roleId: await roleId(request.role) },
       include: membershipInclude,
@@ -755,7 +755,7 @@ export async function updateOrganizationMembership(
 }
 
 export async function deleteOrganizationMembership(access: Access, organizationId: string, membershipId: string) {
-  const membership = await prisma.tenantMembership.findFirst({
+  const membership = await prisma.organizationMembership.findFirst({
     where: { id: membershipId, organizationId },
     include: { organization: true },
   });
@@ -772,7 +772,7 @@ export async function deleteOrganizationMembership(access: Access, organizationI
     forbidden();
   }
 
-  await guard(prisma.tenantMembership.delete({ where: { id: membership.id } }));
+  await guard(prisma.organizationMembership.delete({ where: { id: membership.id } }));
 }
 
 async function organizationIdsByUser(tenantId: string, userIds: string[], db: Prisma.TransactionClient | typeof prisma = prisma) {

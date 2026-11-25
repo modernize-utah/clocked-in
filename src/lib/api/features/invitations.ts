@@ -430,7 +430,7 @@ export async function acceptInvitation(access: Access, request: AcceptInvitation
     let organizationMembership = null;
     if (invitation.organizationId) {
       const alreadyInOrganization =
-        (await tx.tenantMembership.count({
+        (await tx.organizationMembership.count({
           where: { userId: caller.id, organizationId: invitation.organizationId },
         })) > 0;
       if (alreadyInOrganization) {
@@ -441,7 +441,7 @@ export async function acceptInvitation(access: Access, request: AcceptInvitation
         tenantMembership = await newTenantMembership(memberRoleId);
       }
 
-      organizationMembership = await tx.tenantMembership.create({
+      organizationMembership = await tx.organizationMembership.create({
         data: { userId: caller.id, organizationId: invitation.organizationId, roleId: invitation.roleId, joinedAt: now },
         include: membershipInclude,
       });

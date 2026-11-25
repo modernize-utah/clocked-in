@@ -21,6 +21,48 @@ async function requireTenantAdmin(access: Access, tenantId: string) {
   }
 }
 
+/** Block local people/role edits when the portal owns the directory. */
+export async function assertPeopleRolesMutable(tenantId: string) {
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { preferences: true },
+  });
+  if (!tenant) {
+    notFound();
+  }
+  if (portalDirectorySyncEnabled(readPreferences(tenant.preferences))) {
+    validation("People and roles are managed by the portal for this tenant.");
+  }
+}
+
+/** Block local organization (AO/group) edits when the portal owns the directory. */
+export async function assertTenantGroupsMutable(tenantId: string) {
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { preferences: true },
+  });
+  if (!tenant) {
+    notFound();
+  }
+  if (portalDirectorySyncEnabled(readPreferences(tenant.preferences))) {
+    validation("Organizations are managed by the portal for this tenant.");
+  }
+}
+
+/** Block invitations when the portal owns the directory. */
+export async function assertInvitationsMutable(tenantId: string) {
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { preferences: true },
+  });
+  if (!tenant) {
+    notFound();
+  }
+  if (portalDirectorySyncEnabled(readPreferences(tenant.preferences))) {
+    validation("Invitations are managed by the portal for this tenant.");
+  }
+}
+
 async function loadTenant(tenantId: string) {
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
   if (!tenant) {
@@ -102,7 +144,7 @@ export async function validatePortalDirectory(access: Access, tenantId: string) 
 
 export async function pullPortalDirectoryForTenant(access: Access, tenantId: string) {
   await requireTenantAdmin(access, tenantId);
-  return guard(() =>
+  return guard(
     transaction(async (tx) => {
       const tenant = await tx.tenant.findUnique({ where: { id: tenantId } });
       if (!tenant) {
@@ -203,7 +245,7 @@ export async function ingestPortalWebhook(input: {
     validation("Portal directory sync is not enabled.");
   }
   if (!verifySyncWebhookSignature(input.rawBody, input.signatureHeader, tenant.portalWebhookSecretEnc)) {
-    forbidden("Invalid webhook signature.");
+    forbidden();
   }
 
   let event;

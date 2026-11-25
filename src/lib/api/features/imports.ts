@@ -173,7 +173,7 @@ async function importRows(rows: unknown[], importRow: (row: Body) => Promise<Row
 }
 
 async function organizationByName(tx: Prisma.TransactionClient, tenantId: string, name: string) {
-  return tx.tenant.findFirst({
+  return tx.organization.findFirst({
     where: { tenantId, name: { equals: name, mode: "insensitive" } },
     select: { id: true },
   });
@@ -334,7 +334,7 @@ export async function importPeople(access: Access, tenantId: string, rows: unkno
         },
       });
       if (organization) {
-        await tx.tenantMembership.create({
+        await tx.organizationMembership.create({
           data: { userId: user.id, organizationId: organization.id, roleId: memberRoleId },
         });
       }
@@ -390,7 +390,7 @@ export async function importOrganizations(access: Access, tenantId: string, rows
         return { kind: "skip", name: key } as const;
       }
 
-      await tx.tenant.create({ data: { tenantId, name } });
+      await tx.organization.create({ data: { tenantId, name } });
       return { kind: "created", name: key } as const;
     });
     if (outcome.name) {

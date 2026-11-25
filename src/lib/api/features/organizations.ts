@@ -27,7 +27,7 @@ async function managed(access: Access, organizationId: string) {
 export async function listOrganizations(access: Access, tenantId: string, params: URLSearchParams) {
   const paging = page(params);
   await access.requireTenant(tenantId, false);
-  const organizations = await prisma.tenant.findMany({
+  const organizations = await prisma.organization.findMany({
     where: { tenantId },
     orderBy: { name: "asc" },
     skip: paging.offset,
@@ -40,7 +40,7 @@ export async function createOrganization(access: Access, tenantId: string, reque
   const { assertTenantGroupsMutable } = await import("@/lib/api/features/external-sync");
   await assertTenantGroupsMutable(tenantId);
   await access.requireTenant(tenantId, true);
-  return organizationJson(await guard(prisma.tenant.create({ data: { tenantId, name: request.name } })));
+  return organizationJson(await guard(prisma.organization.create({ data: { tenantId, name: request.name } })));
 }
 
 export async function getOrganization(access: Access, organizationId: string) {
@@ -52,7 +52,7 @@ export async function updateOrganization(access: Access, organizationId: string,
   const { assertTenantGroupsMutable } = await import("@/lib/api/features/external-sync");
   await assertTenantGroupsMutable(organization.tenantId);
   return organizationJson(
-    await guard(prisma.tenant.update({ where: { id: organizationId }, data: { name: request.name } })),
+    await guard(prisma.organization.update({ where: { id: organizationId }, data: { name: request.name } })),
   );
 }
 
@@ -67,5 +67,5 @@ export async function deleteOrganization(access: Access, organizationId: string)
     conflict("Delete the time entries first.");
   }
 
-  await guard(prisma.tenant.delete({ where: { id: organizationId } }));
+  await guard(prisma.organization.delete({ where: { id: organizationId } }));
 }
