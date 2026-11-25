@@ -18,7 +18,7 @@ export function SettingsNav() {
   const { isAdmin } = useWorkspace();
   const copy = useLabels();
   const items = [
-    { href: "/settings/organization", label: copy.tenant, icon: BuildingIcon, admin: true },
+    { href: "/settings/tenant", label: copy.tenant, icon: BuildingIcon, admin: true },
     { href: "/settings/organizations", label: copy.organizations, icon: NetworkIcon, admin: true },
     { href: "/settings/lists", label: `${copy.projects} & lists`, icon: ListTreeIcon },
     { href: "/settings/import", label: "Import", icon: UploadIcon, admin: true },

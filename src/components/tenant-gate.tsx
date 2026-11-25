@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { NoTenant } from "@/components/no-tenant";
 import { useWorkspace } from "@/hooks/use-workspace";
 
-const apexAllowedWithoutOrg = ["/profile", "/feedback", "/organization/new"];
+const apexAllowedWithoutOrg = ["/profile", "/feedback", "/tenant/new"];
 const tenantAllowedWithoutOrg = ["/profile"];
 
 export function TenantGate({ children }: { children: React.ReactNode }) {
